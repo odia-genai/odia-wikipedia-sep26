@@ -353,6 +353,8 @@ DROP_ROLES = {"note", "navigation", "presentation", "figure"}
 BLOCK = {"p", "div", "section", "ul", "ol", "dl", "li", "dd", "dt", "blockquote", "pre",
          "h1", "h2", "h3", "h4", "h5", "h6", "center", "body", "poem", "hr"}
 CONTROL = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+# U+0B64/U+0B65 are unassigned in the Odia block; some keyboards type them for the danda.
+RESERVED_DANDA = {0x0B64: "\u0964", 0x0B65: "\u0965"}
 INVISIBLE = re.compile("[\u00ad\u200b\u2060\ufeff]")  # soft hyphen, ZWSP, word joiner, BOM
 SPACES = re.compile("[ \t\r\n\u00a0\u2002\u2003\u2009\u202f]+")  # not ZWJ/ZWNJ: Odia uses them
 
@@ -496,9 +498,15 @@ class Writer:
             self.flush("li", 0, prefix)
 
 
+# "|" typed for the danda "।" (and "||" for "॥") after Odia text (or a closing quote/bracket
+# after it), before a space or line end.
+PIPE_DANDA = re.compile(r"(?<=[\u0B00-\u0B7F)\]\"'”’])(\s?)(\|\|?)(?=\s|$)", re.M)
+
+
 def clean_block(block):
     """Clean one block's text (not its prefix); "" drops it."""
     kind, level, prefix, text = block
+    text = PIPE_DANDA.sub(lambda m: m.group(1) + ("॥" if len(m.group(2)) == 2 else "।"), text)
     # Parentheses emptied by dropped pronunciation templates: "ବଙ୍ଗଳା ଭାଷା (), ..." "(; বাংলা)"
     text = re.sub(r" ?\([\s,;:]*\)", "", text)
     text = re.sub(r"\((?:\s*[,;:])+\s*", "(", text)
@@ -559,7 +567,7 @@ def html_to_text(doc):
         # Consecutive list items stay together; everything else is a paragraph of its own.
         sep = "\n" if kind == "li" and i and keep[i - 1][0] == "li" else "\n\n"
         out.append((sep if out else "") + text)
-    text = CONTROL.sub("", INVISIBLE.sub("", "".join(out)))
+    text = CONTROL.sub("", INVISIBLE.sub("", "".join(out))).translate(RESERVED_DANDA)
     return normalize_odia(text).strip(), info
 
 
@@ -731,7 +739,8 @@ A short example record:
    - list items that are only an external link or a book citation, under any heading
    - empty sections, and parentheses emptied by the removed pronunciations
 4. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
-   U+0B5F). Soft hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
+   U+0B5F). A `|` typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
+   hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
 5. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
