@@ -1315,8 +1315,10 @@ def annotations_section(stats):
                      side.with_suffix(".jsonl"))
         key = "para_sha1" if ".paragraphs." in table.name else "text_sha1"
         stale = f" Depends on the text: rows carry `{key}`." if meta.get("depends_on_text") else ""
+        joins = "".join(f" More columns, `{', '.join(j.get('columns', {}))}`, are read from `{j['path']}`"
+                        f" on `{j['on']}` (kept there once per key)." for j in meta.get("joins") or [])
         lines.append(f"- **`annotations/{table.name}`**: {meta.get('description', '').strip()}"
-                     f" Columns: {', '.join(f'`{c}`' for c in meta.get('columns', {}))}.{stale}")
+                     f" Columns: {', '.join(f'`{c}`' for c in meta.get('columns', {}))}.{joins}{stale}")
     reports = sorted((ROOT / "quality").glob("*.md"))
     body = "\n".join(lines) or "- none yet"
     reps = ", ".join(f"[`quality/{r.name}`](quality/{r.name})" for r in reports) or "none yet"
@@ -1390,7 +1392,8 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
-All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`.
+All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file under
+50 MB here is tracked in git; the corpus JSONL (larger) is rebuilt from them by `pipeline.py`.
 
 ## Record format
 

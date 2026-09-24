@@ -23,15 +23,38 @@ Files (JSON lines, JSON or Markdown only; the corpus and every output use ASCII 
   orwiki-20260901.jsonl       the corpus; paragraph i = text.split("\\n\\n")[i], 0 = the title (not scored)
   raw/bpb/scores.jsonl.gz     the store: one row per paragraph text ever scored (para_sha1, score_run,
                               bytes, tokens, pieces, bits), kept for good, so a text that leaves the
-                              corpus and comes back is never scored again
+                              corpus and comes back is never scored again. It is the only copy of
+                              those fields: never delete it.
+  annotations/bpb.jsonl       one row per article: bpb, and bytes, tokens and bits summed over its
+                              scored paragraphs, its extremes and its place in the review queue
+  annotations/bpb.paragraphs.jsonl
+                              one row per non-title paragraph: id, para, para_sha1, kind, bpb and the
+                              columns derived from them (percentile, flag, script shares, repeats, ...).
+                              Written without spaces after "," and ":", which keeps it under 50 MB.
   annotations/bpb.json        sidecar of bpb.jsonl; "runs" holds every scoring run's record (pod,
                               versions, checks), and a store row's score_run is a run's id; "unscored"
                               counts the paragraphs with no score and gives the pod command for them
+  annotations/bpb.paragraphs.json
+                              sidecar of bpb.paragraphs.jsonl; "joins" names the store's columns
+
+Sidecar joins (a general convention, not specific to bpb). A sidecar's "columns" describe the columns
+of its own file. Columns that belong to every row but are kept once in another file are declared there,
+not copied:
+
+    "joins": [{"path": "raw/bpb/scores.jsonl.gz", "on": "para_sha1", "description": "...",
+               "columns": {"score_run": "...", "bytes": "...", "tokens": "...", "bits": "...", "pieces": "..."}}]
+
+says that a row's score_run, bytes, tokens, bits and pieces are those of the row of
+raw/bpb/scores.jsonl.gz (path relative to the repository root) whose para_sha1
+equals the row's. The joined file has one row per key; a row with no match there has those columns
+null (here: a text not scored yet). edaapp joins them for display. In Python:
+
+    store = {r["para_sha1"]: r for r in read_jsonl("raw/bpb/scores.jsonl.gz")}
+    bits = store[row["para_sha1"]]["bits"]  # and bpb == bits / bytes
 
 A paragraph's score depends only on its own text (it is scored from BOS), so `build` looks every
 paragraph of the current corpus up in the store by para_sha1. If any text has no score, it stops and
-prints how many texts, bytes and tokens need a pod run; removals alone never need one. (If the store is
-ever lost, the current texts' scores are also in annotations/bpb.paragraphs.jsonl.) With
+prints how many texts, bytes and tokens need a pod run; removals alone never need one. With
 --allow-missing (pipeline.py passes it) it builds anyway and warns on stderr. Those paragraphs get
 bpb null and no percentile or flag; article bpb is over the scored paragraphs (`unscored_paragraphs`
 counts the rest); they never enter the review queue; and bpb.json ("unscored") and quality/bpb.md say
@@ -88,6 +111,8 @@ ROOT = Path(__file__).resolve().parent  # the repository root: every local outpu
 CORPUS = ROOT / "orwiki-20260901.jsonl"
 STORE = ROOT / "raw" / "bpb" / "scores.jsonl.gz"
 STORE_FIELDS = ["para_sha1", "score_run", "bytes", "tokens", "pieces", "bits"]
+# In bpb.paragraphs.jsonl these are not copied: its sidecar's "joins" points each row to its store row.
+STORE_JOINED = ["score_run", "bytes", "tokens", "bits", "pieces"]
 ANN = ROOT / "annotations"
 ODIA_DIGIT = re.compile("[\u0b66-\u0b6f]")  # the owner's rule: none in any output
 QUALITY = ROOT / "quality"
@@ -184,9 +209,11 @@ def read_jsonl(path):
         return [json.loads(line) for line in f if line.strip()]
 
 
-def jsonl(rows):
-    """JSON lines text, in the corpus's style: Odia as is, no NaN (a missing value is null)."""
-    return "".join(json.dumps(r, ensure_ascii=False, allow_nan=False) + "\n" for r in rows)
+def jsonl(rows, compact=False):
+    """JSON lines text, in the corpus's style: Odia as is, no NaN (a missing value is null). compact: no
+    space after "," and ":" (the same JSON, 9% smaller for bpb.paragraphs.jsonl)."""
+    sep = (",", ":") if compact else None
+    return "".join(json.dumps(r, ensure_ascii=False, allow_nan=False, separators=sep) + "\n" for r in rows)
 
 
 def write_jsonl(path, rows):
@@ -1024,13 +1051,20 @@ def read_json(path, default):
     return json.loads(Path(path).read_text(encoding="utf-8")) if Path(path).exists() else default
 
 
-def before_stats(ann):
-    """The build a run's scores are added to, for the report: size, bpb, review queue types."""
+def before_stats(ann, store):
+    """The build a run's scores are added to, for the report: size, bpb, review queue types. Its paragraphs'
+    bytes and bits are looked up in `store` (the store before the run is added), as the paragraph
+    sidecar's "joins" say; a paragraph file from before 2026-09-25 still has them in its rows."""
     import pandas as pd
 
     if not ((ann / "bpb.paragraphs.jsonl").exists() and (ann / "bpb.jsonl").exists()):
         return {}
-    op = pd.DataFrame(read_jsonl(ann / "bpb.paragraphs.jsonl"), columns=["id", "kind", "bytes", "bits"])
+    rows = read_jsonl(ann / "bpb.paragraphs.jsonl")
+    if rows and "bits" in rows[0]:
+        op = pd.DataFrame(rows, columns=["id", "kind", "bytes", "bits"])
+    else:
+        op = pd.DataFrame(rows, columns=["id", "kind", "para_sha1"])
+        op = op.join(store.set_index("para_sha1")[["bytes", "bits"]], on="para_sha1")
     op = op[op.bits.notna()]  # a paragraph that build --allow-missing left unscored
     oa = pd.DataFrame(read_jsonl(ann / "bpb.jsonl"), columns=["id", "review_type"])
     ot = op[op.kind == "text"]
@@ -1094,7 +1128,7 @@ def add_run(add, runs, store, ann):
         }
     note = (add / "note.txt").read_text(encoding="utf-8").strip() if (add / "note.txt").exists() else ""
     if r["mode"] == "only-missing":
-        rec["before"] = before_stats(ann)
+        rec["before"] = before_stats(ann, store)
     if r["mode"] == "only-missing" or note:
         rec["note"] = note
     fresh = new[~seen].assign(score_run=rid)[STORE_FIELDS]
@@ -1506,19 +1540,12 @@ def cmd_build(args):
     para_cols = {
         "id": "page id",
         "para": "paragraph index; 0 (the title heading) is not scored",
-        "para_sha1": "sha1 of the paragraph text (UTF-8); the score belongs to exactly this text",
-        "score_run": (
-            "the scoring run that scored this text (see 'runs' in bpb.json): 1 = the full run, later runs = "
-            "texts that were new after a corpus rebuild; a text found in several paragraphs of one run gets the mean"
-        ),
+        "para_sha1": "sha1 of the paragraph text (UTF-8); the score belongs to exactly this text, and it is the key "
+        "of the score store (see 'joins')",
         "kind": "heading / list / table / math / text, from the leading characters (edaapp's rule; its 'para' = text)",
-        "bpb": "bits per UTF-8 byte; paragraphs over 1,000 characters are scored in whitespace-split pieces, as "
-        "the eval harness does; null = the text has no score in the store yet (build --allow-missing; see "
-        "'unscored' in bpb.json)",
-        "bytes": "UTF-8 bytes scored (pieces are stripped, so this can be a few bytes under the raw paragraph)",
-        "tokens": "Sarvam-1 tokens scored (without BOS)",
-        "bits": "-sum(log2 p) over the tokens",
-        "pieces": "pieces the paragraph was split into (1 unless over 1,000 characters)",
+        "bpb": "bits per UTF-8 byte (bits / bytes of the store row, see 'joins'); paragraphs over 1,000 characters "
+        "are scored in whitespace-split pieces, as the eval harness does; null = the text has no score in the store "
+        "yet (build --allow-missing; see 'unscored' in bpb.json)",
         "bpb_group": (
             f"comparison group: kind x length band, pooled over the kind when under {MIN_GROUP} paragraphs; only "
             "text/list/math >= 100 B and tables >= 200 B are compared (headings never); null when not compared or "
@@ -1544,6 +1571,34 @@ def cmd_build(args):
             "low, null otherwise"
         ),
     }
+    # The store's columns are not copied into bpb.paragraphs.jsonl: its sidecar says where they are.
+    out_root = Path(args.out).resolve()  # the dataset root: join paths are relative to it
+    in_out = store_path.resolve().is_relative_to(out_root)
+    joins = [
+        {
+            "path": store_path.resolve().relative_to(out_root).as_posix() if in_out else f"raw/bpb/{store_path.name}",
+            "on": "para_sha1",
+            "description": (
+                "More columns of every row, kept once per paragraph text in the score store: they are those of the "
+                "store row whose para_sha1 equals this row's (the path is relative to the repository "
+                "root; the store has one row per para_sha1). A row with no store row is a text not "
+                "scored yet: bpb null here, these columns null too. Every text ever scored stays in the store, even "
+                "after it leaves the corpus."
+            ),
+            "columns": {
+                "score_run": (
+                    "the scoring run that scored this text (see 'runs' in bpb.json): 1 = the full run, later runs = "
+                    "texts that were new after a corpus rebuild; a text found in several paragraphs of one run gets "
+                    "the mean"
+                ),
+                "bytes": "UTF-8 bytes scored (pieces are stripped, so this can be a few bytes under the raw paragraph)",
+                "tokens": "Sarvam-1 tokens scored (without BOS)",
+                "bits": "-sum(log2 p) over the tokens; bpb = bits / bytes",
+                "pieces": "pieces the paragraph was split into (1 unless over 1,000 characters)",
+            },
+        }
+    ]
+    assert list(joins[0]["columns"]) == STORE_JOINED
     a = art.reset_index().assign(bpb_pct=lambda d: d.bpb_pct.round(5), extreme_share=lambda d: d.extreme_share.round(4))
     derived = lambda d: d.assign(  # noqa: E731
         bpb_group=d.group,
@@ -1557,7 +1612,8 @@ def cmd_build(args):
     )
     # unscored paragraphs (--allow-missing): the text-only columns, and null for bpb and everything derived from it
     u = u.assign(bpb=np.nan, group=None, pct=np.nan, z=np.nan, flag=None, near_copies=np.nan)
-    p = derived(pd.concat([s, u[[c for c in u.columns if c in s.columns]]]).sort_index())
+    keep = [c for c in s.columns if c in u.columns and c not in STORE_JOINED]
+    p = derived(pd.concat([s[keep], u[keep]]).sort_index() if len(u) else s)  # corpus order
     miss_rows = u.join(corpus.set_index("id").title, on="id")
 
     def sidecar(name, description, columns, **more):
@@ -1583,12 +1639,14 @@ def cmd_build(args):
             runs=runs,  # every scoring run so far: what `build` needs to run again without the pods' files
         )
         + "\n",
-        out_ann / "bpb.paragraphs.jsonl": jsonl(records(p, list(para_cols))),
+        out_ann / "bpb.paragraphs.jsonl": jsonl(records(p, list(para_cols)), compact=True),
         out_ann / "bpb.paragraphs.json": sidecar(
             "bpb.paragraphs",
             "Sarvam-1 bits per byte of every paragraph except the title (paragraph i = text.split('\\n\\n')[i]), "
-            "with its percentile within its kind and length band.",
+            "with its percentile within its kind and length band. Each row's bits, bytes, tokens, pieces and "
+            "scoring run are in the score store, joined on para_sha1 (see 'joins').",
             para_cols,
+            joins=joins,
         )
         + "\n",
         **write_reports(
@@ -1665,8 +1723,9 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         f"`{MODEL}` (revision `{run['revision'][:12]}`) by `score_bpb.py`"
         + (f", except {miss_short} not scored yet (see [Not scored yet](#not-scored-yet))" if n_miss else "")
         + ". Written by `score_bpb.py build`; the per-article and per-paragraph numbers are in "
-        "`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl`, and the review queue is in "
-        "`quality/review-first.md`.\n"
+        "`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl` (each paragraph's bits, bytes, tokens, "
+        "pieces and scoring run are in the score store `raw/bpb/scores.jsonl.gz`, joined on `para_sha1`), and the "
+        "review queue is in `quality/review-first.md`.\n"
     )
     w("## Summary\n")
     if n_miss:
@@ -2299,7 +2358,9 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     )
     w(
         "- `raw/bpb/scores.jsonl.gz`: the store, one row per paragraph text ever scored (`para_sha1`, "
-        "`score_run`, `bytes`, `tokens`, `pieces`, `bits`), kept when a text leaves the corpus."
+        "`score_run`, `bytes`, `tokens`, `pieces`, `bits`), kept when a text leaves the corpus. It is the only copy "
+        "of those fields: `bpb.paragraphs.jsonl` has each paragraph's `bpb`, and its sidecar's `joins` says that "
+        "the rest is in the store row with the same `para_sha1`."
     )
     w(
         "- Rerun: `uv run --script score_bpb.py build` (about 30 s, no GPU) rebuilds every "

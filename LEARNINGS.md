@@ -335,12 +335,32 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **Everything under 50 MB is now in git; history grows with every rebuild** (2026-09-25, owner's
+  rule). The first commit added 83 files; `.git` is 205 MB, mostly the 43 rendered-HTML chunks
+  (150 MB, already gzipped). The 96 MB corpus is left out and rebuilt by `pipeline.py`. Each
+  rebuild that changes the annotations (`bpb.paragraphs.jsonl` alone is 46.7 MB) adds new blobs.
+  Another session had 580 files staged, so the commit named its path
+  (`git commit -- data/odia-wikipedia`). — Commit data after a real change, not after every
+  build; limit the commit to its path in a shared checkout. — idea: gzip the big annotation
+  files, or keep them out of git and rebuild them too, if history size starts to matter.
+
+- **Dropping five duplicate columns wasn't enough for 50 MB** (2026-09-25). `bpb.paragraphs.jsonl`
+  went from 63.9 to 51.7 MB. The `", "` and `": "` separators were another 4.8 MB, and compact
+  separators gave 46.7 MB. — Measure the serialised size before promising a limit. — done;
+  idea: leaving out null keys would give about 39 MB if the corpus grows.
+- **The dropped columns are joined back from their source** (2026-09-25). A sidecar declares
+  `"joins": [{"path": "raw/bpb/scores.jsonl.gz", "on": "para_sha1", "columns": {…}}]`, and
+  edaapp joins them for any annotation. A missing or broken join file is a warning. — One copy
+  of each fact, with the reader doing the join. — done (edaapp 170 tests pass).
 - **A build that stops on a small gap blocks everything after it** (2026-09-25). The corpus
   changed three times in one task (26, then 179 unscored texts). — Prefer a flagged partial
   result. — done: `score_bpb.py build --allow-missing` (null `bpb`, `unscored_paragraphs`, a
   report section), used by the pipeline.
 - **Timestamps in outputs broke byte-identical rebuilds** (2026-09-25). The sidecars' `created`
   was the clock time. — Change a timestamp only when the content changes. — done.
+- **A rarely run path read the dropped columns** (2026-09-25). `before_stats`, used only after a
+  pod run, read bits and bytes from the paragraph file. — Search for readers as well as writers,
+  and exercise rare paths with a fake run. — done: it reads the store.
 
 - **Scores lived only in annotations and scratch dirs** (2026-09-25). A text that left the corpus
   lost its score, and run 1's raw pod output was lost with a scratch dir. — Keep every score

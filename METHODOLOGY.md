@@ -524,7 +524,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 
 ### Re-scoring
 
-**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. Plain `build` stops while any paragraph has no score. The pipeline runs `build --allow-missing` instead, which gives such paragraphs `bpb: null` (no percentile or flag, never in the review queue), counts them per article (`unscored_paragraphs`) and in `bpb.json` (`unscored`, with the pod command), and warns. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.json` keeps every run's record.
+**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. Plain `build` stops while any paragraph has no score. The pipeline runs `build --allow-missing` instead, which gives such paragraphs `bpb: null` (no percentile or flag, never in the review queue), counts them per article (`unscored_paragraphs`) and in `bpb.json` (`unscored`, with the pod command), and warns. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.paragraphs.jsonl` keeps only what isn't in the store (`bpb` and the derived columns); its sidecar declares a `joins` entry, and edaapp reads `score_run`, `bits`, `bytes`, `tokens` and `pieces` from the store by `para_sha1` (63.9 MB → 46.7 MB, under git's 50 MB rule). `annotations/bpb.json` keeps every run's record.
 
 **Effect.** After the cleanups, 143,357 of 144,751 paragraphs kept their scores.
 - 1,379 new texts (1,394 rows in 1,304 articles, 183,357 tokens) were scored on an RTX 4000 Ada, Secure, at $0.28/h: 25 s of GPU time and 5 minutes of pod time. The image was cached, so the pod was ready in 13 s.
@@ -560,6 +560,10 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-09-25: everything under 50 MB in git.**
+  - `bpb.paragraphs.jsonl` no longer repeats the score store; its bits, bytes, tokens, pieces and run are read from `raw/bpb/scores.jsonl.gz`.
+  - Every file under 50 MB in this folder is tracked in git (the corpus JSONL, 96 MB, is rebuilt by `pipeline.py`).
 
 - **2026-09-25: boilerplate pages out, every exclusion recorded, JSON-only outputs, one pipeline.**
   - Dropped 1,864 year pages, 260 date pages without events and 19 empty film-year lists, judged by sentence frames repeated in 5+ articles. 18,693 articles remain, 4,513,948 Odia words (−22,615).
