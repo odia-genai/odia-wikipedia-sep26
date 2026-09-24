@@ -42,10 +42,40 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 - **Render infoboxes as `key: value` lines?** (2026-09-24). Infoboxes hold dense facts
   (capital, population, dates), but the lead usually repeats the important ones, so they are
   dropped for now. Worth an ablation if knowledge QA is weak.
-- **Down-weight bot-made pages in the CPT mix** (2026-09-24). 1,495 pages are bot-created
-  (year pages, town stubs) and formulaic. They are flagged (`bot_created`), not dropped.
+- **Down-weight bot-made pages in the CPT mix** (2026-09-24; updated 2026-09-25). The 1,495
+  bot-created pages were all year pages and are now excluded. The formulaic stubs that remain
+  (village, town and film pages) carry `templated_share`: 1,007 articles are at 0.5 or more.
+  Use it in `cpt.py` as a down-weight or a repeat cap. The change is in `src/`.
+- **A per-source `--min-chars` in `cpt.py`** (2026-09-25). Its global `--min-chars 200` drops
+  498 clean one-line fact articles from this corpus (chemical elements, blocks, capitals). A
+  per-source threshold would keep them without admitting short web documents.
+- **Split frames inside paragraphs** (2026-09-25). `templated()` matches whole paragraphs, so
+  a template sentence followed by one free sentence counts as free. Sentence-level frames
+  (split on `।`) would measure `templated_share` more exactly.
+- **Move "2"'s number content to 2 (ସଂଖ୍ୟା)?** (2026-09-25). The year page "2" holds 126
+  words on the significance of the number 2, lost with the year pages. It is an upstream
+  (Wikipedia) fix, or a one-off keep.
 
 ## Data (Odia)
+
+- **Year pages were 9% of the articles and almost no content** (2026-09-25, owner's decision
+  to drop them).
+  - 1,864 year pages: 1,766 have no Odia word outside sentence frames repeated in 5 or more
+    articles, and together they have only 2,415 free words. `0 (ମସିହା)` needed the title rule
+    to accept a qualifier.
+  - The same frame test split the date pages: 260 of 364 are empty, and 104 list real events.
+    It also found 19 empty film-year lists.
+  - All 1,495 pages with the bot-created template were year pages, so `bot_created` is now
+    false throughout the corpus. It was never a good formulaic-text flag: the town stubs don't
+    carry it.
+  — Measure boilerplate by repeated frames (title and numbers masked), not by the bot
+  template. — done: `frame_key()`, `templated()`, `boilerplate_reason()` and
+  `templated_share` in `prepare.py`; `excluded.jsonl` lists every page with its reason.
+- **A 200-character floor would cost only clean facts** (2026-09-25). After the boilerplate
+  rules, 498 articles are under 200 characters: 7,856 words (0.17%). A sample showed
+  chemical elements, block and village one-liners and a national anthem's adoption date, all
+  clean. — A length floor is a proxy for boilerplate; once the boilerplate is out by rule, the
+  proxy only removes good data. — done: `--min-chars` defaults to 0 (off).
 
 - **Removing all English left skeletons; the fix was translate prose, keep data, drop
   citations** (2026-09-24, owner's decision).
@@ -289,6 +319,13 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   kept (it is real content), link lists dropped.
 
 ## Tooling and automation
+
+- **The topic precision samples shrink with the corpus** (2026-09-25). Dropping year and date
+  pages took the held-out check from 100 to 90 articles (86 of 87 tagged correct). — todo:
+  decide whether to report precision on the full labelled set.
+- **`sys.dont_write_bytecode` doesn't stop importlib's loader** (2026-09-25), which caches
+  bytecode before the module runs. — Run verification scripts with `PYTHONDONTWRITEBYTECODE=1`.
+  — done.
 
 - **Re-scoring after the translations: $0.03, and the translations read like native Odia**
   (2026-09-25).

@@ -1224,7 +1224,8 @@ def topics_report(rows, wd, n_fallback):
         f"{sum(words[r['id']] for r in odisha):,} words ({pct(sum(words[r['id']] for r in odisha), total_words)}).",
         f"- {sum(len(r['topics']) > 1 for r in rows):,} articles list more than one topic.",
         "",
-        health_note(rows) + "`calendar` is the bot-made year and date pages. `politics` includes "
+        health_note(rows) + "`calendar` is date pages with events, weekdays and observances (year pages are "
+        "excluded). `politics` includes "
         f"{sum(1 for r in rows if any('ବିଧାନ ସଭା' in c for c in r['categories']) and r['is_person']):,} "
         "biographies of Odisha assembly members.",
         "",

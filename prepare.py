@@ -1020,6 +1020,63 @@ def drop_paragraphs(paras, shas, keep_first):
     return kept, gone
 
 
+# Boilerplate pages: articles that say nothing beyond their title. A "frame" is a paragraph with
+# the article's own title and all numbers masked; a frame found in FRAME_ARTICLES or more articles
+# is a template sentence. An article's free words are its Odia words outside template sentences
+# and headings. (Measured 2026-09-25: 1,863 year pages, 260 of 364 date pages and 19 of 75 year
+# film lists had nothing else. Fact-bearing stubs, e.g. a village's block and district or a town's
+# census figures, stay: their templated_share lets training down-weight them.)
+FRAME_ARTICLES, FREE_WORDS = 5, 25
+MONTHS = "(?:ଜାନୁଆରୀ|ଫେବୃଆରୀ|ମାର୍ଚ୍ଚ|ଅପ୍ରେଲ|ମଇ|ଜୁନ|ଜୁଲାଇ|ଅଗଷ୍ଟ|ସେପ୍ଟେମ୍ବର|ଅକ୍ଟୋବର|ନଭେମ୍ବର|ଡିସେମ୍ବର)"
+YEAR_TITLE = re.compile(r"[0-9]+(?:\s*(?:ଖ୍ରୀଷ୍ଟପୂର୍ବ|ଖ୍ରୀ\.?\s*ପୂ\.?))?")
+DATE_TITLE = re.compile(rf"[0-9]{{1,2}}\s*{MONTHS}|{MONTHS}\s*[0-9]{{1,2}}")
+FILM_YEAR_TITLE = re.compile(r"[0-9]{4}ର ଓଡ଼ିଆ (?:କଥାଚିତ୍ର|ଚଳଚ୍ଚିତ୍ର|ସିନେମା)")
+
+
+def frame_key(paragraph, title):
+    for t in sorted({title, re.sub(r"\s*\([^)]*\)\s*$", "", title), title.split(",")[0].strip()},
+                    key=len, reverse=True):
+        if len(t) >= 2:
+            paragraph = paragraph.replace(t, "TITLE")
+    return re.sub(r"\d[\d.,]*", "N", paragraph)
+
+
+def body_paragraphs(text):
+    return [q for q in text.split("\n\n")[1:] if not q.startswith("#")]
+
+
+def templated(records):
+    """{id: (templated words, free words)} over the whole corpus."""
+    frames = collections.defaultdict(set)
+    keys = {}
+    for r in records:
+        keys[r["id"]] = [frame_key(q, r["title"]) for q in body_paragraphs(r["text"])]
+        for k in keys[r["id"]]:
+            frames[k].add(r["id"])
+    out = {}
+    for r in records:
+        tw = fw = 0
+        for q, k in zip(body_paragraphs(r["text"]), keys[r["id"]], strict=True):
+            n = len(odia_words(q))
+            if len(frames[k]) >= FRAME_ARTICLES:
+                tw += n
+            else:
+                fw += n
+        out[r["id"]] = (tw, fw)
+    return out
+
+
+def boilerplate_reason(title, free_words):
+    """Why a page is boilerplate (title shape + nothing beyond templates), or None."""
+    if YEAR_TITLE.fullmatch(title):
+        return "year page"
+    if DATE_TITLE.fullmatch(title) and free_words < FREE_WORDS:
+        return "date page without events"
+    if FILM_YEAR_TITLE.fullmatch(title) and free_words < FREE_WORDS:
+        return "empty list page"
+    return None
+
+
 GUTTED_WORDS, GUTTED_RATIO = 25, 20
 
 
@@ -1097,6 +1154,7 @@ def build(args):
             exclude(a, "duplicate text", f"same text as id {first['id']} ({first['title']})")
             continue
         seen[key] = a
+        title = a["title"].translate(ODIA_DIGITS)
         text = f"# {md_heading(a['title'])}\n\n{body}"
         if review := reviews.get(a["id"]):
             if review.get("verdict") == "drop":
@@ -1105,13 +1163,16 @@ def build(args):
                 continue
             review_counts["fix_pending"] += review.get("verdict") == "fix"
             text = apply_review(text, review, review_counts)
+        if args.min_chars and len(text) < args.min_chars:
+            exclude(a, f"under {args.min_chars} characters")
+            continue
         removed_blocks += blocks_of(a, info, True)
         english_totals["translated"] += info["translated"]
         english_totals["kept as is"] += info["english_kept"]
         records.append({
             "id": a["id"],
-            "title": a["title"],
-            "url": SITE + urllib.parse.quote(a["title"].replace(" ", "_")),
+            "title": title,
+            "url": SITE + urllib.parse.quote(a["title"].replace(" ", "_")),  # the page's real name
             "revid": a["revid"],
             "timestamp": a["timestamp"],
             "text": text,
@@ -1123,6 +1184,21 @@ def build(args):
             "bot_created": a["bot_created"],
             "stub": a["stub"],
         })
+
+    # Boilerplate pages, judged over the whole corpus (a template sentence is one found in many
+    # articles), and the templated share of every article that stays.
+    tmpl = templated(records)
+    kept = []
+    for r in records:
+        tw, fw = tmpl[r["id"]]
+        if reason := boilerplate_reason(r["title"], fw):
+            exclude(arts[r["id"]], reason, f"{fw} Odia words outside template sentences")
+            continue
+        r["templated_share"] = round(tw / (tw + fw), 3) if tw + fw else 0.0
+        kept.append(r)
+    records = sorted(kept, key=lambda r: r["id"])
+    kept_ids = {r["id"] for r in records}
+    removed_blocks = [b for b in removed_blocks if b["id"] in kept_ids or not b["article_kept"]]
 
     stem = corpus_stem(date)
     jl = ROOT / f"{stem}.jsonl"
@@ -1140,6 +1216,7 @@ def build(args):
         "utf8_bytes": sum(len(r["text"].encode()) for r in records),
         "bot_created": sum(r["bot_created"] for r in records),
         "stub": sum(r["stub"] for r in records),
+        "templated_share_over_half": sum(r["templated_share"] > 0.5 for r in records),
         "odia_digits_converted": DIGITS_CONVERTED[0],
         "english": {"translated": english_totals["translated"], "kept as is": english_totals["kept as is"],
                     "removed_blocks": dict(collections.Counter(b["reason"] for b in removed_blocks))},
@@ -1153,7 +1230,7 @@ def build(args):
         "articles_with_escapes": sum(bool(MD_ESCAPE.search(r["text"])) for r in records),
         "reviews": {"file": shown_path(args.reviews) if reviews else None, "articles_reviewed": len(reviews),
                     **review_counts},
-        "min_words": args.min_words,
+        "min_words": args.min_words, "min_chars": args.min_chars,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
         "dropped_titles": excluded,
     }
@@ -1268,8 +1345,9 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `odia_ratio` | share of non-space characters in the Odia block (`odia_text.odia_ratio`) |
 | `tables` | data tables in `text`, as Markdown tables |
 | `translated_paragraphs` | paragraphs and headings machine-translated from English (0 = all native Odia) |
-| `bot_created` | the page carries `{{{{ବଟ୍ ତିଆରି}}}}`: made by a bot (year pages, town stubs), formulaic text |
+| `bot_created` | the page carries `{{{{ବଟ୍ ତିଆରି}}}}`, made by a bot (in 2026-09 only year pages, all excluded) |
 | `stub` | the page carries a stub template (`{{{{ମୁଣ୍ଡିଆ}}}}`, `{{{{ଅଧାଗଢ଼ା}}}}`) |
+| `templated_share` | share of the article's Odia words in template sentences (found in 5+ articles); high = formulaic |
 
 `text` is GitHub-flavoured Markdown: `# title`, the lead, `##`/`###` section headings,
 paragraphs separated by a blank line, `- ` / `1. ` lists (sublists indented to their parent's
@@ -1333,13 +1411,15 @@ A short example record:
    its context: {', '.join(f"{k[5:]} ({v:,})" for k, v in stats['cleanup_fixes'].items() if k.startswith('typo'))}.
 5. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
    U+0B5F). **Odia digits become ASCII** (`୧୯୪୭` → `1947`; {stats['odia_digits_converted']:,} digits), in
-   text, headings, tables and math, so numbers look the same everywhere (titles keep the page name). A `|`
-   typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
+   text, headings, tables and math, so numbers look the same everywhere, titles included (`url` keeps the page's
+   real name). A `|` typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
    hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
 6. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
-   `{stem}-build.json`. Stubs are kept and flagged, not dropped.
+   `{stem}-build.json`. Boilerplate pages (year pages, date pages without events,
+   empty film-year lists) say nothing beyond their title. Fact-bearing stubs stay, with
+   `templated_share` for down-weighting.
 
 | Reason | Pages |
 |---|---:|
@@ -1348,8 +1428,9 @@ A short example record:
 ## Size
 
 The median article has {q(0.5):,} Odia words (10th percentile {q(0.1):,}, 90th {q(0.9):,}).
-{len(bot):,} articles ({sum(r['words'] for r in bot):,} words) are bot-created and formulaic;
-{stats['stub']:,} are marked as stubs.
+{stats['templated_share_over_half']:,} articles have more than half of their words in template
+sentences (`templated_share` > 0.5: bot-made villages, towns and film pages),
+{f"{len(bot):,} carry the bot-created template, " if bot else ""}and {stats['stub']:,} are marked as stubs.
 {stats['odia_ratio_below_0.6']:,} articles
 ({stats['odia_ratio_below_0.6_words']:,} Odia words) have `odia_ratio` under 0.6, mostly from English
 bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-trainer's
@@ -1365,7 +1446,7 @@ bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-t
 ```python
 import json
 docs = [r["text"] for r in map(json.loads, open("{stem}.jsonl", encoding="utf-8"))
-        if r["words"] >= 50 and not r["bot_created"]]  # e.g. without tiny and bot-made pages
+        if r["templated_share"] < 0.8]  # e.g. down-weight or skip formulaic stubs
 ```
 
 - In odia-llm-trainer, `odia-build-cpt --local {stem}.jsonl --local-upsample 1` adds all of it
@@ -1387,7 +1468,7 @@ whose history lists the authors.
 ```bash
 uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD
 ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~2 h, resumable
-uv run prepare.py build      # about a minute; --markdown
+uv run prepare.py build      # about a minute; --min-chars N, --markdown
 uv run check.py              # exit 1 if any check fails
 ```
 
@@ -1407,6 +1488,8 @@ def main():
     ap.add_argument("--workers", type=int, default=6, help="parallel HTTP requests (render)")
     ap.add_argument("--limit-chunks", type=int, help="render at most this many chunks")
     ap.add_argument("--markdown", action="store_true", help="build: also write markdown/<title>.md files")
+    ap.add_argument("--min-chars", type=int, default=0,
+                    help="build: drop articles shorter than this many characters (0: off; see METHODOLOGY.md)")
     ap.add_argument("--min-words", type=int, default=5,
                     help="drop articles with fewer Odia words than this after cleaning")
     ap.add_argument("--partial", action="store_true", help="build from the chunks rendered so far")

@@ -14,7 +14,7 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 | Sarvam-1 tokens | 12.82M, without the BOS token of each scored paragraph (150.0 per kB of scored text) |
 | Paragraphs | 162,052, of which 143,357 are not the title |
 | Data tables | 2,962 in 1,727 articles, 168,947 Odia words |
-| Pages left out | 137 under 5 Odia words, 112 disambiguation, 7 exact duplicates, the main page |
+| Pages left out | 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 7 exact duplicates, the main page |
 | English inside articles | 899 paragraphs and headings translated into Odia (in 368 articles), 5,754 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
 
@@ -225,13 +225,41 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 
 | Reason | Pages | Rule | Examples |
 |---|---:|---|---|
+| year page | 1,864 | the title is a year (`1937`, `621`, `2`; `YEAR_TITLE`, which also accepts a BCE suffix) | 1,766 have no word outside template sentences |
+| date page without events | 260 | the title is a day of the year (`11 ଅପ୍ରେଲ`; `DATE_TITLE`) and it has under 25 Odia words outside template sentences | 7 ଅକ୍ଟୋବର, 14 ଡିସେମ୍ବର: all 0 |
 | under 5 Odia words | 137 | fewer than 5 runs of Odia letters in the body after cleaning (`--min-words`) | one-line stubs: ଛତିଶଗଡ଼ ("ଛତିଶଗଡ଼, ଭାରତର ଏକ ରାଜ୍ୟ ।"), ତ୍ରିପୁରା, ଲାକ୍ଷାଦ୍ୱୀପ |
 | disambiguation | 112 | Parsoid's `mw:PageProp/disambiguation` | ଓଡ଼ିଆ, ବୌଦ୍ଧ, ସମାଜ, ସମୟ |
+| empty list page | 19 | a film-year list (`1951ର ଓଡ଼ିଆ କଥାଚିତ୍ର`; `FILM_YEAR_TITLE`) with under 25 Odia words outside template sentences | the 1949, 1951 and 1991 lists: headings with no films |
 | exact duplicate | 7 | the same body text as an earlier article (sha1) | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
 | mostly English | 2 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ, whose English is all citations |
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
 
-Every left-out title and its reason is in `orwiki-20260901-build.json`. Stubs (1,910) and bot-created pages (1,495) are kept and flagged (`stub`, `bot_created`), not dropped. Articles whose `odia_ratio` is under 0.6 (332, 56,627 Odia words) are kept; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
+Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (332, 56,627 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
+
+### Boilerplate pages
+
+**Rule.** A sentence frame is a paragraph with the article's title replaced by `TITLE` and every number by `N` (`frame_key()`). A frame found in 5 or more articles is a template sentence (`templated()`, over the whole corpus after all other filters). Then (`boilerplate_reason()`):
+
+- every **year page** is dropped
+- a **date page** or an **Odia film-year list** is dropped when it has under 25 Odia words outside template sentences, and kept when it has more (104 date pages with lists of events, births and deaths stay; so do 56 film-year lists with films)
+
+Every article that stays gets `templated_share`: the share of its Odia words (outside headings) in template sentences.
+
+**Why.** The owner's decision (2026-09-25): year pages carry almost nothing beyond their title, and the same sentences repeat on every one. In the 2026-09-01 dump, 1,766 of the 1,864 year pages have no word outside the frame `N (…) ଗ୍ରେଗୋରି ପାଞ୍ଜି ଅନୁସାରେ … ଏକ ସାଧାରଣ ବର୍ଷ …`, and 1,855 have under 25. Together they have 2,415 free words, about 0.05% of the corpus. The nine with more are 2014 (81 words: events and the deaths of Odia writers), 1937 (48: births of Odia poets), a few 1930s–40s years with birth lists, and "2", whose 126 words are really about the number (they belong on 2 (ସଂଖ୍ୟା)). They are dropped with the rest, as decided. Date pages were split because 104 of 364 do list events. All 1,495 pages carrying the bot-created template `{{ବଟ୍ ତିଆରି}}` turned out to be year pages, so no article in the corpus is `bot_created` any more.
+
+**What was not dropped.** Bot-made village, town and film stubs also repeat frames (`<name> ଏକ ଭାରତୀୟ ପୌରପାଳିକା ଅଟେ । ଏହା <state>ର <district> ଜିଲ୍ଲାରେ ଅବସ୍ଥିତ ।`), but each states facts about one place: its kind, state and district. They stay, and `templated_share` lets a training mix down-weight them. 1,007 articles (74,556 Odia words) have `templated_share` of 0.5 or more; 187 are entirely template sentences (11,639 words). Over the corpus, about 1.8% of Odia words are in template sentences.
+
+### Short articles (`--min-chars`)
+
+**Rule.** Off by default (`--min-chars 0`). `build --min-chars N` drops articles whose text, title included, is under N characters, with the reason `under N characters`.
+
+**Why off.** At 200 characters the rule would drop 507 articles (8,010 Odia words, 0.18% of the corpus) that pass every other filter. They are short but clean one- or two-sentence facts, for example:
+
+- ଆକ୍ଟିନିଅମ ହେଉଛି ଏକ ରାସାୟନିକ ମୌଳିକ ଯାହାର ପ୍ରତୀକ Ac ଓ ପରମାଣୁ କ୍ରମାଙ୍କ 89 । (a chemical element)
+- ବେଗୁନିଆ ଓଡ଼ିଶାର ଖୋର୍ଦ୍ଧା ଜିଲ୍ଲାର ଏକ ପଞ୍ଚାୟତ ସମିତି ଅଟେ । … ହାରାହାରି 35 କି.ମି ଦୂରତାରେ ଅବସ୍ଥିତ । (a block and its distance from Bhubaneswar)
+- କିରଗିଜସ୍ତାନର ଜାତୀୟ ସଙ୍ଗୀତ 18 ଡିସେମ୍ବର 1992ରେ ଗ୍ରହଣ କରାଯାଇଥିଲା । (a date)
+
+The boilerplate the rule was meant to catch is already out by the rules above. Note that `odia-build-cpt` applies its own `--min-chars 200` (default) to every source, so it drops these 507 articles anyway. Its option is global: keeping them there without also admitting short web documents needs a per-source threshold in `cpt.py`.
 
 ## Annotations
 
@@ -267,7 +295,7 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 
 | Sample | Correct |
 |---|---:|
-| random 100, held out (labelled after the rules were frozen) | 96 of 97 tagged (99.0%; 95 of 97 at first scoring) |
+| random 100, held out (labelled after the rules were frozen) | 96 of 97 tagged (99.0%; 95 of 97 at first scoring); 86 of 87 among the 90 still in the corpus |
 | random 120 used to tune the rules | 118 of 118 (optimistic) |
 | stratified, 8 per small topic | 65 of 72 (90.3%): science 5/8, society 5/8, education 7/8 |
 
@@ -503,7 +531,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 
 ## Known limitations and open issues
 
-- **Boilerplate.** 6.8% of paragraphs repeat, with names and numbers masked, in 5 or more articles (year-page sentences, coordinates, census sentences, the Hindi-official-language sentence); `bot_created` covers only about a fifth of them. A per-article templated share and a repeat cap for the training mix are still to do.
+- **Boilerplate.** Year pages, empty date pages and empty film-year lists are out (2,143 pages). What stays is fact-bearing stubs with repeated frames: 1,007 articles have `templated_share` ≥ 0.5, and about 1.8% of the corpus's Odia words are in template sentences. The training mix does not yet use `templated_share` (a down-weight or a repeat cap is still to do). Frames are matched on whole paragraphs, so a template sentence inside a longer paragraph is not counted.
 - **Paragraph granularity.** A list is one paragraph, so a paragraph drop removes the whole list block.
 - **Translations are LLM output.** They passed automatic checks and a sample review, not a full human review. They are marked per article (`translated_paragraphs`) and listed with their sources in `translations/english-to-odia.jsonl`.
 - **English lists and tables stay.** 5,754 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
@@ -518,6 +546,11 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-09-25: boilerplate pages out.**
+  - Dropped 1,864 year pages, 260 date pages without events and 19 empty film-year lists, judged by sentence frames repeated in 5+ articles. 18,693 articles remain, 4,513,948 Odia words (−22,615).
+  - New field `templated_share` on every article.
+  - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
 
 - **2026-09-25: re-scoring run 3 and follow-ups.**
   - 2,445 new texts scored ($0.03); translations score like native Odia.
@@ -563,4 +596,4 @@ Every step that changes the Wikipedia data, or adds knowledge about its quality,
 3. Update the Summary numbers if they changed, and the [Known limitations](#known-limitations-and-open-issues) if an issue was fixed or found.
 4. Record what the step taught us in `LEARNINGS.md`.
 
-Coming next: scoring the corpus with the project's own model.
+Coming next: scoring the corpus with the project's own model, and using `templated_share` (a down-weight or a repeat cap) in the training mix.
