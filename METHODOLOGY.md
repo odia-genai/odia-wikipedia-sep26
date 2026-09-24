@@ -83,6 +83,13 @@ Many of these are Lua modules, which only MediaWiki can run. So `prepare.py rend
 - ବାହ୍ୟ / ବାହାର / ବାହର / ଅନ୍ୟାନ୍ୟ followed by ଲିଙ୍କ, ଲିଂକ, ଆଧାର, ସଂଯୋଗ, ଯୋଗସୂତ୍ର, ସ୍ରୋତ, ତଥ୍ୟ or ଉତ୍ସ
 - a bare ଲିଙ୍କ / ଲିଂକ
 - ପଠନ ତାଲିକା
+- since 2026-09-25:
+  - "see also" as **ପୁନଶ୍ଚ ଦେଖଣା** (227 articles) and its misspellings (ପୁନଶ ଦେଖଣା, ପୁନଶ୍ଚ ଦେଖାଣ, …), ଏହାକୁ ବି ଦେଖ, ଏହା ମଧ୍ୟ ଦେଖ, ଦେଖନ୍ତୁ ମଧ୍ୟ, ଆହୁରି ଦେଖନ୍, ଅଧିକ ଜାଣନ୍ତୁ
+  - further reading as ଅଧିକ / ଆହୁରି / ଆଗକୁ + ପଢ଼… (ଅଧିକ ପଢ଼ିବେ, ଆହୁରି ପଢ଼ିପାରିବେ, ଆଗକୁ ପଢ଼ିବା)
+  - references as ସହାୟକ ଗ୍ରନ୍ଥ, ସନ୍ଦର୍ଭ, ବାହ୍ୟ ସନ୍ଦର୍ଭ, ପୁସ୍ତକ ଆଧାର, ବହି ଆଧାର, ଅନ୍ୟ ଆଧାର, ଆଧାର ନୋଟ
+  - misspelled external links: ଅନ୍ୟନ୍ୟ ଲିଂକ୍, ବହର ଲିଙ୍କ, ବାହାଡ ଲିଙ୍କ
+
+  Found by reviewing the paragraphs with no Odia letter. Before adding them, everything under these headings was measured: 276 articles, but only 246 Odia words; the rest was English page names and book references.
 
 Content headings that share a word stay, e.g. ଉତ୍ସବ ("festival"), ଖାଦ୍ୟ ଉତ୍ସ ("food sources") and ଆର୍କିମିଡିସଙ୍କ ସୂତ୍ର ("Archimedes' principle"). Found on 2026-09-24 by scanning the remaining headings for reference words.
 
@@ -243,7 +250,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 | disambiguation | 112 | Parsoid's `mw:PageProp/disambiguation` | ଓଡ଼ିଆ, ବୌଦ୍ଧ, ସମାଜ, ସମୟ |
 | empty list page | 19 | a film-year list (`1951ର ଓଡ଼ିଆ କଥାଚିତ୍ର`; `FILM_YEAR_TITLE`) with under 25 Odia words outside template sentences | the 1949, 1951 and 1991 lists: headings with no films |
 | exact duplicate | 7 | the same body text as an earlier article (sha1); `detail` names the kept one | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
-| mostly English | 2 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ, whose English is all citations |
+| mostly English | 0 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ until 2026-09-25, when their English bibliographies went with the new reference-section rules |
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
 | reviewer: drop | 0 | an edaapp review decision | |
 
@@ -561,7 +568,9 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
-- **2026-09-25: everything under 50 MB in git.**
+- **2026-09-25: more reference sections, everything under 50 MB in git.**
+  - "See also", further-reading and reference headings the rules missed are now dropped, the main one being ପୁନଶ୍ଚ ଦେଖଣା (276 articles, 246 Odia words).
+  - 18,695 articles (+2: the two "mostly English" pages lost their English bibliographies), 4,512,644 Odia words.
   - `bpb.paragraphs.jsonl` no longer repeats the score store; its bits, bytes, tokens, pieces and run are read from `raw/bpb/scores.jsonl.gz`.
   - Every file under 50 MB in this folder is tracked in git (the corpus JSONL, 96 MB, is rebuilt by `pipeline.py`).
 
