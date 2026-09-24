@@ -7,8 +7,9 @@
 
 Steps:
 
-  score     (pod, GPU)  every non-title paragraph -> <work>/scores.jsonl and run.json, checkpointed
-                        per shard
+  score     (pod, GPU)  paragraph texts -> <work>/scores.jsonl and run.json, checkpointed per shard;
+                        with --only-missing <file>: only the texts whose para_sha1 is not in <file>
+                        (plus --recheck N random ones that are), one row per text
   sanity    (pod, GPU)  shuffle control, determinism, batch invariance, parity with
                         odia-llm-trainer's eval harness -> <work>/sanity.json
   precision (pod, GPU)  bf16 paragraph bpb against an fp32 reference -> <work>/precision.json
@@ -16,9 +17,11 @@ Steps:
                         (+ .json sidecars), quality/bpb.md, quality/review-first.md; joins
                         annotations/translation.jsonl and topics.jsonl when they exist
 
-On a pod (torch and transformers installed there): `score`, then `sanity` and `precision` (--harness-src:
-a copy of odia-llm-trainer's src/). Pull <work> with a pod.json (pod_id, gpu, cloud, datacenter,
-price_per_hr, image, created, terminated, hours, cost) and run `build --work <dir>` on the laptop.
+On a pod (torch and transformers installed there): `score`, and for a full run `sanity` and `precision`
+(--harness-src: a copy of odia-llm-trainer's src/). Pull <work> with a pod.json and add it with
+`build --add <dir>`. A paragraph's score depends only on its own text, so after a corpus rebuild `build`
+carries every score over by para_sha1 from annotations/bpb.paragraphs.jsonl, and only new texts need a
+pod run (`score --only-missing <a copy of that file>`); `build` stops while any paragraph has no score.
 
 Method (matches odia-llm-trainer's src/odia_llm/evaluation/harness.py, so numbers are comparable with E03/E06):
 - paragraph i of an article = text.split("\\n\\n")[i]; i = 0 is the `# title` heading, not scored
@@ -43,6 +46,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # the repository root: every local output goes here
 CORPUS = ROOT / "orwiki-20260901.jsonl"
+STORE_FIELDS = ["para_sha1", "score_run", "bytes", "tokens", "pieces", "bits"]
 ANN = ROOT / "annotations"
 QUALITY = ROOT / "quality"
 MODEL = "sarvamai/sarvam-1"
@@ -270,6 +274,31 @@ def gpu_info():
 # ----------------------------------------------------------------------------- score
 
 
+def missing_texts(corpus, store, recheck=200):
+    """[(para_sha1, purpose, text)]: every distinct paragraph text of `corpus` whose para_sha1 is not in
+    `store` (JSON lines with a para_sha1 field, e.g. a copy of annotations/bpb.paragraphs.jsonl: "missing"), then
+    `recheck` random texts that are ("recheck").
+
+    A paragraph's bpb depends only on its own text (it is scored from BOS), so a score can be carried
+    over to any paragraph with the same text. The recheck texts measure how well new scores agree with
+    carried-over ones.
+    """
+    have = {r["para_sha1"] for r in read_jsonl(store)}
+    seen, todo, carried = set(), [], []
+    for _pid, _i, b in load_paragraphs(corpus):
+        h = sha1(b)
+        if h not in seen:
+            seen.add(h)
+            (carried if h in have else todo).append((h, b))
+    again = random.Random(20260924).sample(carried, min(recheck, len(carried)))
+    print(
+        f"{len(seen):,} distinct paragraph texts: {len(carried):,} already scored, {len(todo):,} to score, "
+        f"{len(again)} rechecked",
+        flush=True,
+    )
+    return [(h, "missing", b) for h, b in todo] + [(h, "recheck", b) for h, b in again]
+
+
 def cmd_score(args):
     import numpy as np
 
@@ -277,7 +306,11 @@ def cmd_score(args):
     shards = work / "shards"
     shards.mkdir(parents=True, exist_ok=True)
     t_start = time.time()
-    paras = load_paragraphs(args.corpus)
+    missing = bool(args.only_missing)
+    if missing:
+        paras = missing_texts(args.corpus, args.only_missing, args.recheck)
+    else:
+        paras = load_paragraphs(args.corpus)
     if args.limit:
         paras = paras[: args.limit]
     piece_para, pieces = [], []
@@ -310,6 +343,7 @@ def cmd_score(args):
         bounds.append((lo, len(order)))
     manifest = {
         "corpus_sha1": file_sha1(args.corpus),
+        "mode": "only-missing" if missing else "all",
         "revision": args.revision,
         "limit": args.limit,
         "pieces": len(pieces),
@@ -367,11 +401,12 @@ def cmd_score(args):
         ntoks[k] += enc[j][2]
         npieces[k] += 1
         trunc[k] += enc[j][2] > enc[j][1]
+    # One row per paragraph (a full run: keyed by id and para) or per text (--only-missing).
     rows = [
         {
-            "id": p[0],
-            "para": p[1],
-            "para_sha1": sha1(p[2]),
+            **(
+                {"para_sha1": p[0], "purpose": p[1]} if missing else {"id": p[0], "para": p[1], "para_sha1": sha1(p[2])}
+            ),
             "kind": para_kind(p[2]),
             "chars": len(p[2]),
             "bytes": int(nbytes[k]),
@@ -390,6 +425,7 @@ def cmd_score(args):
         **gpu_info(),
         "corpus": Path(args.corpus).name,
         "corpus_sha1": manifest["corpus_sha1"],
+        "mode": manifest["mode"],
         "paragraphs": n,
         "pieces": len(pieces),
         "tokens_with_bos": total_tokens,
@@ -405,6 +441,19 @@ def cmd_score(args):
         "budget_tokens_per_batch": args.budget,
         "finished": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
+    if missing:
+        new = np.array([p[1] == "missing" for p in paras])
+        run.update(
+            {
+                "have": Path(args.only_missing).name,
+                "have_sha1": file_sha1(args.only_missing),
+                "texts_missing": int(new.sum()),
+                "texts_rechecked": int((~new).sum()),
+                "bytes_missing": int(nbytes[new].sum()),
+                "tokens_missing": int(ntoks[new].sum()),
+                "bpb_missing": float(bits[new].sum() / max(nbytes[new].sum(), 1)),
+            }
+        )
     write_atomic(work / "run.json", json.dumps(run, indent=2))
     print(json.dumps(run, indent=2), flush=True)
 
@@ -422,11 +471,13 @@ def shuffle_words(text, rng):
 
 
 def main_run(work):
-    """(bits, bytes) of a paragraph (id, para, block) as `score` wrote it to <work>/scores.jsonl, or None."""
+    """(bits, bytes) of a paragraph (id, para, block) as `score` wrote it to <work>/scores.jsonl, or None:
+    a full run is looked up by (id, para), an --only-missing run by the text's sha1."""
     path = Path(work) / "scores.jsonl"
     rows = read_jsonl(path) if path.exists() else []
     by_pos = {(r["id"], r["para"]): (r["bits"], r["bytes"]) for r in rows if "id" in r}
-    return lambda pid, i, b: by_pos.get((pid, i))
+    by_text = {r["para_sha1"]: (r["bits"], r["bytes"]) for r in rows if "id" not in r}
+    return lambda pid, i, b: by_pos.get((pid, i)) or by_text.get(sha1(b))
 
 
 def cmd_sanity(args):
@@ -657,6 +708,14 @@ def main():
     s.add_argument("--budget", type=int, default=32768, help="tokens per batch (rows x width)")
     s.add_argument("--shard-tokens", type=int, default=500_000, help="tokens per checkpoint shard")
     s.add_argument("--limit", type=int, default=None, help="first N paragraphs only (smoke test)")
+    s.add_argument(
+        "--only-missing",
+        metavar="SCORED",
+        default=None,
+        help="score only the paragraph texts whose para_sha1 is not in this JSON lines file (a copy of "
+        "annotations/bpb.paragraphs.jsonl); output is one row per text",
+    )
+    s.add_argument("--recheck", type=int, default=200, help="with --only-missing: also re-score N scored texts")
     s = sub.add_parser("sanity")
     s.add_argument("--corpus", default=str(CORPUS))
     s.add_argument("--work", required=True)
@@ -670,11 +729,21 @@ def main():
     s = sub.add_parser("build")
     s.add_argument("--corpus", default=str(CORPUS))
     s.add_argument(
-        "--work",
-        required=True,
-        help="the pod's `score` run: scores.jsonl and run.json, and any pod.json, sanity.json, precision.json",
+        "--add",
+        action="append",
+        default=None,
+        metavar="DIR",
+        help="add a `score` run from a pod: DIR holds its scores.jsonl and run.json, and optionally pod.json, "
+        "sanity.json, precision.json and note.txt (a line for the report). Repeatable; a run already added is "
+        "skipped",
+    )
+    s.add_argument(
+        "--out",
+        default=str(ROOT),
+        help="where annotations/ (whose bpb.json holds the run records) and quality/ are (default: this directory)",
     )
     s.add_argument("--partial", action="store_true", help="smoke test: scores cover only some articles")
+    s.add_argument("--context-dir", default=str(ANN), help="where translation.jsonl / topics.jsonl are read from")
     args = ap.parse_args()
     {"score": cmd_score, "sanity": cmd_sanity, "precision": cmd_precision, "build": lambda a: cmd_build(a)}[args.step](
         args
@@ -896,17 +965,100 @@ def read_json(path, default):
     return json.loads(Path(path).read_text(encoding="utf-8")) if Path(path).exists() else default
 
 
+def before_stats(ann):
+    """The build a run's scores are added to, for the report: size, bpb, review queue types."""
+    import pandas as pd
+
+    if not ((ann / "bpb.paragraphs.jsonl").exists() and (ann / "bpb.jsonl").exists()):
+        return {}
+    op = pd.DataFrame(read_jsonl(ann / "bpb.paragraphs.jsonl"), columns=["id", "kind", "bytes", "bits"])
+    oa = pd.DataFrame(read_jsonl(ann / "bpb.jsonl"), columns=["id", "review_type"])
+    ot = op[op.kind == "text"]
+    return {
+        "articles": int(op.id.nunique()),
+        "paragraphs": len(op),
+        "bytes": int(op.bytes.sum()),
+        "bpb": float(op.bits.sum() / op.bytes.sum()),
+        "bpb_text": float(ot.bits.sum() / ot.bytes.sum()),
+        "queue_types": {k: int(v) for k, v in oa.review_type.value_counts().items()},
+    }
+
+
+def add_run(add, runs, store, ann):
+    """Add the `score` run in directory `add` (scores.jsonl, run.json, optional pod.json, sanity.json,
+    precision.json, note.txt): its texts that the store lacks go in with a new run id, the texts it
+    already has are compared with their stored scores, and the run's record joins `runs`."""
+    import pandas as pd
+
+    add = Path(add)
+    r = json.loads((add / "run.json").read_text())
+    if any(x["scoring"].get("finished") == r["finished"] for x in runs):
+        print(f"{add}: already added, skipped")
+        return runs, store
+    rid = max((x["id"] for x in runs), default=0) + 1
+    new = one_per_text(pd.DataFrame(read_jsonl(add / "scores.jsonl")))
+    old = store.set_index("para_sha1").bits
+    seen = new.para_sha1.isin(old.index)
+    rec = {"id": rid, "mode": r["mode"], "scoring": r, "pod": read_json(add / "pod.json", {})}
+    sanity = read_json(add / "sanity.json", {})
+    if (add / "precision.json").exists():
+        sanity["precision"] = read_json(add / "precision.json", {})
+    if sanity:
+        rec["sanity"] = sanity
+    if seen.any():  # the --recheck texts: how well new scores agree with stored ones
+        chk = new[seen].assign(old_bits=new[seen].para_sha1.map(old))
+        rel = (chk.bits - chk.old_bits).abs() / chk.old_bits
+        big = chk.bytes >= 100
+        num = lambda x: float(x) if x == x else None  # noqa: E731  (no NaN in JSON)
+        rec["recheck"] = {
+            "texts": len(chk),
+            "identical": int((chk.bits == chk.old_bits).sum()),
+            "median_rel": num(rel.median()),
+            "p95_rel": num(rel.quantile(0.95)),
+            "max_rel": num(rel.max()),
+            "median_rel_ge_100B": num(rel[big].median()),
+            "max_rel_ge_100B": num(rel[big].max()),
+            "mean_signed_rel": num(((chk.bits - chk.old_bits) / chk.old_bits).mean()),
+            "bpb_new": num(chk.bits.sum() / chk.bytes.sum()),
+            "bpb_carried": num(chk.old_bits.sum() / chk.bytes.sum()),
+            "worst": chk.assign(rel=rel)
+            .sort_values("rel")
+            .tail(3)[["para_sha1", "kind", "bytes", "bits", "old_bits"]]
+            .to_dict("records"),
+        }
+    note = (add / "note.txt").read_text(encoding="utf-8").strip() if (add / "note.txt").exists() else ""
+    if r["mode"] == "only-missing":
+        rec["before"] = before_stats(ann)
+    if r["mode"] == "only-missing" or note:
+        rec["note"] = note
+    fresh = new[~seen].assign(score_run=rid)[STORE_FIELDS]
+    store = pd.concat([store, fresh], ignore_index=True) if len(store) else fresh.reset_index(drop=True)
+    ck = rec.get("recheck")
+    print(
+        f"{add}: added {len(fresh):,} new texts to the store as run {rid}"
+        + (
+            f"; {ck['texts']} texts it already had came out {ck['identical']} identical, median |rel diff| "
+            f"{ck['median_rel']:.2%}, max {ck['max_rel']:.2%}"
+            if ck
+            else ""
+        )
+    )
+    return [*runs, rec], store
+
+
 def cmd_build(args):
     import numpy as np
     import pandas as pd
 
-    # ---- scores, one per paragraph *text* (para_sha1), from the pod's run
-    out_ann = ANN
-    work = Path(args.work)  # scores.jsonl and run.json from `score`; pod.json, sanity.json, precision.json if any
-    sanity = {**read_json(work / "sanity.json", {}), "precision": read_json(work / "precision.json", {})}
-    rec = {"scoring": json.loads((work / "run.json").read_text()), "pod": read_json(work / "pod.json", {})}
-    runs = [{"id": 1, "mode": "all", **rec, "sanity": sanity}]
-    store = one_per_text(pd.DataFrame(read_jsonl(work / "scores.jsonl"))).assign(score_run=1)
+    # ---- scores, one per paragraph *text* (para_sha1), from every scoring run so far
+    # A paragraph's bpb depends only on its own text (scored from BOS), so scores carry over by para_sha1
+    # when the corpus is rebuilt, and only new texts need the GPU (`score --only-missing`).
+    out_ann = Path(args.out) / "annotations"
+    runs = read_json(out_ann / "bpb.json", {}).get("runs", [])
+    prev = out_ann / "bpb.paragraphs.jsonl"  # every score so far, one row per paragraph
+    store = pd.DataFrame(read_jsonl(prev) if prev.exists() else [], columns=STORE_FIELDS).drop_duplicates("para_sha1")
+    for add in args.add or []:
+        runs, store = add_run(add, runs, store, out_ann)
     per = store.set_index("para_sha1")
     run = runs[0]["scoring"]
 
@@ -946,7 +1098,10 @@ def cmd_build(args):
         "zero_byte_paragraphs": int((s.bytes == 0).sum()),
     }
     if cov["missing_rows"] and not args.partial:
-        raise SystemExit(f"{cov['missing_rows']:,} paragraphs have no score in {args.work}: a run of another corpus?")
+        raise SystemExit(
+            f"{cov['missing_rows']:,} paragraphs ({s[unscored].para_sha1.nunique():,} texts) have no score: run "
+            "`score --only-missing` with a copy of annotations/bpb.paragraphs.jsonl on a pod and add it with --add"
+        )
     if args.partial:  # smoke tests: only what was scored
         s = s[~unscored]
         corpus = corpus[corpus.id.isin(set(s.id))].reset_index(drop=True)
@@ -1014,7 +1169,7 @@ def cmd_build(args):
     # ---- optional context from the other annotators (joined when present, never waited for)
     ctx = {}
     for name in ("translation", "topics"):
-        f = ANN / f"{name}.jsonl"
+        f = Path(args.context_dir) / f"{name}.jsonl"
         if f.exists():
             ctx[name] = pd.DataFrame(read_jsonl(f)).set_index("id")
 
@@ -1159,7 +1314,7 @@ def cmd_build(args):
     art["text_sha1"] = [sha1(t) for t in corpus.set_index("id").loc[art.index, "text"]]
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     src = (
-        f"{MODEL}@{run['revision'][:12]} on {run['gpu']} (a RunPod pod; its record: 'runs' in bpb.json); "
+        f"{MODEL}@{run['revision'][:12]}, {len(runs)} scoring runs on RunPod GPUs (records: 'runs' in bpb.json); "
         "score_bpb.py; corpus "
         f"{Path(args.corpus).name} sha1 {corpus_sha1[:12]}"
     )
@@ -1189,7 +1344,10 @@ def cmd_build(args):
         "id": "page id",
         "para": "paragraph index; 0 (the title heading) is not scored",
         "para_sha1": "sha1 of the paragraph text (UTF-8); the score belongs to exactly this text",
-        "score_run": "the scoring run that scored this text (see 'runs' in bpb.json)",
+        "score_run": (
+            "the scoring run that scored this text (see 'runs' in bpb.json): 1 = the full run, later runs = "
+            "texts that were new after a corpus rebuild; a text found in several paragraphs of one run gets the mean"
+        ),
         "kind": "heading / list / table / math / text, from the leading characters (edaapp's rule; its 'para' = text)",
         "bpb": "bits per UTF-8 byte; paragraphs over 1,000 characters are scored in whitespace-split pieces, as "
         "the eval harness does",
@@ -1237,7 +1395,7 @@ def cmd_build(args):
         head = {"name": name, "description": description, "source": src, "created": now}
         return json.dumps({**head, "columns": columns, "depends_on_text": True, **more}, indent=2, ensure_ascii=False)
 
-    out_q = QUALITY
+    out_q = Path(args.out) / "quality"
     files = {
         out_ann / "bpb.jsonl": jsonl(records(a, list(art_cols))),
         out_ann / "bpb.json": sidecar(
@@ -1246,7 +1404,7 @@ def cmd_build(args):
             "wrong-script text, untranslated English, boilerplate, odd tables, conversion leftovers) from "
             "paragraph and article bpb extremes.",
             art_cols,
-            runs=runs,  # the scoring run's record: pod, versions, sanity and precision checks
+            runs=runs,  # every scoring run so far: what `build` needs to run again without the pods' files
         )
         + "\n",
         out_ann / "bpb.paragraphs.jsonl": jsonl(records(p, list(para_cols))),
@@ -1264,7 +1422,7 @@ def cmd_build(args):
     for f, text in files.items():
         write_atomic(f, text)
     print(
-        f"wrote {', '.join(str(f.relative_to(ROOT)) for f in files)}; {len(ranked)} articles flagged"
+        f"wrote {', '.join(str(f.relative_to(args.out)) for f in files)}; {len(ranked)} articles flagged"
     )
 
 
@@ -1336,6 +1494,12 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
             "repo harness gives the same pooled bpb to "
             f"{abs(hp['bpb_harness_loglik'] - hp['bpb_this_script']) / hp['bpb_harness_loglik']:.2%}; "
             "one paragraph's bpb is good to about 0.3% (median; bf16), 2% at p95; every paragraph has a row."
+            + "".join(
+                f" Run {x['id']}'s re-scores of {x['recheck']['texts']} carried-over texts agree with them "
+                f"(median {x['recheck']['median_rel']:.1%}, max {x['recheck']['max_rel']:.1%})."
+                for x in runs
+                if x.get("recheck")
+            )
         )
     w(
         f"- {nflag:,} paragraphs are extreme (top or bottom {TAIL:.0%} of their kind and length band, among "
@@ -1399,6 +1563,10 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         "over its paragraphs, headings included."
     )
     w(
+        "- Scores are kept per paragraph *text*: when the corpus is rebuilt they are carried over by `para_sha1`, "
+        "and only new texts are scored (see the runs below). A text scored more than once gets the mean."
+    )
+    w(
         "- bf16 weights, SDPA attention, `torch.inference_mode`. Batches are sorted by length and cut at "
         f"{run['budget_tokens_per_batch']:,} tokens. The decoder runs once per batch, and the output head "
         "runs on 8,192 positions at a time with an fp32 log-softmax (`cross_entropy`), so the full "
@@ -1409,12 +1577,17 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     # ---- runs
     w("## Runs\n")
     w(
-        f"Model `{MODEL}` @ `{run['revision']}`, bf16.\n"
+        f"Model `{MODEL}` @ `{run['revision']}`, bf16, the same code path in every run. Each paragraph's score "
+        "comes from the run that first scored its text (`score_run`).\n"
     )
     rows = []
     for x in runs:
         r, pd_ = x["scoring"], x.get("pod", {})
-        what = f"all {r['paragraphs']:,} paragraphs"
+        what = (
+            f"all {r['paragraphs']:,} paragraphs"
+            if x["mode"] == "all"
+            else f"{r.get('texts_missing', 0):,} new texts + {r.get('texts_rechecked', 0)} rechecks"
+        )
         rows.append(
             (
                 str(x["id"]),
@@ -1454,6 +1627,11 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
 
     # ---- sanity
     w("## Sanity checks\n")
+    if len(runs) > 1:
+        w(
+            "Checks 1-3 ran with run 1, on the whole corpus as it was then; 4 and 5 are recomputed on the current "
+            "corpus at every build. Later runs are checked against carried-over scores in their own section below.\n"
+        )
     sh = sanity.get("shuffle")
     if sh:
         w(
@@ -1532,6 +1710,74 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         + f". {cov['zero_byte_paragraphs']} paragraphs have no bytes to score."
     )
     w("")
+
+    # ---- re-scoring runs
+    now_types = {t: sum(primary[x][0] == t for x in ranked) for t in TYPES}
+    for x in runs:
+        if x["mode"] != "only-missing":
+            continue
+        r, pd_, ck, bf = x["scoring"], x.get("pod", {}), x.get("recheck", {}), x.get("before", {})
+        new = s[s.score_run == x["id"]]
+        w(f"## Re-scoring after the {r['finished'][:10]} cleanup\n")
+        if x.get("note"):
+            w(x["note"] + "\n")
+        w(
+            "A paragraph's bpb depends only on its own text (it is scored from BOS, and paragraph *i* is still "
+            '`text.split("\\n\\n")[i]`), so every score was carried over by `para_sha1` and only texts never '
+            "scored before went to the GPU (`score --only-missing`), with the same model revision, chunking, "
+            "bf16 and code as run 1.\n"
+        )
+        if bf:
+            w(
+                f"- **Before**: {bf['articles']:,} articles, {bf['paragraphs']:,} paragraphs, "
+                f"corpus bpb {bf['bpb']:.4f} "
+                f"(prose {bf['bpb_text']:.4f})."
+            )
+        w(
+            f"- **Now**: {s.id.nunique():,} articles, {len(s):,} paragraphs "
+            f"({s.para_sha1.nunique():,} distinct texts), "
+            f"corpus bpb {s.bits.sum() / s.bytes.sum():.4f} (prose "
+            f"{s[s.kind == 'text'].bits.sum() / s[s.kind == 'text'].bytes.sum():.4f}). "
+            f"{int((s.score_run != x['id']).sum()):,} rows carried over; {len(new):,} rows "
+            f"({r.get('texts_missing', 0):,} "
+            f"new texts, {r.get('bytes_missing', 0) / 1e6:.2f} MB, {r.get('tokens_missing', 0):,} tokens) in "
+            f"{new.id.nunique():,} articles were scored in run {x['id']}: "
+            + ", ".join(f"{v:,} {k}" for k, v in new.kind.value_counts().items())
+            + f"; their bpb is {r.get('bpb_missing', float('nan')):.4f}."
+        )
+        w(
+            f"- **Pod**: `{pd_.get('pod_id', '?')}`, {pd_.get('gpu', r['gpu'])}, {pd_.get('cloud', '?')} cloud, "
+            f"{pd_.get('datacenter', '?')}, ${pd_.get('price_per_hr', 0):.2f}/h, up {pd_.get('hours', 0) * 60:.0f} min "
+            f"(${pd_.get('cost', 0):.2f}); scoring took {r['gpu_seconds_this_session']:.0f} s of GPU time "
+            f"({r['tok_per_s_this_session']:,.0f} tokens/s)."
+        )
+        if ck:
+            w(
+                f"- **Consistency**: {ck['texts']} carried-over texts, scored again on the new pod, came out identical "
+                f"for {ck.get('identical', '?')}; |Δ bits| / bits has median {ck['median_rel']:.2%}, p95 "
+                f"{ck['p95_rel']:.2%}, max {ck['max_rel']:.2%} (paragraphs >= 100 B: "
+                + (
+                    f"median {ck['median_rel_ge_100B']:.2%}, max {ck['max_rel_ge_100B']:.2%}"
+                    if ck["median_rel_ge_100B"] is not None
+                    else "none rechecked"
+                )
+                + f"), mean signed "
+                f"{ck['mean_signed_rel']:+.2%}; pooled bpb {ck['bpb_new']:.4f} new vs {ck['bpb_carried']:.4f} "
+                "carried over. That is the size of run 1's own bf16 batch noise (see determinism above), so old and "
+                "new scores are on the same scale"
+                + (
+                    " and the flags are unaffected."
+                    if ck["max_rel"] < 0.05
+                    else ". **The difference is more than a few percent: check before relying on new scores.**"
+                )
+            )
+        if bf.get("queue_types"):
+            w(
+                "- **Review queue** (types among the 200, before → now): "
+                + ", ".join(f"{t} {bf['queue_types'].get(t, 0)} → {now_types.get(t, 0)}" for t in TYPES)
+                + "."
+            )
+        w("")
 
     # ---- distributions
     w("## Distributions\n")
@@ -1744,6 +1990,9 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
 
     # ---- extremes
     w("## What the extremes look like\n")
+    for line in findings(s, art, el, ctx, pooled):
+        w(line)
+    w("")
 
     def show(d, n, head):
         w(f"**{head}**\n")
@@ -1789,11 +2038,13 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     w(
         "- `annotations/bpb.jsonl`: one row per article (scores, extremes, the review queue); "
         "`annotations/bpb.paragraphs.jsonl`: one row per non-title paragraph. Their sidecars `bpb.json` and "
-        "`bpb.paragraphs.json` describe every field."
+        "`bpb.paragraphs.json` describe every field, and `bpb.json` holds the record of every scoring run."
     )
     w(
-        "- Rerun: `score`, `sanity` and `precision` on a GPU pod (see the script's docstring), then "
-        "`uv run --script score_bpb.py build --work <pulled dir>` (no GPU)."
+        "- Rerun: `uv run --script score_bpb.py build` (no GPU) rebuilds every output from the annotations and "
+        "the run records, carrying every score over by `para_sha1`; rerun it when the corpus or the topic and "
+        "translation annotations change. It stops if a paragraph text has no score: run `score --only-missing` "
+        "on a pod and add it with `build --add <dir>` (see the script's docstring)."
     )
     bpb_md = "\n".join(L) + "\n"
 
@@ -1853,11 +2104,120 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
             w(f"   > {excerpt(blocks[(pid, para)], 220)}")
         else:
             worst = s[(s.id == pid) & s.eligible].sort_values("z", key=abs, ascending=False).head(1)
+            if not len(worst):  # nothing comparable (all short): show the article's largest non-heading block
+                worst = s[(s.id == pid) & (s.kind != "heading")].sort_values("bytes", ascending=False).head(1)
             if len(worst):
                 r0 = worst.iloc[0]
                 w(f"   > (para {r0.para}, bpb {r0.bpb:.2f}) {excerpt(r0.block, 200)}")
         w("")
     return {out_q / "bpb.md": bpb_md, out_q / "review-first.md": "\n".join(R) + "\n"}
+
+
+def findings(s, art, el, ctx, pooled):
+    """The 'what the extremes look like' narrative. Counts and examples are picked from the data, so the
+    text stays true when the corpus is rebuilt; the one judgement (what the Odia top 1% is) comes from
+    reading the queue on 2026-09-24."""
+    import numpy as np
+
+    title = art.title
+
+    def names(d, n=4):
+        seen, out = set(), []
+        for r in d.itertuples():
+            if r.id not in seen:
+                seen.add(r.id)
+                out.append(f"{title[r.id]} ({r.id})")
+            if len(out) == n:
+                break
+        return ", ".join(out)
+
+    txt = el[el.kind == "text"]
+    hi, lo = txt[txt.flag == "high"], txt[txt.flag == "low"]
+    L = []
+    L.append(
+        "Spread within groups (robust sd of log bpb, 1.4826 MAD): "
+        + ", ".join(
+            f"{g} {1.4826 * (np.log(d.bpb) - np.log(d.bpb).median()).abs().median():.2f}"
+            for g, d in el.groupby("group")
+            if len(d) >= 1000
+        )
+        + ". So the top 1% of prose sits roughly 2.5 robust sd, or about 1.7x, above its group's median.\n"
+    )
+    oh = hi[(hi.latin_share < 0.5) & (hi.other_share < 0.25)]
+    L.append(
+        f"**The high end.** Of the {len(hi):,} prose paragraphs in the top 1%, {(hi.latin_share >= 0.5).mean():.0%} "
+        f"are mostly Latin script, {(hi.other_share >= 0.25).mean():.0%} mostly another script and "
+        f"{len(oh) / max(len(hi), 1):.0%} Odia."
+    )
+    eng = el[el.latin_english & el.kind.isin(["text", "list"])]
+    if len(eng):
+        L.append(
+            f"- English: {len(eng):,} comparable text and list paragraphs are mostly Latin script with common English "
+            f"words, median bpb {eng.bpb.median():.2f} (Sarvam-1 reads English at about 0.8 bpb, E03); the largest are "
+            f"in {names(eng.sort_values('bytes', ascending=False), 3)}."
+        )
+    fr = el[el.foreign & el.kind.isin(["text", "list"])]
+    if len(fr):
+        L.append(
+            f"- Another script, or Latin letters that are not English (transliteration, IPA, romanised titles, code): "
+            f"{len(fr):,} comparable paragraphs, most extreme in {names(fr.sort_values('z', ascending=False))}."
+        )
+    prose = oh[~oh.verse].sort_values("z", ascending=False)
+    L.append(
+        f"- Odia: {len(oh):,} paragraphs, {oh.verse.mean():.0%} of them verse by line shape; the most extreme prose "
+        f"ones are in {names(prose)}. Read on 2026-09-24, the Odia top 1% was mostly legitimate but unusual text: "
+        "poems, folk songs and Sanskrit shlokas, archaic Odia, and runs of names (weapons, song and film titles "
+        "transliterated into Odia). Genuinely garbled Odia was rare. That is why verse is ranked after prose in "
+        "the `garbled` type.\n"
+    )
+    lo_copy = lo[(lo.repeats >= 5) | (lo.near_copies.fillna(0) > 0) | (lo.self_repeat >= 0.3)]
+    tab = s[s.kind == "table"]
+    top_header = tab.loc[tab.header_repeats.idxmax()] if len(tab) else None
+    L.append(
+        f"**The low end is formulaic writing.** Of the {len(lo):,} prose paragraphs in the bottom 1%, "
+        f"{len(lo_copy):,} ({len(lo_copy) / max(len(lo), 1):.0%}) have a near-copy in another article, a shared "
+        f"sentence frame or internal repetition (most extreme in {names(lo_copy.sort_values('z'), 3)}). The rest is "
+        "plain, well-formed encyclopedic prose (most extreme in "
+        f"{names(lo[~lo.index.isin(lo_copy.index)].sort_values('z'), 3)})."
+        + (
+            f" The most repeated table header row, `{top_header.header.strip()}`, is in "
+            f"{int(top_header.header_repeats):,} articles."
+            if top_header is not None
+            else ""
+        )
+        + "\n"
+    )
+    rep = s[s.eligible & (s.kind == "text") & (s.repeats >= 5)]
+    rest = s[s.eligible & (s.kind == "text") & (s.repeats < 5)]
+    small = s[(s.bytes < 100) & (s.repeats >= 5)]
+    L.append(
+        f"**bpb does not find boilerplate.** Each paragraph is scored on its own, so a sentence frame repeated "
+        f"across many articles is no more predictable to the model than any other sentence. The "
+        f"{len(rep):,} comparable prose paragraphs whose frame (names and numbers masked) recurs in 5+ articles "
+        f"score {pooled(rep):.3f} pooled against {pooled(rest):.3f} for the rest. They are shorter (median "
+        f"{rep.bytes.median():.0f} B against {rest.bytes.median():.0f} B), and within their own kind and length "
+        f"band their median sits at the {rep.pct.median() * 100:.0f}th percentile; only "
+        f"{int((lo.repeats >= 5).sum())} of them reach the bottom 1%. Use the `repeats` column, not bpb, to find "
+        f"templates; {len(small):,} more templated paragraphs are under 100 B and are not compared at all.\n"
+    )
+    mk = s[s.markup.notna()]
+    if len(mk) <= 12:
+        L.append(
+            f"**Conversion leftovers**: {len(mk)} paragraph{'s' * (len(mk) != 1)} in {mk.id.nunique()} "
+            f"article{'s' * (mk.id.nunique() != 1)} match the markup patterns outside math"
+            + (
+                ": " + "; ".join(f"{title[r.id]} ({r.id}/{r.para}): `{r.markup}`" for r in mk.itertuples())
+                if len(mk)
+                else ""
+            )
+            + "."
+        )
+    else:
+        L.append(
+            f"**Conversion leftovers**: {len(mk)} paragraphs in {mk.id.nunique()} articles match the markup patterns "
+            "outside math; the `markup` column lists what was found."
+        )
+    return L
 
 
 if __name__ == "__main__":

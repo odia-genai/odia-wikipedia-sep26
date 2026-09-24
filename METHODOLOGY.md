@@ -304,6 +304,7 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 - Paragraphs are scored without the text before them, so short ones cost more. Matched for length, prose paragraphs of 1 kB and more score 0.4948, the same as base Sarvam-1 on odia-llm-trainer's held-out set (0.4951).
 - Machine-assisted translations score like the rest (0.554 vs 0.556).
 - Pages created after Sarvam-1's release score lower (median 0.519 vs 0.559): no sign of memorisation (correlational).
+- **After the text cleanups** (re-scored, see [Re-scoring](#re-scoring)): corpus bpb 0.5500, prose 0.5219, prose paragraphs of 1 kB and over 0.4945. The high tail is now Odia text: 98% of the top 1% of prose is in Odia script, up from 81%, because the English blocks are gone.
 
 **What bpb cannot see.** Boilerplate repeated across articles: each paragraph is scored alone, so a sentence frame found in 5 or more articles sits at the 58th percentile of its band. Repetition is detected by `repeats`, not by perplexity.
 
@@ -325,7 +326,21 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 | `script` | mostly another script, or Latin letters that are not English | 31 | 375 |
 | `article` | the article as a whole | 31 | 455 |
 
-200 articles are queued. The first items: OCR-garbled text with Malayalam fragments (ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର, id 49282, para 2), an English bibliography (id 99867), a repetitive table (ଲୋକ ସଭା, id 33455), `&amp;amp;` in a 32 kB table (id 70092), a leaked Content Translation link (id 82526), whole English pages (id 98398).
+200 articles are queued. The table shows the first run. The queue was rebuilt on the cleaned text (see [Re-scoring](#re-scoring)). By then 85 of its 200 flagged paragraphs had gone with the cleanups: 31 English, 22 other-script, 21 table, 11 markup.
+
+The queue after the cleanups: garbled 35, english 35, templated 35, script 35, article 34, table 24, markup 2.
+
+- The `english` pool shrank from 707 candidates to 66, and they are now mostly bilingual paragraphs: Odia with English quotes or glosses.
+- Other script fell from 375 to 178, and markup from 14 to 2.
+
+Its first items:
+- OCR-garbled text (ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର, id 49282, para 2)
+- a mostly-English paragraph (id 97980)
+- a repetitive list of volumes (ସ୍ୱାମୀ ବିବେକାନନ୍ଦ, id 18187)
+- a repetitive table (ଲୋକ ସଭା, id 33455)
+- a hidden category shown as text, `Category:ଜୀବିତ ବ୍ୟକ୍ତି]` (id 66231)
+- a Latin-script film list (id 56180)
+- a list article left as English headings and short items after the English removal (ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା, id 56546, bpb 2.82)
 
 ## Human review loop
 
@@ -399,6 +414,19 @@ In total the rules removed 8,046 characters of leftovers.
 
 **Why.** Removing an item can leave its sublist stranded deeper than any item above it. CommonMark reads that as an indented code block: the English filter broke the rivers-of-India list and the dinosaur classification this way, and the Markdown check caught both. After the fix all 20,827 articles parse as intended again, and pandoc agrees on the 405-article sample.
 
+### Re-scoring
+
+**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build` stops while any paragraph has no score. `annotations/bpb.json` keeps every run's record.
+
+**Effect.** After the cleanups, 143,357 of 144,751 paragraphs kept their scores.
+- 1,379 new texts (1,394 rows in 1,304 articles, 183,357 tokens) were scored on an RTX 4000 Ada, Secure, at $0.28/h: 25 s of GPU time and 5 minutes of pod time. The image was cached, so the pod was ready in 13 s.
+- It cost **$0.02**; both scoring runs together cost $0.29.
+- Same model revision, library versions, precision and code path as the first run.
+
+**Consistency.** 200 already-scored texts were scored again on the new GPU. 102 came out bit-identical, and the median change was 0.00% (p95 1.04%, max 2.20%, on short headings). Pooled bpb was 0.5360 against 0.5359. That is within the first run's own bf16 noise, so flags don't move.
+
+**Queue.** The review queue was rebuilt on the cleaned text, and every `review_para` points at a current paragraph (see [Review-first queue](#review-first-queue)).
+
 ## Known limitations and open issues
 
 - **Boilerplate.** 6.8% of paragraphs repeat, with names and numbers masked, in 5 or more articles (year-page sentences, coordinates, census sentences, the Hindi-official-language sentence); `bot_created` covers only about a fifth of them. A per-article templated share and a repeat cap for the training mix are still to do.
@@ -415,6 +443,11 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
+- **2026-09-24: re-scoring after the cleanups.**
+  - Scores carried over by `para_sha1`; only 1,379 new texts scored.
+  - Cost: $0.02 on an RTX 4000 Ada.
+  - Corpus bpb 0.5564 → 0.5500.
+  - Review queue rebuilt on the cleaned text.
 - **2026-09-24: text cleanups.**
   - External-link templates dropped (IMDb lines 608 → 1).
   - ପରୁଷ → ପୁରୁଷ in context (917).
@@ -441,4 +474,4 @@ Every step that changes the Wikipedia data, or adds knowledge about its quality,
 3. Update the Summary numbers if they changed, and the [Known limitations](#known-limitations-and-open-issues) if an issue was fixed or found.
 4. Record what the step taught us in `LEARNINGS.md`.
 
-Coming next: re-scoring the paragraphs the text cleanups changed, and scoring the corpus with the project's own model.
+Coming next: scoring the corpus with the project's own model.

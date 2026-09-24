@@ -47,6 +47,14 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **After the cleanups the queue's English type is mostly bilingual text** (2026-09-24). The
+  English candidates fell from 707 to 66, and they are now mostly Odia with English quotes or
+  glosses. The removal also left some list articles as skeletons: ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା is now
+  English headings plus short items (bpb 2.82). An Odia category name still leaks as text
+  (`Category:ଜୀବିତ ବ୍ୟକ୍ତି]`). — idea: drop pages the removal leaves mostly empty (e.g. under
+  N Odia words after removal); extend `CATEGORY_TEXT` to `ଶ୍ରେଣୀ:`/`Category:` + any name.
+  Both change text, so the affected paragraphs need a ~$0.02 re-score.
+
 - **Judge English per list item, not per list, and give bilingual tables a floor**
   (2026-09-24). The first English filter judged a whole list at once. It removed mixed lists
   that had real Odia in them: Galileo's timeline (696 Odia letters) and a Kalpana Chawla list
@@ -65,6 +73,10 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   bot's census sentence, the rest in forms like ପରୁଷଙ୍କ, ପରୁଷମାନଙ୍କ and ପରୁଷୋତ୍ତମ. — done:
   `TYPO_FIXES` with context patterns; 917 fixed. The two left are other misspellings
   (ପରୁଷ୍କାର, ପରୁଷାମାନଙ୍କ).
+- **Re-score by content hash, not by article** (2026-09-24). The cleanups changed 2,530
+  articles, but only 1,379 paragraph texts (~137k tokens) had no score, because a paragraph's
+  bpb depends only on its own text. — Key model scores by the text's hash so edits cost only
+  what changed. — done: `score_bpb.py` carries scores over by `para_sha1`.
 
 - **Topics: 97.7% of articles tagged, precision ~95–99% on held-out samples, weaker on small
   topics** (2026-09-24).
@@ -226,6 +238,17 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   kept (it is real content), link lists dropped.
 
 ## Tooling and automation
+
+- **A cached pod image makes small GPU jobs nearly free** (2026-09-24). The re-score pod
+  (RTX 4000 Ada, $0.28/h) was ready in 13 s instead of 7 minutes and cost $0.02 for 25 s of
+  scoring. The same texts re-scored on a different GPU came out bit-identical for 102 of 200,
+  and within 2.2% for all, so bf16 noise comes from batch neighbours, not the GPU model. —
+  done: a recheck sample goes with every partial re-score. idea: keep the same image tag for
+  quick jobs.
+- **Report prose that names examples goes stale when the data changes** (2026-09-24). Most
+  examples named in `quality/bpb.md` (radio listings, PVC citations, CX markup) disappeared with
+  the cleanup. — done: bpb.md now picks its examples from the current data, and METHODOLOGY.md
+  names the queue as it stands after the re-score.
 
 - **A pipe inside a code span still splits a GFM table cell** (2026-09-24). The methodology
   page's tables had `{{TownType|M}}`, `ଡାହାଣ|thumb` and `{| … |}` in code spans. GFM splits
