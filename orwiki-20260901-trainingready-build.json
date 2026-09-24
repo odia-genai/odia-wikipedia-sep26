@@ -1,0 +1,83 @@
+{
+ "dump": "orwiki-20260901-pages-articles.xml.bz2",
+ "dump_sha1": "4ace67b6c5412a78565e463066f9450bfff6df6b",
+ "built": "2026-09-25",
+ "pages_in_dump": 21095,
+ "articles": 18695,
+ "excluded": 2400,
+ "words": 4512644,
+ "chars": 34811694,
+ "utf8_bytes": 87308950,
+ "bot_created": 0,
+ "stub": 1910,
+ "templated_share_over_half": 1006,
+ "odia_digits_converted": 689041,
+ "english": {
+  "translated": 899,
+  "kept as is": 5133,
+  "removed_blocks": {
+   "citation": 104,
+   "curated: fragment with no meaning on its own": 22,
+   "curated: test edit or vandalism": 8,
+   "curated: template or markup residue": 10,
+   "junk": 11,
+   "curated: coordinates": 4,
+   "curated: citation or source line": 12,
+   "curated: garbled: the variables were lost in conversion": 1,
+   "curated: hatnote or cross-reference": 6,
+   "curated: caption of a removed figure": 2,
+   "curated: colour legend of a table (the colours are gone)": 27,
+   "curated: leaked template: life timeline (axis ticks and labels)": 52,
+   "curated: pasted search-result snippet": 42,
+   "curated: advertisement": 2,
+   "curated: repeats the lead": 1
+  }
+ },
+ "cleanup_fixes": {
+  "typo ପରୁଷ→ପୁରୁଷ": 917,
+  "anchor tags": 24,
+  "html entities": 26,
+  "html attributes": 3,
+  "category text": 5,
+  "_chars removed": 8064,
+  "wikitext heading marks": 2,
+  "wikitext heading": 19,
+  "superscripts as LaTeX": 283,
+  "subscripts as LaTeX": 303,
+  "typed powers of ten as LaTeX": 13,
+  "template parameter text": 2,
+  "stray wikitable marks": 8,
+  "raw wikitable blocks dropped": 1
+ },
+ "table_words": 168947,
+ "articles_with_tables": 1727,
+ "odia_ratio_below_0.6": 332,
+ "odia_ratio_below_0.6_words": 56627,
+ "markdown_escapes": 2454,
+ "articles_with_escapes": 523,
+ "reviews": {
+  "file": null,
+  "articles_reviewed": 0,
+  "articles_dropped": 0,
+  "paragraphs_dropped": 0,
+  "fix_pending": 0,
+  "paragraph_refs_not_found": 0
+ },
+ "curated": {
+  "file": "curation/junk-paragraphs.jsonl",
+  "entries": 183,
+  "paragraphs_dropped": 189,
+  "entries_not_found": 0
+ },
+ "min_words": 5,
+ "min_chars": 0,
+ "dropped": {
+  "year page": 1864,
+  "date page without events": 260,
+  "under 5 Odia words": 137,
+  "disambiguation": 112,
+  "empty list page": 19,
+  "duplicate text": 7,
+  "main page": 1
+ }
+}

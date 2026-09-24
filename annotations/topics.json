@@ -1,0 +1,39 @@
+{
+ "name": "topics",
+ "description": "Subject topics of each article from its categories, its Wikidata item and its title, for weighting a school-oriented training mix. One JSON object per line (topics.jsonl), one per article of the corpus, in corpus order. See quality/topics.md.",
+ "source": "orwiki-20260901: categories from the rendered HTML of the dump revision (raw/html); hidden categories and the category tree from the page, page_props, linktarget and categorylinks SQL dumps (reduced to raw/orwiki-20260901-category-graph.jsonl.gz); for articles without a direct category or title match, the Wikidata item from page_props (in raw/orwiki-20260901-article-facts.jsonl.gz) and its P31/P106/P2175/P279 fetched from the Wikidata API, wbgetentities (raw/orwiki-20260901-wikidata.jsonl.gz); annotate.py topics",
+ "created": "2026-09-24T20:30:59Z",
+ "columns": {
+  "id": "page id (integer)",
+  "title": "article title (Odia digits as ASCII)",
+  "categories": "visible content categories, in page order: hidden (hiddencat) and maintenance or tracking categories removed (JSON array; Odia digits as ASCII)",
+  "topics": "topics with enough evidence, strongest first (JSON array; vocabulary in 'topics' below)",
+  "primary_topic": "the strongest topic, or null when there is no evidence",
+  "is_person": "a biography: Wikidata P31 = human (Q5), else a people category (births, deaths, occupations, people of a place)",
+  "odisha": "Odisha-related: a category or the title names Odisha, Odia, Ollywood, Jagannath, Utkal, Kalinga or an Odisha district or city",
+  "school_relevant": "primary_topic is a school subject (science, biology, health, mathematics, technology, geography, history, politics, economy, literature, society, education), or arts/religion when odisha; for a biography only science, biology, health, mathematics, technology, history or literature",
+  "topic_source": "evidence behind primary_topic, '+'-joined: category (a rule on one of the article's categories), parent_category (a rule on a parent category up to 3 levels up), title (year or date page, or a '(qualifier)'), wikidata (P31/P106); 'none' when untagged",
+  "wikidata": "the article's Wikidata item (QID) from page_props, or null",
+  "topic_scores": "a string holding JSON {topic: score}: the summed evidence weights behind 'topics'"
+ },
+ "depends_on_text": false,
+ "topics": {
+  "calendar": "year, date, month, decade and century pages; observances",
+  "film": "film, television and entertainment, including actors, directors, models",
+  "sports": "sports, sportspeople, clubs, venues, tournaments",
+  "health": "health and medicine: diseases, drugs, anatomy, nutrition, hospitals",
+  "biology": "biology and nature: plants, animals, taxa, ecology, forests, sanctuaries",
+  "mathematics": "mathematics and numbers",
+  "science": "physical and earth sciences: physics, chemistry, astronomy, geology, weather",
+  "technology": "technology and engineering: computing, internet, vehicles, transport, space tech",
+  "economy": "economy and business: companies, industry, agriculture, banking, trade",
+  "education": "education: schools, colleges, universities, teachers",
+  "religion": "religion, mythology and philosophy: deities, temples, scriptures, saints",
+  "literature": "literature and language: writers, poets, books, periodicals, languages, scripts",
+  "arts": "arts and culture: music, dance, theatre, painting, festivals, food, customs, crafts",
+  "history": "history and military: empires, dynasties, rulers, wars, freedom struggle, monuments",
+  "politics": "politics, government and law: politicians, elections, legislatures, courts, schemes",
+  "society": "society: communities, tribes, castes, organisations, social movements, activists",
+  "geography": "geography and places: countries, states, districts, towns, villages, rivers"
+ }
+}

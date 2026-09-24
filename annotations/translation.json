@@ -1,0 +1,29 @@
+{
+ "name": "translation",
+ "description": "Articles created or largely written with Content Translation (CX) or MDWiki's CX-based translation dashboard: machine-assisted translations, mostly from English. One JSON object per line (translation.jsonl), one per article of the corpus, in corpus order. See quality/translation.md.",
+ "source": "orwiki-20260901: stub-meta-history (every revision's id, timestamp, contributor, edit summary, size) and the change_tag and change_tag_def SQL dumps (tags on revisions), reduced to raw/orwiki-20260901-article-facts.jsonl.gz; user_groups and user_former_groups SQL dumps (bot accounts); annotate.py translation",
+ "created": "2026-09-24T20:31:00Z",
+ "columns": {
+  "id": "page id (integer)",
+  "ct_created": "the page's first revision carries a CX tag (contenttranslation, contenttranslation-v2, sectiontranslation, contenttranslation-high-unmodified-mt-text)",
+  "ct_any": "any revision of the page carries a CX tag",
+  "ct_tags": "the CX tags found on the page's revisions (JSON array)",
+  "mdwiki_created": "the first revision was published by MDWiki's translation dashboard (edit summary 'Created by translating the page [[:mdwiki:...]] to:or #mdwikicx'); CX-based machine translation of medical articles, without a CX tag",
+  "mdwiki_any": "any revision was published by the MDWiki dashboard",
+  "tool_bytes_share": "bytes added by CX or MDWiki revisions / bytes of the dump revision (0-1)",
+  "translated": "use this flag: ct_created or mdwiki_created or tool_bytes_share >= 0.5",
+  "translated_at": "timestamp of the first CX or MDWiki revision, or null",
+  "source_lang": "source wiki of the first CX or MDWiki revision (en, simple, hi, mdwiki, ...), from its edit summary",
+  "source_title": "source page title from that summary (as written, Odia digits as ASCII: may be a user-space draft, e.g. 'User:Mr. Ibrahem/...')",
+  "source_revid": "source page revision id from that summary, or null",
+  "source_section": "the translated section when only a section was translated ('opening section' for the lead), else null (Odia digits as ASCII)",
+  "created": "timestamp of the page's first revision",
+  "creator_is_bot": "the first revision's account is, or was, in the bot group, or is a global bot (name ends in 'bot')",
+  "revisions": "revisions up to the dump (the last is the corpus revision)",
+  "edits_after_creation": "revisions after the first by accounts that are not bots (IP edits count)",
+  "bot_edits_after_creation": "revisions after the first by bots",
+  "editors_after_creation": "distinct non-bot editors after the first revision, other than the creator",
+  "bytes": "size of the dump revision's wikitext in bytes"
+ },
+ "depends_on_text": false
+}

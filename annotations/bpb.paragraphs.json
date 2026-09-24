@@ -1,0 +1,40 @@
+{
+  "name": "bpb.paragraphs",
+  "description": "Sarvam-1 bits per byte of every paragraph except the title (paragraph i = text.split('\\n\\n')[i]), with its percentile within its kind and length band. Each row's bits, bytes, tokens, pieces and scoring run are in the score store, joined on para_sha1 (see 'joins').",
+  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 634b1411a0d1",
+  "created": "2026-09-24T20:31:23Z",
+  "columns": {
+    "id": "page id",
+    "para": "paragraph index; 0 (the title heading) is not scored",
+    "para_sha1": "sha1 of the paragraph text (UTF-8); the score belongs to exactly this text, and it is the key of the score store (see 'joins')",
+    "kind": "heading / list / table / math / text, from the leading characters (edaapp's rule; its 'para' = text)",
+    "bpb": "bits per UTF-8 byte (bits / bytes of the store row, see 'joins'); paragraphs over 1,000 characters are scored in whitespace-split pieces, as the eval harness does; null = the text has no score in the store yet (build --allow-missing; see 'unscored' in bpb.json)",
+    "bpb_group": "comparison group: kind x length band, pooled over the kind when under 400 paragraphs; only text/list/math >= 100 B and tables >= 200 B are compared (headings never); null when not compared or not scored",
+    "bpb_pct": "percentile of bpb within bpb_group (0-1); null when not compared or not scored",
+    "bpb_z": "robust z of log bpb within bpb_group ((x - median) / (1.4826 MAD)); null when not compared or not scored",
+    "flag": "'high' = top 1%, 'low' = bottom 1% of bpb_group; null otherwise",
+    "latin_share": "share of the paragraph's letters and marks that are Latin script",
+    "other_script_share": "share that is neither Odia nor Latin (Devanagari, Bengali, ...)",
+    "english_words": "share of the Latin-script words that are common English words (null: under 5 Latin words)",
+    "markup": "conversion leftovers found outside math (tags, {{ }}, [[ ]], {| |}, px, URLs, namespace prefixes), if any",
+    "verse": "a prose block of 3+ short lines (poems, songs, shlokas)",
+    "repeats": "articles with a paragraph of the same sentence frame: digits, the article's title and words found in fewer than 20 articles masked (1 = unique or too little left to compare)",
+    "self_repeat": "share of word triples that repeat an earlier one in the same paragraph",
+    "near_copies": "other articles holding a near-copy (word-bigram Jaccard >= 0.5); computed only for paragraphs flagged low, null otherwise"
+  },
+  "depends_on_text": true,
+  "joins": [
+    {
+      "path": "raw/bpb/scores.jsonl.gz",
+      "on": "para_sha1",
+      "description": "More columns of every row, kept once per paragraph text in the score store: they are those of the store row whose para_sha1 equals this row's (the path is relative to the repository root; the store has one row per para_sha1). A row with no store row is a text not scored yet: bpb null here, these columns null too. Every text ever scored stays in the store, even after it leaves the corpus.",
+      "columns": {
+        "score_run": "the scoring run that scored this text (see 'runs' in bpb.json): 1 = the full run, later runs = texts that were new after a corpus rebuild; a text found in several paragraphs of one run gets the mean",
+        "bytes": "UTF-8 bytes scored (pieces are stripped, so this can be a few bytes under the raw paragraph)",
+        "tokens": "Sarvam-1 tokens scored (without BOS)",
+        "bits": "-sum(log2 p) over the tokens; bpb = bits / bytes",
+        "pieces": "pieces the paragraph was split into (1 unless over 1,000 characters)"
+      }
+    }
+  ]
+}

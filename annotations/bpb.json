@@ -1,0 +1,362 @@
+{
+  "name": "bpb",
+  "description": "Sarvam-1 bits per byte of every article, and a review queue of likely data problems (garbled or wrong-script text, untranslated English, boilerplate, odd tables, conversion leftovers) from paragraph and article bpb extremes.",
+  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 634b1411a0d1",
+  "created": "2026-09-24T20:31:23Z",
+  "columns": {
+    "id": "page id (join key)",
+    "text_sha1": "sha1 of the article text (UTF-8) that was scored; differs from the current text = stale",
+    "bpb": "Sarvam-1 bits per UTF-8 byte over all scored paragraphs (sum of bits / sum of bytes); lower = more predictable",
+    "bpb_text": "the same over prose paragraphs only (kind text); null if the article has none",
+    "bpb_pct": "percentile of bpb among articles with >= 500 scored bytes (0-1); null for smaller articles",
+    "bytes": "UTF-8 bytes scored (the title heading, paragraph 0, is not scored)",
+    "tokens": "Sarvam-1 tokens scored (without the BOS each piece starts with)",
+    "bits": "total bits",
+    "paragraphs": "paragraphs scored (all but the title, less unscored_paragraphs)",
+    "unscored_paragraphs": "paragraphs whose text has no score in the store yet (build --allow-missing; see 'unscored' in bpb.json): left out of bpb, bytes, tokens and bits; 0 normally",
+    "extreme_high": "paragraphs in the top 1% of bpb for their kind and length (see bpb.paragraphs)",
+    "extreme_low": "paragraphs in the bottom 1% of bpb for their kind and length",
+    "extreme_share": "share of the article's scored bytes that are in extreme paragraphs",
+    "review_rank": "order to review in, 1 = first; the top 200 articles, failure types interleaved; null = not flagged",
+    "review_type": "primary failure type: garbled, english, templated, table, markup, script, article",
+    "review_para": "paragraph index of the primary reason (text.split('\\n\\n')[i]); null for article-level reasons",
+    "review_reasons": "human-readable reasons, primary first"
+  },
+  "depends_on_text": true,
+  "unscored": {
+    "note": "paragraphs of the current corpus whose text has no score in the store: bpb null, not in the review queue; pod_command runs `score --only-missing` on a GPU pod (steps in the docstring of score_bpb.py), add_command merges its output",
+    "paragraphs": 319,
+    "texts": 319,
+    "articles": 233,
+    "bytes": 366751,
+    "latin_texts": 17,
+    "tokens_estimate": 57961,
+    "gpu_seconds_estimate_a6000": 3.6,
+    "pod_command": "cd /root && setsid nohup python score_bpb.py score --corpus orwiki-20260901-trainingready.jsonl --work /root/bpb --only-missing scores.jsonl.gz < /dev/null > score.log 2>&1 &",
+    "add_command": "uv run --script score_bpb.py build --add raw/bpb/<date>"
+  },
+  "runs": [
+    {
+      "id": 1,
+      "mode": "all",
+      "scoring": {
+        "model": "sarvamai/sarvam-1",
+        "revision": "e9607337286ddf496d4a2562b194e489dcf3feea",
+        "gpu": "NVIDIA RTX A6000",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "transformers": "5.17.0",
+        "corpus": "orwiki-20260901.parquet",
+        "corpus_sha1": "7a9fcceddbeae4ce843397212943e19325d4b3ed",
+        "paragraphs": 148745,
+        "pieces": 152975,
+        "tokens_with_bos": 13461968,
+        "tokens": 13308993,
+        "bytes": 86662670,
+        "bits": 48219668.09846072,
+        "bpb": 0.5564064446486673,
+        "truncated_pieces": 0,
+        "gpu_seconds_this_session": 816.5,
+        "tokens_this_session": 13461968,
+        "tok_per_s_this_session": 16487.4,
+        "wall_seconds": 831.7,
+        "budget_tokens_per_batch": 32768,
+        "finished": "2026-09-24T14:25:52Z"
+      },
+      "pod": {
+        "pod_id": "uandv1iutcwyqg",
+        "gpu": "NVIDIA RTX A6000 (48 GB)",
+        "cloud": "Secure",
+        "datacenter": "US-TX-1",
+        "price_per_hr": 0.53,
+        "image": "runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404",
+        "created": "2026-09-24T13:59:58Z",
+        "ssh_ready": "2026-09-24T14:07:09Z",
+        "terminated": "2026-09-24T14:29:39Z",
+        "hours": 0.4947,
+        "cost": 0.262
+      },
+      "sanity": {
+        "split_text_mismatches_vs_harness": 0,
+        "shuffle": {
+          "n": 300,
+          "shuffled_higher": 300,
+          "share_higher": 1.0,
+          "bpb_original": 0.5178394235480079,
+          "bpb_shuffled": 0.8831592184410753,
+          "median_ratio": 1.6896314495132023,
+          "min_ratio": 1.079662075506991,
+          "not_higher": []
+        },
+        "determinism": {
+          "n": 100,
+          "max_abs_bpb_diff_rerun": 0.0,
+          "max_abs_bits_diff_rerun": 0.0,
+          "max_abs_bpb_diff_batch_of_one": 0.025970297521088703,
+          "max_rel_bits_diff_batch_of_one": 0.023357065248530418,
+          "max_abs_bpb_diff_vs_main_run": 0.028093985155982937,
+          "corr_vs_main_run": 0.9999202804838726
+        },
+        "harness_parity": {
+          "pieces": 208,
+          "max_abs_loglik_diff": 3.5513091734578666,
+          "max_rel_loglik_diff": 0.03779086336126559,
+          "bpb_harness_loglik": 0.542213675862038,
+          "bpb_harness_bpb_fn": 0.542213675862038,
+          "bpb_this_script": 0.5424133063673907
+        },
+        "gpu": "NVIDIA RTX A6000",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "transformers": "5.17.0",
+        "precision": {
+          "paragraphs": 150,
+          "pieces": 154,
+          "main_run_bf16_batched": {
+            "median_rel": 0.0030518719615129286,
+            "p95_rel": 0.020297140587405182,
+            "max_rel": 0.03430577224335186,
+            "max_abs_dbpb": 0.052519985483750906,
+            "pooled_bpb": 0.5549734861067906,
+            "worst_bytes": 18
+          },
+          "bf16_batch_of_one": {
+            "median_rel": 0.0033084732309925048,
+            "p95_rel": 0.02782210044396966,
+            "max_rel": 0.03234894342228473,
+            "max_abs_dbpb": 0.07717816047926496,
+            "pooled_bpb": 0.5554737634487106,
+            "worst_bytes": 21
+          },
+          "bf16_batched_again": {
+            "median_rel": 0.0026933763629101914,
+            "p95_rel": 0.01504449041761205,
+            "max_rel": 0.022573771086739414,
+            "max_abs_dbpb": 0.03996143233898572,
+            "pooled_bpb": 0.55514621189501,
+            "worst_bytes": 58
+          },
+          "harness_bf16_bs8": {
+            "median_rel": 0.0029317560471315797,
+            "p95_rel": 0.013277399176091335,
+            "max_rel": 0.03207422174019653,
+            "max_abs_dbpb": 0.040227954105017005,
+            "pooled_bpb": 0.5553784765859009,
+            "worst_bytes": 21
+          },
+          "fp32_batched": {
+            "median_rel": 7.860154206849247e-07,
+            "p95_rel": 3.1283619230632014e-06,
+            "max_rel": 8.350517881021676e-06,
+            "max_abs_dbpb": 2.3260653529089126e-05,
+            "pooled_bpb": 0.5550993147380517,
+            "worst_bytes": 4
+          },
+          "fp32_one_pooled_bpb": 0.5550995823289931
+        }
+      }
+    },
+    {
+      "id": 2,
+      "mode": "only-missing",
+      "scoring": {
+        "model": "sarvamai/sarvam-1",
+        "revision": "e9607337286ddf496d4a2562b194e489dcf3feea",
+        "gpu": "NVIDIA RTX 4000 Ada Generation",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "transformers": "5.17.0",
+        "corpus": "orwiki-20260901.parquet",
+        "corpus_sha1": "4f64265f48874dd985af3cbbf5467397f3ff1ca1",
+        "mode": "only-missing",
+        "paragraphs": 1579,
+        "pieces": 1624,
+        "tokens_with_bos": 210361,
+        "tokens": 208737,
+        "bytes": 1060905,
+        "bits": 617234.5507853376,
+        "bpb": 0.5818000205346733,
+        "truncated_pieces": 0,
+        "gpu_seconds_this_session": 25.2,
+        "tokens_this_session": 210361,
+        "tok_per_s_this_session": 8356.8,
+        "wall_seconds": 39.4,
+        "budget_tokens_per_batch": 32768,
+        "finished": "2026-09-24T17:01:22Z",
+        "have": "bpb.paragraphs.parquet",
+        "have_sha1": "2d0db53277cda3d9f0a6a332bd94a64a41a5d151",
+        "texts_missing": 1379,
+        "texts_rechecked": 200,
+        "bytes_missing": 891538,
+        "tokens_missing": 183357,
+        "bpb_missing": 0.5905076541804987
+      },
+      "pod": {
+        "pod_id": "okby731xk0lcet",
+        "gpu": "NVIDIA RTX 4000 Ada Generation (20 GB)",
+        "cloud": "Secure",
+        "datacenter": "EU-RO-1",
+        "price_per_hr": 0.28,
+        "image": "runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404",
+        "created": "2026-09-24T16:57:44Z",
+        "ssh_ready": "2026-09-24T16:57:57Z",
+        "terminated": "2026-09-24T17:02:41Z",
+        "hours": 0.0825,
+        "cost": 0.0231
+      },
+      "recheck": {
+        "texts": 200,
+        "identical": 102,
+        "median_rel": 0.0,
+        "p95_rel": 0.010415251704644721,
+        "max_rel": 0.02199872793592691,
+        "median_rel_ge_100B": 0.0,
+        "max_rel_ge_100B": 0.02199872793592691,
+        "mean_signed_rel": 0.0003267271365323113,
+        "bpb_new": 0.5359635453929286,
+        "bpb_carried": 0.5358605386063042,
+        "worst": [
+          {
+            "para_sha1": "8b555fb0b54bbd1bd6d404683b5f7d36df974164",
+            "kind": "heading",
+            "bytes": 27,
+            "bits": 29.597344669206606,
+            "old_bits": 29.046059097380095
+          },
+          {
+            "para_sha1": "349ce1fedbdf338e8bc72355670ca5f9f21a70af",
+            "kind": "heading",
+            "bytes": 21,
+            "bits": 29.056334028873245,
+            "old_bits": 28.459964237018955
+          },
+          {
+            "para_sha1": "74d502a4ad8b3a4466421862949812090ead2d1b",
+            "kind": "text",
+            "bytes": 140,
+            "bits": 80.40841501225243,
+            "old_bits": 82.21708632602324
+          }
+        ]
+      },
+      "before": {
+        "articles": 20834,
+        "paragraphs": 148745,
+        "bytes": 86662670,
+        "bpb": 0.5564064446486673,
+        "bpb_text": 0.5234089721966532,
+        "queue_types": {
+          "garbled": 32,
+          "english": 32,
+          "article": 31,
+          "templated": 31,
+          "script": 31,
+          "table": 30,
+          "markup": 13
+        }
+      },
+      "note": "On 2026-09-24 the corpus was rebuilt with text cleanups: 917 ପରୁଷ→ପୁରୁଷ typo fixes, external-link templates (IMDb, Facebook, …) dropped, conversion leftovers stripped, and 6,622 English-dominant paragraphs, list items and tables removed (kept in `removed/english-paragraphs.parquet`). It went from 20,834 to 20,827 articles and from 148,745 to 144,751 non-title paragraphs."
+    },
+    {
+      "id": 3,
+      "mode": "only-missing",
+      "scoring": {
+        "model": "sarvamai/sarvam-1",
+        "revision": "e9607337286ddf496d4a2562b194e489dcf3feea",
+        "gpu": "NVIDIA RTX A6000",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "transformers": "5.17.0",
+        "corpus": "orwiki-20260901.parquet",
+        "corpus_sha1": "a80c57fd72f3efd30de8d672032df761011d4354",
+        "mode": "only-missing",
+        "paragraphs": 2645,
+        "pieces": 3139,
+        "tokens_with_bos": 525058,
+        "tokens": 521919,
+        "bytes": 1532703,
+        "bits": 1266433.382679641,
+        "bpb": 0.8262744854545473,
+        "truncated_pieces": 0,
+        "gpu_seconds_this_session": 34.5,
+        "tokens_this_session": 525058,
+        "tok_per_s_this_session": 15231.3,
+        "wall_seconds": 70.0,
+        "budget_tokens_per_batch": 32768,
+        "finished": "2026-09-24T18:30:04Z",
+        "have": "bpb.paragraphs.parquet",
+        "have_sha1": "9a5245944fd4393d4303e0a690f8abc48dc145e9",
+        "texts_missing": 2445,
+        "texts_rechecked": 200,
+        "bytes_missing": 1373057,
+        "tokens_missing": 497209,
+        "bpb_missing": 0.8614900663810605
+      },
+      "pod": {
+        "pod_id": "t7qxsgbz59epm5",
+        "gpu": "NVIDIA RTX A6000 (48 GB)",
+        "cloud": "Secure",
+        "datacenter": "EU-SE-1",
+        "price_per_hr": 0.53,
+        "image": "runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404",
+        "created": "2026-09-24T18:27:16Z",
+        "ssh_ready": "2026-09-24T18:27:48Z",
+        "terminated": "2026-09-24T18:30:54Z",
+        "hours": 0.0606,
+        "cost": 0.0321
+      },
+      "recheck": {
+        "texts": 200,
+        "identical": 126,
+        "median_rel": 0.0,
+        "p95_rel": 0.009149752090454119,
+        "max_rel": 0.017892141329540062,
+        "median_rel_ge_100B": 0.0,
+        "max_rel_ge_100B": 0.017892141329540062,
+        "mean_signed_rel": 0.00048268182789985864,
+        "bpb_new": 0.5233981221243332,
+        "bpb_carried": 0.523323165067555,
+        "worst": [
+          {
+            "para_sha1": "4241135c58b9414a4d9564201919dc6bf9ab3c0e",
+            "kind": "heading",
+            "bytes": 44,
+            "bits": 40.757586766528426,
+            "old_bits": 40.15612219824619
+          },
+          {
+            "para_sha1": "79cc0609e7892343d54f6ec34bdbe8de4a6cfa6d",
+            "kind": "text",
+            "bytes": 109,
+            "bits": 61.698010758883974,
+            "old_bits": 60.66770885374471
+          },
+          {
+            "para_sha1": "4aea1aa28a0293213ee3ec3281c9ea0c1fc8b203",
+            "kind": "text",
+            "bytes": 149,
+            "bits": 51.18928677007885,
+            "old_bits": 50.28949992994046
+          }
+        ]
+      },
+      "before": {
+        "articles": 20827,
+        "paragraphs": 144751,
+        "bytes": 85504923,
+        "bpb": 0.5500225681657716,
+        "bpb_text": 0.5219475118999345,
+        "queue_types": {
+          "script": 35,
+          "garbled": 35,
+          "templated": 35,
+          "english": 35,
+          "article": 34,
+          "table": 24,
+          "markup": 2
+        }
+      },
+      "note": "On 2026-09-24 the corpus was rebuilt again: 980 English prose paragraphs and headings were replaced by hand-checked Odia translations (`translations/english-to-odia.jsonl`), English list items and tables were restored (5,754 English blocks are now kept as they are), and 136 citation and template-error blocks were removed. It went from 20,827 to 20,836 articles and from 144,751 to 146,769 non-title paragraphs; 2,445 paragraph texts in 1,064 articles were new. The RTX 4000 Ada was out of stock, so this run used an RTX A6000."
+    }
+  ]
+}
