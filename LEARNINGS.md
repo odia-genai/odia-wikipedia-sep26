@@ -9,6 +9,16 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Ideas backlog
 
+- **Guard the CPT held-out set before training on this corpus** (2026-09-24). `cpt.py` holds out
+  300 documents from the 2023 Wikipedia snapshot for bits-per-byte. The same articles, in newer
+  revisions, are in this corpus, so training on it as-is would leak the eval. Exclude those
+  titles, or rebuild the held-out set from this corpus. The change is in `src/`.
+- **Blind human review of ~50 random articles** (2026-09-24), with `odia-review`, for
+  fluency, translationese and leftover noise. It is the only measure of what the automated
+  checks miss.
+- **Near-dedup against Sangraha and FineWeb-2** (2026-09-24). Both probably contain copies
+  of Wikipedia pages, which would silently up-weight Wikipedia in the mix. MinHash on the pod.
+
 - **Point `odia-build-cpt`'s `wikipedia` source at this corpus** (2026-09-24). `cpt.py` still
   reads the 2023 Hugging Face snapshot (`wikimedia/wikipedia` `20231101.or`, ~4M words). It
   lacks three years of edits and articles and has the template holes described below.
@@ -27,6 +37,36 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   (year pages, town stubs) and formulaic. They are flagged (`bot_created`), not dropped.
 
 ## Data (Odia)
+
+- **Odia digits converted to ASCII, before escaping** (2026-09-24, user decision). 689,848
+  digits were converted in text, headings, tables and math. Titles keep the page name. The
+  order matters: converting after Markdown escaping would turn a paragraph "୧. ବିଧାୟିକା" into
+  "1. ବିଧାୟିକା", which is a numbered list. The Odia word count fell from 4.73M to 4.53M because
+  digit runs had counted as words. — Normalise text before escaping it; re-run the Markdown
+  parse check after every text change. — done: `clean_block()` converts first, and
+  `put_math_back()` and `md_heading()` convert too; the parse check and pandoc still agree.
+  idea: Sangraha, FineWeb-2 and the eval sets still use Odia digits, and Odisha textbooks print
+  them. So the model must still read them. Apply the same conversion in `cpt.py`'s `clean()` and
+  to eval prompts, or the corpus will be inconsistent (outside `data/`, so it needs the owner's
+  go-ahead).
+
+- **6.8% of paragraphs are templated, and the bot flag catches only a fifth of them**
+  (2026-09-24). Same text with numbers and the title masked, in 5 or more articles: 155
+  patterns, 6,848 of 100,204 paragraphs. Top patterns:
+  - "N ଗ୍ରେଗୋରି ପାଞ୍ଜି ଅନୁସାରେ ଏକ ସାଧାରଣ ବର୍ଷ ଅଟେ ।" (1,774×)
+  - coordinates (625×)
+  - census population (710×), with the bot typo ପରୁଷ for ପୁରୁଷ repeated in every copy
+  - "ହିନ୍ଦୀ …ର ସରକାରୀ ଭାଷା ଅଟେ ।" (346×)
+
+  Only 1,422 of those occurrences are in pages with `{{ବଟ୍ ତିଆରି}}`. — A template flag is not a
+  measure of templated text. Measure repetition directly. — todo: a per-article templated
+  share, a cap on repeats, and the ପରୁଷ typo fixed or down-weighted.
+- **429 IMDb link lines survived the link filter** (2026-09-24). "- ଇଣ୍ଟରନେଟ ମୁଭି ଡାଟାବେସରେ
+  <title>" is an external link written in Odia, so `link_only_item`'s odia_ratio < 0.5 test
+  keeps it. — done 2026-09-24: dropped by template name (`imdb*`, `facebook*`, …); IMDb lines 608 → 1.
+- **1,302 English-dominant paragraphs, and 2,751 articles mix ASCII and Odia digits**
+  (2026-09-24). The English is untranslated leftovers, quotes and bibliographies. Mixed digits
+  are real usage, so don't normalise them. `odia_llm.text.numbers` already reads both.
 
 - **The full corpus: 20,834 articles, 4.73M Odia words, 89 MB** (2026-09-24, dump
   2026-09-01). That is about 18% more than the ~4M-word estimate for the 2023 HF snapshot in

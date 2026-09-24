@@ -62,7 +62,7 @@ HTML_DIR = RAW / "html"
 # never NFC. Importing must not leave __pycache__ here.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT))
-from odia_text import normalize_odia, odia_ratio, odia_words  # noqa: E402
+from odia_text import ODIA_DIGITS, normalize_odia, odia_ratio, odia_words  # noqa: E402
 
 WIKI = "orwiki"
 DUMPS = f"https://dumps.wikimedia.org/{WIKI}"
@@ -446,7 +446,7 @@ def tex_of(el):
 
 def put_math_back(text):
     return MATH_SLOT.sub(lambda m: ("$${}$$" if _MATH[int(m.group(1))][0] else "${}$")
-                         .format(_MATH[int(m.group(1))][1]), text)
+                         .format(_MATH[int(m.group(1))][1].translate(ODIA_DIGITS)), text)
 
 
 class Writer:
@@ -647,11 +647,19 @@ def md_escape(text, line_starts=True):
     return text
 
 
+ODIA_DIGIT = re.compile("[\u0b66-\u0b6f]")
+DIGITS_CONVERTED = [0]  # Odia digits converted to ASCII in this build, for the statistics
+
+
 def clean_block(block, cell=False):
     """Clean one block's text (not its prefix) and escape it for Markdown; "" drops it."""
     kind, level, prefix, text = block
     if kind == "t":
         return block
+    # Odia digits become ASCII here, before escaping: "୧. ବିଧାୟିକା" must end up "1\. ବିଧାୟିକା",
+    # not a numbered list.
+    DIGITS_CONVERTED[0] += len(ODIA_DIGIT.findall(text))
+    text = text.translate(ODIA_DIGITS)
     # Broken [[File:...|thumb|...]] or table markup that rendered as text; punctuation alone.
     if (FILE_RESIDUE.search(text) or TABLE_RESIDUE.search(text) or HTML_RESIDUE.search(text)
             or not re.search(r"\w", text) or re.fullmatch(r"(?:ଛାଞ୍ଚ|Template):[^\n]*", text)):
@@ -740,6 +748,7 @@ MD_ESCAPE = re.compile(r"\\[!-/:-@\[-`{-~]")  # a Markdown backslash escape, for
 
 
 def md_heading(title):
+    title = title.translate(ODIA_DIGITS)
     return re.sub(r"(\s)(#+)$", r"\1\\\2", md_escape(title, line_starts=False))
 
 
@@ -852,6 +861,7 @@ def build(args):
         "utf8_bytes": sum(len(r["text"].encode()) for r in records),
         "bot_created": sum(r["bot_created"] for r in records),
         "stub": sum(r["stub"] for r in records),
+        "odia_digits_converted": DIGITS_CONVERTED[0],
         "table_words": sum(len(odia_words("\n".join(line for line in r["text"].split("\n")
                                                      if line.startswith("|")))) for r in records),
         "articles_with_tables": sum(r["tables"] > 0 for r in records),
@@ -972,7 +982,9 @@ A short example record:
      Translation bug) that renders as text
    - empty sections, and parentheses emptied by the removed pronunciations
 4. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
-   U+0B5F). A `|` typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
+   U+0B5F). **Odia digits become ASCII** (`୧୯୪୭` → `1947`; {stats['odia_digits_converted']:,} digits), in
+   text, headings, tables and math, so numbers look the same everywhere (titles keep the page name). A `|`
+   typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
    hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
