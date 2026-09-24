@@ -426,7 +426,8 @@ def tex_of(el):
 
 class Writer:
     """Walks the DOM and collects blocks (kind, level, prefix, text): kind is "h" (heading of
-    that level), "p" (paragraph) or "li" (list item; prefix is its indent and marker)."""
+    that level), "p" (paragraph), "li" (list item; prefix is its indent and marker) or "t"
+    (a finished Markdown table)."""
 
     def __init__(self):
         self.blocks = []
@@ -440,7 +441,15 @@ class Writer:
             self.blocks.append((kind, level, prefix, text))
 
     def walk(self, el, in_item=False):
-        """in_item: inside a list item, where blocks (<p>, <div>) run on inline."""
+        """in_item: inside a list item or table cell, where blocks (<p>, <div>) run on inline."""
+        if isinstance(el.tag, str) and el.tag == "table" and is_data_table(el) and not in_item:
+            self.flush()
+            table = table_markdown(el)
+            if table:
+                self.blocks.append(("t", 0, "", table))
+            if el.tail:
+                self.inline.append(el.tail)
+            return
         if droppable(el):
             if el.tail:
                 self.inline.append(el.tail)
@@ -498,21 +507,80 @@ class Writer:
             self.flush("li", 0, prefix)
 
 
+def is_data_table(el):
+    """A content table (class wikitable), not an infobox, navbox or layout table."""
+    cls = set((el.get("class") or "").split())
+    return "wikitable" in cls and not cls & DROP_CLASSES and not el.xpath("ancestor::table")
+
+
+def cell_text(cell):
+    w = Writer()
+    w.children(cell, True)
+    w.flush()
+    text = " ".join(b[3] for b in w.blocks).replace("\n", ", ")
+    text = clean_block(("p", 0, "", text), cell=True)[3] if re.search(r"\w", text) else ""
+    return text.replace("|", "\\|")
+
+
+def table_markdown(tbl, max_span=50):
+    """The table as a GitHub Markdown table. A rowspan cell repeats down its rows; a colspan
+    cell fills its first column only. Columns empty in every data row (images) are left out."""
+    grid, pending = [], {}  # pending: column -> [text, rows left] for rowspans
+    for tr in tbl.xpath("./tr|./thead/tr|./tbody/tr|./tfoot/tr"):
+        cells = iter(c for c in tr if isinstance(c.tag, str) and c.tag in ("td", "th"))
+        row, col = [], 0
+        while True:
+            if col in pending:
+                row.append(pending[col][0])
+                pending[col][1] -= 1
+                if not pending[col][1]:
+                    del pending[col]
+                col += 1
+                continue
+            c = next(cells, None)
+            if c is None:
+                break
+            text = "" if droppable(c) else cell_text(c)
+            span = min(int(re.sub(r"\D", "", c.get("colspan") or "") or 1), max_span)
+            rows = min(int(re.sub(r"\D", "", c.get("rowspan") or "") or 1), max_span)
+            for k in range(span):
+                row.append("" if k else text)
+                if rows > 1:
+                    pending[col] = ["" if k else text, rows - 1]
+                col += 1
+        if any(row):
+            grid.append(row)
+    if len(grid) < 2:
+        return ""
+    width = max(map(len, grid))
+    grid = [r + [""] * (width - len(r)) for r in grid]
+    used = [j for j in range(width) if any(r[j] for r in grid[1:])]
+    grid = [[r[j] for j in used] for r in grid]
+    width = len(used)
+    if not width:
+        return ""
+    lines = ["| " + " | ".join(r) + " |" for r in grid]
+    lines.insert(1, "|" + "---|" * width)
+    return "\n".join(lines)
+
+
 # "|" typed for the danda "।" (and "||" for "॥") after Odia text (or a closing quote/bracket
 # after it), before a space or line end.
 PIPE_DANDA = re.compile(r"(?<=[\u0B00-\u0B7F)\]\"'”’])(\s?)(\|\|?)(?=\s|$)", re.M)
 
 
-def clean_block(block):
+def clean_block(block, cell=False):
     """Clean one block's text (not its prefix); "" drops it."""
     kind, level, prefix, text = block
+    if kind == "t":
+        return block
     text = PIPE_DANDA.sub(lambda m: m.group(1) + ("॥" if len(m.group(2)) == 2 else "।"), text)
     # Parentheses emptied by dropped pronunciation templates: "ବଙ୍ଗଳା ଭାଷା (), ..." "(; বাংলা)"
     text = re.sub(r" ?\([\s,;:]*\)", "", text)
     text = re.sub(r"\((?:\s*[,;:])+\s*", "(", text)
     text = re.sub(r"\s*(?:[,;:]\s*)+\)", ")", text)
     text = re.sub(r"[ \t]{2,}", " ", text).strip()
-    if kind == "p" and re.fullmatch(r"\$[^$]+\$[.,]?", text):  # a formula on its own: display math
+    if kind == "p" and not cell and re.fullmatch(r"\$[^$]+\$[.,]?", text):  # a formula on its own: display math
         text = "$" + text.rstrip(".,") + "$"
     return kind, level, prefix, text
 
@@ -632,6 +700,7 @@ def build(args):
             "words": len(odia_words(text)),
             "chars": len(text),
             "odia_ratio": round(odia_ratio(text), 4),
+            "tables": len(re.findall(r"(?m)^\|(?:---\|)+$", text)),
             "bot_created": a["bot_created"],
             "stub": a["stub"],
         })
@@ -650,6 +719,9 @@ def build(args):
         "utf8_bytes": sum(len(r["text"].encode()) for r in records),
         "bot_created": sum(r["bot_created"] for r in records),
         "stub": sum(r["stub"] for r in records),
+        "table_words": sum(len(odia_words("\n".join(line for line in r["text"].split("\n")
+                                                     if line.startswith("|")))) for r in records),
+        "articles_with_tables": sum(r["tables"] > 0 for r in records),
         "min_words": args.min_words,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
         "dropped_titles": excluded,
@@ -694,6 +766,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `{stem}.jsonl` | the corpus, one JSON object per line (fields below) |
 | `{stem}-build.json` | build statistics and the title of every page left out, with the reason |
 | `prepare.py` | the script that made all of it (download, render, build) |
+| `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | inputs kept for rebuilds: the dump, the article index, Wikipedia's rendered HTML of every article |
 
@@ -706,10 +779,11 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `url` | article URL |
 | `revid` | revision in the dump; `https://or.wikipedia.org/w/index.php?oldid=<revid>` is exactly this text |
 | `timestamp` | when that revision was saved |
-| `text` | the article: `# title`, then the lead, `##`/`###` section headings, paragraphs separated by a blank line, `- ` / `1. ` lists, math as `$...$` |
+| `text` | the article: `# title`, then the lead, `##`/`###` section headings, paragraphs separated by a blank line, `- ` / `1. ` lists, data tables as Markdown tables, math as `$...$` |
 | `words` | Odia words in `text` (runs of Odia-script characters) |
 | `chars` | characters in `text` |
 | `odia_ratio` | share of non-space characters in the Odia block (`odia_text.odia_ratio`) |
+| `tables` | data tables in `text`, as Markdown tables |
 | `bot_created` | the page carries `{{{{ବଟ୍ ତିଆରି}}}}`: made by a bot (year pages, town stubs), formulaic text |
 | `stub` | the page carries a stub template (`{{{{ମୁଣ୍ଡିଆ}}}}`, `{{{{ଅଧାଗଢ଼ା}}}}`) |
 
@@ -733,7 +807,12 @@ A short example record:
 3. **Clean** (HTML to text). Prose, headings, lists and math are kept. Dropped:
    - citations, reference lists, and reference-type sections (ଆଧାର, ଟୀକା, ଆହୁରି ଦେଖନ୍ତୁ,
      ବାହାର ଲିଙ୍କ, ଅଧିକ ପଢ଼ନ୍ତୁ, ଗ୍ୟାଲେରୀ, … and their English equivalents)
-   - all tables (infoboxes, navboxes, data tables), images, galleries, captions, maps
+   - infoboxes, navboxes, layout tables, images, galleries, captions, maps. Data tables
+     (`wikitable`) are kept as Markdown tables. A cell spanning rows repeats in each row, a cell
+     spanning columns fills the first one, and image-only columns are removed. Tables hold
+     {stats['table_words']:,} Odia words ({stats['table_words'] / stats['words']:.1%}) in
+     {stats['articles_with_tables']:,} articles: lists of districts, constituencies, award winners
+     and office holders. For prose only, drop the lines starting with `|`.
    - hatnotes, maintenance and stub banners, coordinates, pronunciation (IPA), sister-project
      boxes, archive notes ("Archived … at the Wayback Machine"), template error messages
    - list items that are only an external link or a book citation, under any heading
