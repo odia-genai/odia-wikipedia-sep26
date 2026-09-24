@@ -1023,6 +1023,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `{stem}.jsonl` | the corpus, one JSON object per line (fields below) |
 | `{stem}-build.json` | build statistics and the title of every page left out, with the reason |
 | `prepare.py` | the script that made all of it (download, render, build) |
+| `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |

@@ -208,6 +208,13 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **A pipe inside a code span still splits a GFM table cell** (2026-09-24). The methodology
+  page's tables had `{{TownType|M}}`, `ଡାହାଣ|thumb` and `{| … |}` in code spans. GFM splits
+  cells on those pipes, and markdown-it quietly pads or truncates the rows, so a cell-count
+  check through the parser passes anyway. — Escape `|` as `\|` inside table cells, even in
+  code; check by counting unescaped pipes per row against the header. — done for
+  METHODOLOGY.md; `table_markdown()` already escaped cell pipes.
+
 - **Wikimedia services were slow or lagging, so use mirrors and plain reads** (2026-09-24).
   - dumps.wikimedia.org served 2–3 kB/s. The official ACC Umeå mirror did ~400 kB/s, with SHA-1
     still checked against Wikimedia's `dumpstatus.json`.
