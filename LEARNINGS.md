@@ -47,6 +47,25 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **Judge English per list item, not per list, and give bilingual tables a floor**
+  (2026-09-24). The first English filter judged a whole list at once. It removed mixed lists
+  that had real Odia in them: Galileo's timeline (696 Odia letters) and a Kalpana Chawla list
+  (648). It also removed a bilingual yoga-asana table with 1,207 Odia letters. — Pick the unit
+  of a filter to match the unit of mixing; check which removed blocks hold the most Odia. —
+  done: paragraph ≥ 30, list item ≥ 10, and table ≥ 30 Latin letters with under 200 Odia
+  letters. The rule removes 6,622 blocks (513 paragraphs, 5,591 list items, 518 tables); 184
+  of the list items hold any Odia at all.
+- **Removing list items can turn a list into a code block** (2026-09-24). Taking a parent item
+  out left its sublist indented 4+ spaces past any item above it, and CommonMark read that as an
+  indented code block (rivers of India, dinosaur classification). The Markdown parse check
+  caught it. — Re-run the Markdown check after every filter. — done: an item's indent is
+  clamped to the previous item's content column (`LI_PREFIX`).
+- **Tie a typo fix to its context** (2026-09-24). ପରୁଷ ("harsh") is a real word, so blindly
+  replacing it with ପୁରୁଷ ("male") is wrong in general. All 919 uses here meant "male": 904 in a
+  bot's census sentence, the rest in forms like ପରୁଷଙ୍କ, ପରୁଷମାନଙ୍କ and ପରୁଷୋତ୍ତମ. — done:
+  `TYPO_FIXES` with context patterns; 917 fixed. The two left are other misspellings
+  (ପରୁଷ୍କାର, ପରୁଷାମାନଙ୍କ).
+
 - **Topics: 97.7% of articles tagged, precision ~95–99% on held-out samples, weaker on small
   topics** (2026-09-24).
   - Signals: categories from the rendered HTML (including template-added ones), shallow category
@@ -319,6 +338,28 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   done: rewritten as escapes.
 
 ## Web app (edaapp)
+
+- **Methodology and Review first pages, found by file name** (2026-09-24). `METHODOLOGY.md` at
+  the dataset root → a Methodology page (contents, anchors, live reload). `quality/review-first.md`
+  → a Review first page: items link to the flagged paragraph, show live verdict badges, filter by
+  type, and have Keep/Drop/Fix and drop-¶ buttons in place. `id N`, `quality/x.md`,
+  `annotations/x.parquet` and `README.md`/`LEARNINGS.md` in any rendered document become links,
+  but only to targets that exist.
+- **Follow a flagged paragraph by content across rebuilds** (2026-09-24). The 22:24 cleanup
+  rebuild edited 16 of the 50 review-first paragraphs in place and removed 7. With a sha1 check
+  alone, the edited ones would have looked "gone". — done: the page reports each paragraph as
+  same, moved, changed or gone, from `para_sha1`, and counts staleness per paragraph (8,452
+  stale paragraphs right after the rebuild). idea: have `review-first.md` carry `para_sha1`
+  itself.
+- **Documents need stricter math rules than the corpus** (2026-09-24). Rendered with the
+  articles' dollar rules, "$0.53/h … $0.26" in METHODOLOGY.md became a formula. The corpus
+  escapes its dollars; hand-written documents don't. — done: `render_doc` uses stricter rules.
+- **Separate document edits from data changes in live reload** (2026-09-24). Every save of
+  METHODOLOGY.md made Browse, Overview and the queue reload. — done: a separate `tables` counter
+  in `/api/changes`.
+- **Checks run with their own review state** (2026-09-24). — done: `--state PATH` (must be inside
+  `edaapp/`), plus a pytest guard that fails the run if the real `state/` changes. todo: make
+  "checks use `--state .cache/…`" a rule for agents working on edaapp.
 
 - **The review file needs full-state events** (2026-09-24). `build` applies only the latest
   event per article and matches dropped paragraphs by sha1. So an event that leaves out an

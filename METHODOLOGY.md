@@ -94,7 +94,7 @@ Many of these are Lua modules, which only MediaWiki can run. So `prepare.py rend
 
 **Why.** External-link and bibliography lists also sit under headings the section rules don't know. In the first 500 pages, lists like "India profile from the BBC News" survived under ଅଧିକ ତଥ୍ୟ and ବାହାର ତଥ୍ୟ before this rule.
 
-**Known gap.** A link written in Odia passes the test: 429 "- ଇଣ୍ଟରନେଟ ମୁଭି ଡାଟାବେସରେ …" (IMDb) lines survived.
+**Known gap, fixed.** A link written in Odia passes this test: "- ଇଣ୍ଟରନେଟ ମୁଭି ଡାଟାବେସରେ …" (IMDb) lines survived it. They are now dropped by template name; see [Text cleanups](#text-cleanups-2026-09-24).
 
 ### Data tables kept as Markdown
 
@@ -341,6 +341,64 @@ edaapp, the web app of odia-llm-trainer for browsing and reviewing datasets, sho
 
 The counts are in the build JSON and `README.md`. So far no reviews have been applied.
 
+## Text cleanups, 2026-09-24
+
+Four problems found by the measurements and the review queue, fixed in `prepare.py`. The rebuild changed 2,530 articles and dropped 7 more pages that were left with under 5 Odia words (all near-entirely English, `odia_ratio` 0.02–0.21, e.g. ସାମରୋଜ ଆଜମି ଆଲଭୀ).
+
+### External-link lines written in Odia
+
+**Rule.** The output of external-link templates is dropped by template name, like the other templates in `DROP_TEMPLATES`: `imdb*`, `facebook*`, `instagram*`, `twitter*`, `youtube*`, `bollywood hungama*`, `official website`, `official`, `dmoz`, `curlie`, `cia world factbook link`, `allmusic*`, `discogs*`, `rotten tomatoes*`, `spotify*`, `linkedin*`. A list item left empty disappears.
+
+**Why.** These templates write their line in Odia ("ଇଣ୍ଟରନେଟ ମୁଭି ଡାଟାବେସରେ ନନ୍ଦିତା ଦାସ", "ଫେସବୁକରେ ଶ୍ରେୟା ଘୋଷାଲ"), so `link_only_item()`, which looks for mostly non-Odia link items, kept them. A scan of all list items with an external link and at most 6 Odia words besides it showed where they come from: `imdb name` 1,162 and `imdb title` 954 items, then `facebook`, `instagram`, `twitter`, `bollywood hungama`, `official website`. Almost all other such items are citations, already dropped with the reference sections.
+
+**Effect.** IMDb lines 608 → 1, Instagram 69 → 1, Facebook 57 → 13 and Twitter 29 → 4 (the rest are mentions in prose).
+
+### Typos copied by bots
+
+**Rule.** `TYPO_FIXES` in `prepare.py`: each entry is a pattern tied to the context the mistake appears in, so a genuine use of the same letters survives. Applied in `fix_residue()`, before escaping.
+
+| Fix | Pattern | Fixed |
+|---|---|---:|
+| ପରୁଷ → ପୁରୁଷ ("male") | ପରୁଷ followed by ୋତ୍ତମ, ଙ୍କ, ମାନ, or a space and ହୋଇଥିବା / ଓ | 917 |
+
+**Why.** A bot's census sentence ("… % ଜଣ ପରୁଷ ହୋଇଥିବା ବେଳେ …") has the typo in every copy (904), and the same slip appears in a few hand-written forms (ପରୁଷଙ୍କ, ପରୁଷମାନଙ୍କ, ପରୁଷୋତ୍ତମ). ପରୁଷ is also a real word ("harsh"), so the fix is not a blind replacement. The corpus has no genuine use of it.
+
+**Not covered.** Two other misspellings with the same letters: ପରୁଷ୍କାର (for ପୁରସ୍କାର "award", ମହେଶ ବାବୁ) and ପରୁଷାମାନଙ୍କ (ହେରେଡିଟାରି ଆଞ୍ଜିଓଇଡିମା).
+
+### Conversion leftovers
+
+**Rule.** `fix_residue()` in `prepare.py`, applied to every block and table cell after the digit conversion and before escaping:
+
+| Leftover | Rule | Fixed |
+|---|---|---:|
+| Content Translation anchors `<a href=… class="cx-link" data-linkid=…>Dryvax</a>` pasted as text | `ANCHOR_TAG`: strip `<a …>` with attributes and `</a>`, keep the link text; a bare `<a>` (the URL article discusses it) stays | 24 |
+| HTML entities shown as text | `&amp;` → `&` ("Channapatna Toys &amp; Dolls"), `&#13;` removed; other numeric entities stay (the article on ୡ lists them on purpose) | 26 |
+| Raw wikitable syntax `{\| … \|- … \|}` | `WIKITABLE_MARK`: a block with 3 or more ` \| ` cell separators is a table printed as text and is dropped; otherwise the stray marks are stripped | 1 block, 8 marks |
+| Template parameters shown as text (`Quote box\|width=\|bgcolor=#ACE1AF\|…`) | `TEMPLATE_PARAMS`, only where `\|width=`, `\|bgcolor=`, `\|align=`, `\|style=`, `\|class=`, `\|quote=` or `\|border=` appears | 2 |
+| HTML attributes shown as text | `HTML_ATTR`: `style="…"`, `class="…"`, `align=…` and similar | 3 |
+| Hidden-category text | `CATEGORY_TEXT`: "Category:Articles containing potentially dated statements from" | 3 |
+
+In total the rules removed 8,046 characters of leftovers.
+
+### English-dominant blocks
+
+**Which blocks.** A block is English-dominant when it has more than twice as many Latin letters as Odia letters. Only letters count (digits are ASCII by then) and math is ignored (`english_dominant()` in `prepare.py`). The unit and its minimum:
+
+| Unit | Also needs |
+|---|---|
+| paragraph | at least 30 Latin letters |
+| heading | at least 5 Latin letters ("Early life") |
+| list item | at least 10 Latin letters |
+| table | at least 30 Latin letters and fewer than 200 Odia letters |
+
+**What happens to them.** They are removed and kept aside in `removed/english-paragraphs.parquet`: 6,622 blocks (513 paragraphs, 5,591 list items, 518 tables).
+
+### List nesting after removals
+
+**Rule.** When the output is assembled, a list item may be indented at most to the content column of the list item before it (`LI_PREFIX` in `html_to_text()`).
+
+**Why.** Removing an item can leave its sublist stranded deeper than any item above it. CommonMark reads that as an indented code block: the English filter broke the rivers-of-India list and the dinosaur classification this way, and the Markdown check caught both. After the fix all 20,827 articles parse as intended again, and pandoc agrees on the 405-article sample.
+
 ## Known limitations and open issues
 
 - **Boilerplate.** 6.8% of paragraphs repeat, with names and numbers masked, in 5 or more articles (year-page sentences, coordinates, census sentences, the Hindi-official-language sentence); `bot_created` covers only about a fifth of them. A per-article templated share and a repeat cap for the training mix are still to do.
@@ -357,6 +415,13 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
+- **2026-09-24: text cleanups.**
+  - External-link templates dropped (IMDb lines 608 → 1).
+  - ପରୁଷ → ପୁରୁଷ in context (917).
+  - Conversion leftovers fixed (67).
+  - 6,622 English-dominant blocks removed and kept aside.
+  - List nesting clamped.
+  - 2,530 articles changed; 20,827 articles remain.
 - **2026-09-24: methodology page.** This document, shown as edaapp's Methodology page.
 - **2026-09-24: human review loop.** `build` applies edaapp decisions (article drops, paragraph drops by sha1; `--no-reviews`). No decisions applied yet.
 - **2026-09-24: Sarvam-1 bits per byte and review-first queue.** Every paragraph scored ($0.26 of GPU time); 200 articles queued in seven types (`annotations/bpb.parquet`, `quality/bpb.md`, `quality/review-first.md`).
@@ -376,4 +441,4 @@ Every step that changes the Wikipedia data, or adds knowledge about its quality,
 3. Update the Summary numbers if they changed, and the [Known limitations](#known-limitations-and-open-issues) if an issue was fixed or found.
 4. Record what the step taught us in `LEARNINGS.md`.
 
-Coming next: the text cleanups, re-scoring the paragraphs they change, and scoring the corpus with the project's own model.
+Coming next: re-scoring the paragraphs the text cleanups changed, and scoring the corpus with the project's own model.

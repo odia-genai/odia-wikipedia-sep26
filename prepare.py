@@ -346,6 +346,11 @@ DROP_TEMPLATES = {
     "authority control", "portal*", "ମୁଣ୍ଡିଆ*", "ଅଧାଗଢ଼ା", "ଅଧାଗଢା", "ବଟ୍ ତିଆରି", "ଆଧାର",
     "reflist", "notelist", "use dmy dates", "use mdy dates", "stub*", "*-stub", "about",
     "other uses*", "redirect*", "distinguish", "main", "see also", "further", "for",
+    # external-link lines written in Odia ("ଇଣ୍ଟରନେଟ ମୁଭି ଡାଟାବେସରେ <title>", "ଫେସବୁକରେ <name>"): the
+    # link-only filter misses them because their text is Odia (2,116 IMDb lines alone)
+    "imdb*", "facebook*", "instagram*", "twitter*", "youtube*", "bollywood hungama*",
+    "official website", "official", "dmoz", "curlie", "cia world factbook link", "allmusic*",
+    "discogs*", "rotten tomatoes*", "spotify*", "linkedin*",
 }
 DROP_TYPEOF = ("mw:Extension/ref", "mw:Extension/references", "mw:Extension/gallery",
                "mw:Extension/templatestyles", "mw:Extension/graph", "mw:Extension/timeline",
@@ -616,6 +621,69 @@ PX_RESIDUE = re.compile(r"(?<![\w.])\d{1,4}px\b")  # image sizes left as text: "
 # after it), before a space or line end.
 PIPE_DANDA = re.compile(r"(?<=[\u0B00-\u0B7F)\]\"'”’])(\s?)(\|\|?)(?=\s|$)", re.M)
 
+# Spelling mistakes copied by bots into many articles: (name, pattern, replacement). Each fix is
+# tied to the context the mistake appears in, so a genuine use of the same letters survives.
+TYPO_FIXES = [
+    # ପରୁଷ (harsh) for ପୁରୁଷ (man): the census template "…% ଜଣ ପରୁଷ ହୋଇଥିବା ବେଳେ…" (904×) and
+    # its forms ପରୁଷଙ୍କ, ପରୁଷମାନଙ୍କ, ପରୁଷୋତ୍ତମ; the corpus has no genuine ପରୁଷ
+    ("ପରୁଷ→ପୁରୁଷ", re.compile(r"ପରୁଷ(?=ୋତ୍ତମ|ଙ୍କ|ମାନ|\s+(?:ହୋଇଥିବା|ଓ\s))"), "ପୁରୁଷ"),
+]
+# Conversion leftovers found by the bpb review queue (2026-09-24)
+ANCHOR_TAG = re.compile(r"<a\s[^<>]*>|</a>")  # Content Translation's <a href=… class="cx-link">…</a>
+WIKITABLE_MARK = re.compile(r"\{\||\|\}|(?:^|(?<=\s))\|-(?=\s|$)")  # raw {| … |- … |} table syntax
+TEMPLATE_PARAMS = re.compile(r"(?:\b[A-Z][A-Za-z ]{0,30})?(?:\|\s*[A-Za-z_]+\s*=\s*[^|\n]*)+")
+TEMPLATE_PARAMS_HINT = re.compile(r"\|\s*(?:width|bgcolor|align|style|class|quote|border)\s*=")
+HTML_ATTR = re.compile(r'\b(?:style|class|align|width|bgcolor|colspan|rowspan|valign|cellpadding|border)'
+                       r'\s*=\s*"[^"]*"')
+CATEGORY_TEXT = re.compile(r"Category:Articles containing potentially dated statements(?: from)?\s*")
+FIX_COUNTS = collections.Counter()  # how often each rule above fired in this build
+
+
+def fix_residue(text):
+    """Strip conversion leftovers; returns "" when the block is raw wikitable text."""
+    n = len(text)
+    for name, pattern, repl in TYPO_FIXES:
+        text, k = pattern.subn(repl, text)
+        FIX_COUNTS[f"typo {name}"] += k
+    text, k = ANCHOR_TAG.subn("", text)
+    FIX_COUNTS["anchor tags"] += k
+    k = text.count("&amp;") + text.count("&#13;") + text.count("&#10;")
+    text = text.replace("&amp;", "&").replace("&#13;", "").replace("&#10;", " ")
+    FIX_COUNTS["html entities"] += k
+    if WIKITABLE_MARK.search(text):
+        if text.count(" | ") >= 3:  # a whole table as text: nothing to salvage
+            FIX_COUNTS["raw wikitable blocks dropped"] += 1
+            return ""
+        text, k = WIKITABLE_MARK.subn("", text)
+        FIX_COUNTS["stray wikitable marks"] += k
+    if TEMPLATE_PARAMS_HINT.search(text):
+        text, k = TEMPLATE_PARAMS.subn("", text)
+        FIX_COUNTS["template parameter text"] += k
+    text, k = HTML_ATTR.subn("", text)
+    FIX_COUNTS["html attributes"] += k
+    text, k = CATEGORY_TEXT.subn("", text)
+    FIX_COUNTS["category text"] += k
+    FIX_COUNTS["_chars removed"] += n - len(text)
+    return text
+
+# English-dominant blocks: more than twice as many Latin as Odia letters (digits are ASCII by
+# then, so only letters count): untranslated leftovers, English quotes, bibliographies, Latin-script
+# lists. They are taken out of the text and counted in the build statistics.
+# Judged per paragraph (>= 30 Latin letters),
+# per list item (>= 10; a whole list judged at once took mixed Odia lists with it), and per table
+# (>= 30, and under 200 Odia letters, so bilingual tables with an Odia column stay).
+LATIN = re.compile(r"[A-Za-z]")
+ODIA_LETTER = re.compile(r"[\u0B00-\u0B65\u0B70-\u0B7F]")
+ENGLISH_MIN_LATIN = {"p": 30, "li": 10, "t": 30}
+TABLE_KEEP_ODIA = 200
+
+
+def english_dominant(text, kind="p"):
+    latin, odia = len(LATIN.findall(text)), len(ODIA_LETTER.findall(text))
+    if kind == "t" and odia >= TABLE_KEEP_ODIA:
+        return False
+    return latin >= ENGLISH_MIN_LATIN[kind] and latin > 2 * odia
+
 # Markdown escaping, so that text from the page never turns into markup: emphasis, code,
 # HTML, links, math ($), and, at the start of a line, headings, quotes, lists, rules.
 WORDCHAR = "0-9A-Za-z\u0B00-\u0B7F"
@@ -659,7 +727,9 @@ def clean_block(block, cell=False):
     # Odia digits become ASCII here, before escaping: "୧. ବିଧାୟିକା" must end up "1\. ବିଧାୟିକା",
     # not a numbered list.
     DIGITS_CONVERTED[0] += len(ODIA_DIGIT.findall(text))
-    text = text.translate(ODIA_DIGITS)
+    text = fix_residue(text.translate(ODIA_DIGITS))
+    if not text:
+        return kind, level, prefix, ""
     # Broken [[File:...|thumb|...]] or table markup that rendered as text; punctuation alone.
     if (FILE_RESIDUE.search(text) or TABLE_RESIDUE.search(text) or HTML_RESIDUE.search(text)
             or not re.search(r"\w", text) or re.fullmatch(r"(?:ଛାଞ୍ଚ|Template):[^\n]*", text)):
@@ -698,6 +768,9 @@ def section_heading(sec):
     return SPACES.sub(" ", h.text_content()).strip() if h is not None else None
 
 
+LI_PREFIX = re.compile(r"^( *)((?:- |\d+\. )?)$")  # a list block's prefix: indent, then marker
+
+
 def html_to_text(doc):
     """(Markdown text without the title, info) for one Parsoid HTML page."""
     from lxml import html as lhtml
@@ -716,6 +789,17 @@ def html_to_text(doc):
     w.walk(body)
     w.flush()
     blocks = [clean_block(b) for b in w.blocks]
+    # English-dominant blocks (see english_dominant) are taken out and returned, so the build
+    # can count them.
+    removed = []
+    for k, (kind, level, prefix, text) in enumerate(blocks):
+        if kind not in ENGLISH_MIN_LATIN or not text or not english_dominant(MATH_SLOT.sub("", text), kind):
+            continue
+        full = put_math_back(text)
+        name = {"p": "paragraph", "li": "list item", "t": "table", "h": "heading"}[kind]
+        removed.append(("English", name, full))
+        blocks[k] = (kind, level, prefix, "")
+    info["english_removed"] = removed
     # Drop headings with no content before the next heading of the same or higher level.
     keep = []
     for k in reversed(range(len(blocks))):
@@ -726,11 +810,19 @@ def html_to_text(doc):
             continue
         keep.append((kind, level, prefix, text))
     keep.reverse()
-    out = []
+    out, prev_col = [], 0
     for i, (kind, level, prefix, text) in enumerate(keep):
         if kind == "h":
             text = "#" * level + " " + text
         elif kind == "li":
+            # An item may be indented at most to the content column of the list item before it.
+            # Removing an item (English filter, empty item) can strand its sublist deeper than
+            # that, which CommonMark reads as an indented code block; such items move up.
+            indent, marker = LI_PREFIX.match(prefix).groups()
+            limit = prev_col if i and keep[i - 1][0] == "li" else 0
+            prefix = indent[:limit] + marker
+            if marker:
+                prev_col = len(prefix)
             # continuation lines line up with the item's content
             text = prefix + text.replace("\n", "\n" + " " * len(prefix))
         # Consecutive list items stay together; everything else is a paragraph of its own.
@@ -852,12 +944,17 @@ def build(args):
     if have < n_chunks and not args.partial:
         raise SystemExit(f"{have}/{n_chunks} chunks rendered; run `render` first (or --partial)")
     records, excluded, seen = [], [], {}
+    removed_blocks = []  # English-dominant blocks taken out of articles
     reviews = {} if args.no_reviews else load_reviews(args.reviews, DATASET)
     review_counts = collections.Counter(articles_dropped=0, paragraphs_dropped=0, fix_pending=0,
                                         paragraph_refs_not_found=0)
 
     def exclude(a, reason, detail=""):
         excluded.append({"title": a["title"], "reason": reason, "detail": detail})
+
+    def blocks_of(a, info, kept):
+        return [{"id": a["id"], "title": a["title"], "kind": kind, "reason": reason,
+                 "text": para, "article_kept": kept} for reason, kind, para in info["english_removed"]]
 
     print(f"converting {len(arts):,} pages", file=sys.stderr)
     for r in read_chunks(date):  # streamed: the HTML of all pages is ~1.3 GB
@@ -889,6 +986,7 @@ def build(args):
                 continue
             review_counts["fix_pending"] += review.get("verdict") == "fix"
             text = apply_review(text, review, review_counts)
+        removed_blocks += blocks_of(a, info, True)
         records.append({
             "id": a["id"],
             "title": a["title"],
@@ -921,6 +1019,8 @@ def build(args):
         "bot_created": sum(r["bot_created"] for r in records),
         "stub": sum(r["stub"] for r in records),
         "odia_digits_converted": DIGITS_CONVERTED[0],
+        "english_removed": dict(collections.Counter(b["kind"] for b in removed_blocks)),
+        "cleanup_fixes": dict(FIX_COUNTS),
         "table_words": sum(len(odia_words("\n".join(line for line in r["text"].split("\n")
                                                      if line.startswith("|")))) for r in records),
         "articles_with_tables": sum(r["tables"] > 0 for r in records),
@@ -1093,14 +1193,25 @@ A short example record:
    - bare URLs typed into the prose, and raw HTML pasted into the wikitext (a Content
      Translation bug) that renders as text
    - empty sections, and parentheses emptied by the removed pronunciations
-4. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
+   - external-link lines written in Odia (IMDb, Facebook, Instagram, Twitter, official website, …),
+     dropped by template name
+   - conversion leftovers found by the review queue: Content Translation `<a href=… cx-link>` tags,
+     raw `{{| … |}}` wikitable text, template parameters shown as text (`Quote box|width=…`), HTML
+     attributes, `Category:` text, and the entities `&amp;` / `&#13;`
+     ({sum(v for k, v in stats['cleanup_fixes'].items() if not k.startswith(('typo', '_'))):,} fixes)
+   - **English-dominant blocks** (more than twice as many Latin as Odia letters: untranslated
+     leftovers, English quotes, bibliographies) are removed, judged per paragraph, list item and
+     table ({sum(stats['english_removed'].values()):,} blocks)
+4. **Fix known typos.** Bots copied some misspellings into hundreds of articles; each fix is tied to
+   its context: {', '.join(f"{k[5:]} ({v:,})" for k, v in stats['cleanup_fixes'].items() if k.startswith('typo'))}.
+5. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
    U+0B5F). **Odia digits become ASCII** (`୧୯୪୭` → `1947`; {stats['odia_digits_converted']:,} digits), in
    text, headings, tables and math, so numbers look the same everywhere (titles keep the page name). A `|`
    typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
    hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
-5. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
+6. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
    `{stem}-build.json`. Stubs are kept and flagged, not dropped.
 
 | Reason | Pages |
