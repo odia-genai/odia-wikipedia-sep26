@@ -132,6 +132,18 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **Review decisions flow from the web app back into the build** (2026-09-24). `build` reads
+  `edaapp/state/reviews.jsonl`, taking the last event per page id. It drops articles marked
+  *drop* and removes dropped paragraphs by **content sha1, not index**, so a decision survives
+  rebuilds that shift paragraphs. It counts decisions whose paragraph no longer exists, and it
+  skips a half-written last line. — done: `load_reviews()` and `apply_review()`, unit-tested in
+  scratch; `--no-reviews`; the counts go into the build JSON and the README.
+- **Backslashes in a plain f-string are a latent syntax error** (2026-09-24). The README template
+  had `` `\*` `` in a non-raw f-string. Python 3.13 only warns (SyntaxWarning), ruff's rule set
+  here (E, F, I, UP, B) doesn't include W605, and a future Python will reject it. — Check
+  generated-text templates with `python -W error` or enable ruff `W605`. — done: doubled the
+  backslashes.
+
 - **"Markdown-shaped" text was not all valid Markdown** (2026-09-24). Parsing all 20,834
   articles with markdown-it (CommonMark + GFM tables) found about 100 articles that parsed
   differently from what was meant:

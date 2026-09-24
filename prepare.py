@@ -793,6 +793,55 @@ def convert(row):
     return row["id"], body, info
 
 
+REVIEWS = ROOT / "reviews" / "reviews.jsonl"  # review decisions, one JSON event per line
+DATASET = "odia-wikipedia"  # the `dataset` field of this corpus's review events
+
+
+def shown_path(path):
+    """A path as the build statistics record it: relative to this folder when it is inside it."""
+    p = Path(path).resolve()
+    return str(p.relative_to(ROOT)) if p.is_relative_to(ROOT) else str(path)
+
+
+def load_reviews(path, dataset):
+    """Latest review event per page id for this dataset (the app appends; the last event wins)."""
+    latest = {}
+    if path and Path(path).exists():
+        for line in Path(path).read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:  # a line the app is still writing
+                continue
+            if e.get("dataset") == dataset and "id" in e:
+                latest[int(e["id"])] = e
+    return latest
+
+
+def apply_review(text, review, counts):
+    """Remove the paragraphs a reviewer dropped, matched by content (sha1), not by position,
+    so a decision survives rebuilds that shift paragraphs. Returns the new text."""
+    shas = {d["sha1"] for d in review.get("drop_paragraphs") or [] if d.get("sha1")}
+    if not shas:
+        return text
+    keep, gone = drop_paragraphs(text.split("\n\n"), shas, keep_first=True)
+    counts["paragraphs_dropped"] += len(gone)
+    counts["paragraph_refs_not_found"] += len(shas - {para_sha1(q) for q in gone})
+    return "\n\n".join(keep)
+
+
+def para_sha1(q):
+    return hashlib.sha1(q.encode()).hexdigest()
+
+
+def drop_paragraphs(paras, shas, keep_first):
+    """(kept, dropped): paras without those whose sha1 is in shas. keep_first: the first paragraph
+    (the # title) always stays."""
+    kept, gone = [], []
+    for i, q in enumerate(paras):
+        (gone if (i or not keep_first) and para_sha1(q) in shas else kept).append(q)
+    return kept, gone
+
+
 def build(args):
     """HTML -> the corpus (JSON lines), the build statistics and README.md."""
     date = find_date(args.dump)
@@ -803,6 +852,9 @@ def build(args):
     if have < n_chunks and not args.partial:
         raise SystemExit(f"{have}/{n_chunks} chunks rendered; run `render` first (or --partial)")
     records, excluded, seen = [], [], {}
+    reviews = {} if args.no_reviews else load_reviews(args.reviews, DATASET)
+    review_counts = collections.Counter(articles_dropped=0, paragraphs_dropped=0, fix_pending=0,
+                                        paragraph_refs_not_found=0)
 
     def exclude(a, reason, detail=""):
         excluded.append({"title": a["title"], "reason": reason, "detail": detail})
@@ -830,6 +882,13 @@ def build(args):
             continue
         seen[key] = a
         text = f"# {md_heading(a['title'])}\n\n{body}"
+        if review := reviews.get(a["id"]):
+            if review.get("verdict") == "drop":
+                exclude(a, "reviewer: drop", review.get("note") or "")
+                review_counts["articles_dropped"] += 1
+                continue
+            review_counts["fix_pending"] += review.get("verdict") == "fix"
+            text = apply_review(text, review, review_counts)
         records.append({
             "id": a["id"],
             "title": a["title"],
@@ -869,6 +928,8 @@ def build(args):
         "odia_ratio_below_0.6_words": sum(r["words"] for r in records if r["odia_ratio"] < 0.6),
         "markdown_escapes": sum(len(MD_ESCAPE.findall(r["text"])) for r in records),
         "articles_with_escapes": sum(bool(MD_ESCAPE.search(r["text"])) for r in records),
+        "reviews": {"file": shown_path(args.reviews) if reviews else None, "articles_reviewed": len(reviews),
+                    **review_counts},
         "min_words": args.min_words,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
         "dropped_titles": excluded,
@@ -884,6 +945,27 @@ def write_jsonl(path, rows):
     with open(path, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def annotations_section(stats):
+    """README section on the review decisions this build applied."""
+    rv = stats["reviews"]
+    return f"""## Review decisions
+
+Review decisions are kept in `reviews/reviews.jsonl`, one append-only JSON event per line: `ts`,
+`dataset` (`odia-wikipedia`), `id`, `title`, `verdict` (`keep`, `drop`, `fix` or null), `note`,
+`drop_paragraphs` (a list of `{{"para": i, "sha1": …}}`) and `text_sha1` (the text reviewed). They were
+recorded with edaapp, the review web app of the project this dataset was built in; appending
+events by hand works as well.
+`build` applies the **latest event per article**, so every event carries the article's complete
+decision: articles marked *drop* are left out, and dropped paragraphs are removed, matched by the
+sha1 of their text (not by position), so they survive rebuilds. Paragraph 0 (the title) is never
+dropped. This
+build applied {rv['articles_reviewed']:,} reviews: {rv['articles_dropped']:,} articles dropped,
+{rv['paragraphs_dropped']:,} paragraphs dropped, {rv['fix_pending']:,} marked *fix*, and
+{rv['paragraph_refs_not_found']:,} paragraph decisions whose text is no longer in the article.
+Use `--no-reviews` to build without them.
+"""
 
 
 def write_readme(stats, records, stem):
@@ -914,6 +996,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `{stem}-build.json` | build statistics and the title of every page left out, with the reason |
 | `prepare.py` | the script that made all of it (download, render, build) |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
+| `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | inputs kept for rebuilds: the dump, the article index, Wikipedia's rendered HTML of every article |
 
@@ -1009,6 +1092,7 @@ bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-t
 |---|---:|---:|
 {chr(10).join(size_rows)}
 
+{annotations_section(stats)}
 ## Using it
 
 ```python
@@ -1058,6 +1142,9 @@ def main():
     ap.add_argument("--min-words", type=int, default=5,
                     help="drop articles with fewer Odia words than this after cleaning")
     ap.add_argument("--partial", action="store_true", help="build from the chunks rendered so far")
+    ap.add_argument("--reviews", type=Path, default=REVIEWS,
+                    help="review decisions, JSON lines (default: reviews/reviews.jsonl)")
+    ap.add_argument("--no-reviews", action="store_true", help="ignore review decisions")
     args = ap.parse_args()
     if args.step in ("download", "all"):
         args.dump = download(args)
