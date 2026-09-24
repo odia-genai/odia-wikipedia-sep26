@@ -118,14 +118,19 @@ def file_sha1(path):
 
 
 def write_atomic(path, data):
+    """Write to a temp file next to `path`, then rename it over `path`; the temp file never survives
+    a failure (a full disk once left one behind)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    if isinstance(data, str):
-        tmp.write_text(data, encoding="utf-8")
-    else:
-        tmp.write_bytes(data)
-    os.replace(tmp, path)
+    try:
+        if isinstance(data, str):
+            tmp.write_text(data, encoding="utf-8")
+        else:
+            tmp.write_bytes(data)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def read_jsonl(path):

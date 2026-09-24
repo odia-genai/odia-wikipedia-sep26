@@ -448,6 +448,7 @@ Newest first.
   - Cost: $0.02 on an RTX 4000 Ada.
   - Corpus bpb 0.5564 → 0.5500.
   - Review queue rebuilt on the cleaned text.
+- **2026-09-24: build writes survive a full disk.** A rebuild on a full disk left a partial temp file; `atomic_write()` now removes it and leaves the old files untouched.
 - **2026-09-24: text cleanups.**
   - External-link templates dropped (IMDb lines 608 → 1).
   - ପରୁଷ → ପୁରୁଷ in context (917).

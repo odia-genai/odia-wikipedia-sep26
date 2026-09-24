@@ -91,12 +91,17 @@ MIN_RATE = 20_000  # bytes/s; slower than this for a minute counts as a stall
 # ---------------------------------------------------------------------------------- io
 
 def replace_atomic(path, write):
-    """Call write(tmp) on a temp file next to path, then move it over path."""
+    """Call write(tmp) on a temp file next to path, then move it over path. On any error (a full
+    disk) the temp file is removed and the old path is left untouched."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
-    write(tmp)
-    os.replace(tmp, path)
+    try:
+        write(tmp)
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def write_atomic(path, data):

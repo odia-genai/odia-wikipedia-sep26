@@ -239,6 +239,13 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **The Mac's disk filled up, and a build died writing its temp file** (2026-09-24). 127 MB of
+  228 GB were free, mostly used outside this work. The atomic writes kept the corpus intact, but
+  a 20 MB partial `orwiki-20260901.tmp` was left behind. Freeing this session's scratch (browser
+  profiles, test copies, a corpus copy: ~510 MB) let the rebuild finish, byte-identical. —
+  Check `df` before long jobs, and clean scratch as you go, not at the end. — done:
+  `atomic_write()` in `prepare.py` removes the temp file on any failure (tested with a
+  simulated ENOSPC).
 - **A cached pod image makes small GPU jobs nearly free** (2026-09-24). The re-score pod
   (RTX 4000 Ada, $0.28/h) was ready in 13 s instead of 7 minutes and cost $0.02 for 25 s of
   scoring. The same texts re-scored on a different GPU came out bit-identical for 102 of 200,

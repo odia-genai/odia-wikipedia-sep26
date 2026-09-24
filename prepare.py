@@ -934,6 +934,18 @@ def drop_paragraphs(paras, shas, keep_first):
     return kept, gone
 
 
+def atomic_write(path, write):
+    """write(tmp) into a temp file next to path, then rename it over path; on failure the temp
+    file is removed and the old path is left untouched."""
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        write(tmp)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def build(args):
     """HTML -> the corpus (JSON lines), the build statistics and README.md."""
     date = find_date(args.dump)
@@ -1004,9 +1016,9 @@ def build(args):
 
     stem = corpus_stem(date)
     jl = ROOT / f"{stem}.jsonl"
-    tmp = jl.with_suffix(".tmp")  # readers never see a half-written file
-    write_jsonl(tmp, records)
-    tmp.replace(jl)
+    # Readers (edaapp, agents) never see a half-written file, and a failed write (a full disk)
+    # leaves no partial file behind.
+    atomic_write(jl, lambda tmp: write_jsonl(tmp, records))
     if args.markdown:
         write_markdown(records, prov.get("dump", stem))
 
