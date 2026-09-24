@@ -7,9 +7,9 @@
 
 Three steps, each resumable, all output under this directory:
 
-  download  the latest complete orwiki pages-articles dump (XML) -> raw/, SHA-1 checked and
-            indexed into raw/<wiki>-<date>-articles.jsonl (id, title, revid, timestamp, bot and
-            stub flags of every article), with its provenance in raw/<wiki>-<date>-dump.json
+  download  the latest complete orwiki pages-articles dump (XML), SHA-1 checked, reduced to
+            raw/<wiki>-<date>-articles.jsonl (id, title, revid, timestamp, bot and stub flags of
+            every article) and raw/<wiki>-<date>-dump.json (provenance), then deleted
   render    Wikipedia's own rendering (Parsoid HTML) of each article's dump revision
             -> raw/html/chunk-*.jsonl.gz, 500 articles per chunk
   build     HTML -> GitHub-flavoured Markdown -> orwiki-<date>.jsonl (the corpus,
@@ -131,7 +131,7 @@ def corpus_stem(date):
 
 def provenance_path(date):
     """raw/<wiki>-<date>-dump.json: which dump the article index came from (name, URL, size,
-    SHA-1)."""
+    SHA-1). The dump itself is deleted once indexed: everything the build needs is in the index."""
     return RAW / f"{WIKI}-{date}-dump.json"
 
 
@@ -151,6 +151,11 @@ def download(args):
     if status != 200:
         raise SystemExit(f"no dump {date} (HTTP {status})")
     info = json.loads(body)["jobs"]["articlesdump"]["files"][f"{WIKI}-{date}-pages-articles.xml.bz2"]
+    if index_path(date).exists() and provenance_path(date).exists():
+        prov = json.loads(provenance_path(date).read_text(encoding="utf-8"))
+        if prov.get("sha1") == info["sha1"]:  # already indexed; the dump itself is not needed
+            print(f"{index_path(date).name} is up to date ({prov['dump']})", file=sys.stderr)
+            return date
     path = dump_path(date)
     RAW.mkdir(parents=True, exist_ok=True)
     part = path.with_suffix(".bz2.part")
@@ -181,6 +186,9 @@ def download(args):
             "sha1": sha1, "date": date, "downloaded": datetime.date.today().isoformat(),
             "index": index_path(date).name}
     provenance_path(date).write_text(json.dumps(prov, indent=1) + "\n", encoding="utf-8")
+    if not args.keep_dump:  # the index holds all the build needs; the dump would only duplicate it
+        path.unlink()
+        print(f"indexed and deleted {path.name} (provenance in {provenance_path(date).name})", file=sys.stderr)
     return date
 
 
@@ -1338,7 +1346,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `translations/english-to-odia.jsonl` | Odia translations of English paragraphs and headings, with source and checks |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
-| `raw/` | inputs kept for rebuilds: the dump, the article index, Wikipedia's rendered HTML of every article |
+| `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
 All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`.
 
@@ -1383,7 +1391,10 @@ A short example record:
 ## How it was made
 
 1. **Download.** `{stats['dump']}` from dumps.wikimedia.org, with its SHA-1
-   (`{stats['dump_sha1']}`) checked against the dump's `dumpstatus.json`.
+   (`{stats['dump_sha1']}`) checked against the dump's `dumpstatus.json`. The build needs only
+   each article's id, title, revision id, timestamp and bot/stub flags, so the dump is reduced to
+   that index (`raw/{stem}-articles.jsonl`, with its provenance in `raw/{stem}-dump.json`) and
+   deleted; `download` fetches it again.
 2. **Render.** Every main-namespace page that is not a redirect ({stats['pages_in_dump']:,} pages)
    was fetched as Wikipedia's own rendering (Parsoid HTML) **of the exact revision in the
    dump**, from `/w/rest.php/v1/revision/<revid>/html`. Odia articles build whole sentences out
@@ -1510,6 +1521,8 @@ def main():
     ap.add_argument("--dump", help="dump date YYYYMMDD (default: latest)")
     ap.add_argument("--workers", type=int, default=6, help="parallel HTTP requests (render)")
     ap.add_argument("--limit-chunks", type=int, help="render at most this many chunks")
+    ap.add_argument("--keep-dump", action="store_true",
+                    help="download: keep the pages-articles dump after indexing it")
     ap.add_argument("--markdown", action="store_true", help="build: also write markdown/<title>.md files")
     ap.add_argument("--min-chars", type=int, default=0,
                     help="build: drop articles shorter than this many characters (0: off; see METHODOLOGY.md)")

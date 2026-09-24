@@ -1,0 +1,10 @@
+{
+ "dump": "orwiki-20260901-pages-articles.xml.bz2",
+ "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-pages-articles.xml.bz2",
+ "size": 41403955,
+ "sha1": "4ace67b6c5412a78565e463066f9450bfff6df6b",
+ "date": "20260901",
+ "downloaded": "2026-09-24",
+ "index": "orwiki-20260901-articles.jsonl",
+ "note": "the dump was indexed (ids, titles, revision ids, timestamps, bot/stub flags) and then deleted; `prepare.py download` fetches it again"
+}

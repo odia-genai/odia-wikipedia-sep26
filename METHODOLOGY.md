@@ -20,7 +20,7 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 
 `pipeline.py` runs everything from the cached inputs in one command (`uv run pipeline.py`, a few minutes; `--fetch` starts from scratch): build, annotations, scores, checks, stopping at the first failure. The steps are scripts of their own, all in this folder:
 
-1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, translation insertion, filtering, outputs, `README.md`).
+1. `prepare.py`: `download` (the dump, reduced to an article index), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, translation insertion, filtering, outputs, `README.md`).
 2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, every page of the index must be in the corpus or `excluded.jsonl` exactly once, and no cleaned-away residue may be left.
 3. `translate.py`: translation rounds for the English prose left in articles. It makes work batches, checks and merges the translations, and marks junk.
 4. `annotate.py`: topics and translation flags from the dump's metadata tables.
@@ -41,6 +41,8 @@ Reading this page: sections 2 to 6 are the build (the order in which text passes
 ## Source and snapshot
 
 **Rule.** Use the latest complete `pages-articles` dump, `orwiki-20260901-pages-articles.xml.bz2` (41,403,955 bytes, SHA-1 `4ace67b6c5412a78565e463066f9450bfff6df6b`, checked against the dump's `dumpstatus.json`). Every main-namespace page that is not a redirect (21,095 pages) is taken at **the exact revision in the dump**.
+
+**What is kept of it.** The build needs only each article's id, title, revision id, timestamp and two flags read from its wikitext (bot-created, stub). `download` writes those to `raw/orwiki-20260901-articles.jsonl` (21,095 lines, 3.3 MB) and the dump's name, URL, size and SHA-1 to `raw/orwiki-20260901-dump.json`, then deletes the 41 MB dump (`--keep-dump` keeps it). The text itself comes from the rendered HTML (below), so the dump would only duplicate it. `download` fetches it again for a new snapshot.
 
 **Why a dump.** It is a fixed, citable snapshot: each record keeps its `revid`, so `https://or.wikipedia.org/w/index.php?oldid=<revid>` shows exactly the source text, and a rebuild gives the same corpus.
 
@@ -564,6 +566,8 @@ Newest first.
   - Removed blocks moved to `removed-blocks.jsonl`.
   - No Parquet: the corpus, annotations and removed blocks are JSON lines. `markdown/` is written only with `--markdown`.
   - Titles use ASCII digits everywhere; `url` keeps the real page name.
+  - The 41 MB dump reduced to the article index (3.3 MB) and a provenance JSON, then deleted.
+  - `annotate.py`'s raw inputs reduced from 54.5 MB to 1.5 MB: the revision history and four SQL dumps became per-article facts and a category graph (JSON lines), with provenance in `raw/orwiki-20260901-caches.json`; results identical for every article.
   - Sarvam-1 scores kept per text in `raw/bpb/scores.jsonl.gz`, so no text is ever scored twice; the migration needed no GPU.
   - `pipeline.py` runs build, annotations, scores and checks in one command.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).

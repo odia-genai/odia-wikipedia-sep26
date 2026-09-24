@@ -1,0 +1,115 @@
+{
+ "description": "Caches that annotate.py translation and topics read instead of the dump files listed in sources. `annotate.py download` reduced those files to the caches and deleted the ones not kept_in_raw. Run it again to fetch them (SHA-1 checked against dumpstatus.json, whose SHA-1s are the ones here) and rebuild the caches: it does so whenever a SHA-1 or the article index changes, or with --rebuild-caches (--keep-dumps keeps the files).",
+ "created": "2026-09-24T19:15:34Z",
+ "script": "annotate.py download",
+ "sources": {
+  "orwiki-20260901-stub-meta-history.xml.gz": {
+   "sha1": "6e25b4872f95354557ee2fce1fbad3efd50b50e2",
+   "size": 44389151,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-stub-meta-history.xml.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "xmlstubsdump",
+   "dump_job_finished": "2026-09-01 11:12:01",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-change_tag.sql.gz": {
+   "sha1": "40080c3024d4fde186e318d4808ae0450aa488e1",
+   "size": 1677182,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-change_tag.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "changetagstable",
+   "dump_job_finished": "2026-09-01 12:03:21",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-page_props.sql.gz": {
+   "sha1": "e9c1f1952577d8a49712721d7bef8d04660a8114",
+   "size": 964843,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-page_props.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "pagepropstable",
+   "dump_job_finished": "2026-09-01 12:03:10",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-page.sql.gz": {
+   "sha1": "4bfdfa80d6303299c2d24aa1c7e99f3b46d8b483",
+   "size": 2884329,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-page.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "pagetable",
+   "dump_job_finished": "2026-09-01 12:03:06",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-linktarget.sql.gz": {
+   "sha1": "de586ece1a58b5d4e9c7ef07085d1e789638c578",
+   "size": 2927485,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-linktarget.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "linktargettable",
+   "dump_job_finished": "2026-09-01 12:02:51",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-categorylinks.sql.gz": {
+   "sha1": "a2a99ac2c00810182ae11528dbb5d4471a86e66f",
+   "size": 1553241,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-categorylinks.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "categorylinkstable",
+   "dump_job_finished": "2026-09-01 12:02:44",
+   "kept_in_raw": false
+  },
+  "orwiki-20260901-change_tag_def.sql.gz": {
+   "sha1": "ab95d7652cb5290f08e78a507810a546a47f9b57",
+   "size": 2010,
+   "url": "https://dumps.wikimedia.org/orwiki/20260901/orwiki-20260901-change_tag_def.sql.gz",
+   "dump_date": "2026-09-01",
+   "dump_job": "changetagdeftable",
+   "dump_job_finished": "2026-09-01 12:03:23",
+   "kept_in_raw": true
+  }
+ },
+ "index": {
+  "file": "orwiki-20260901-articles.jsonl",
+  "sha1": "57337b7beefe4d2b05a007d350b526c8dd7cee7f",
+  "articles": 21095
+ },
+ "caches": {
+  "orwiki-20260901-article-facts.jsonl.gz": {
+   "rows": 21095,
+   "bytes": 1310473,
+   "sha1": "17ba839a61675113cee3164e2bb8f28667c7f623",
+   "made_from": [
+    "orwiki-20260901-stub-meta-history.xml.gz",
+    "orwiki-20260901-change_tag.sql.gz",
+    "orwiki-20260901-change_tag_def.sql.gz",
+    "orwiki-20260901-page_props.sql.gz"
+   ],
+   "description": "one line per dump article (the article index), in index order: what annotate.py translation needs from the revision history, the change tags and page_props",
+   "fields": {
+    "id": "page id",
+    "wikidata": "the page's Wikidata item (page_props wikibase_item), or null",
+    "revisions": "revisions of the page up to the dump",
+    "first": "the first revision by time: rev, parent (0: none), ts, user (null: hidden; 'ip:<address>' for IP edits), uid (null: IP or hidden)",
+    "last": "the last revision by time, which is the dump revision: rev, ts, bytes (wikitext size)",
+    "later_editors": "[user, uid, revisions] for every contributor of the revisions after the first, in order of their first such revision",
+    "translation_revs": "revisions with a Content Translation tag or an edit summary matching /translat/i, in time order: rev, parent, ts, bytes, prev_bytes (size of the parent revision, else of the revision before it in time, else 0), tags (all change tags on it), comment (the edit summary)"
+   }
+  },
+  "orwiki-20260901-category-graph.jsonl.gz": {
+   "rows": 5556,
+   "bytes": 52354,
+   "sha1": "c4bfb8767cb1fb8e0ef52dab711d11ed5c9a3805",
+   "made_from": [
+    "orwiki-20260901-page.sql.gz",
+    "orwiki-20260901-page_props.sql.gz",
+    "orwiki-20260901-linktarget.sql.gz",
+    "orwiki-20260901-categorylinks.sql.gz"
+   ],
+   "description": "one line per category page: the category tree and the hidden categories that annotate.py topics reads",
+   "fields": {
+    "category": "category page title, spaces for underscores, as on the wiki (Odia digits kept)",
+    "hidden": "the category is hidden (__HIDDENCAT__, page_props hiddencat)",
+    "parents": "categories this one is in (categorylinks of type subcat), sorted; a parent may have no page (a red link)"
+   }
+  }
+ }
+}

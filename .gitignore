@@ -2,9 +2,8 @@
 /orwiki-*.jsonl
 # optional per-article Markdown export (`build --markdown`): a second copy of the corpus
 /markdown/
-# the dump `prepare.py download` fetches; its article index is tracked
+# the dump files `prepare.py download` and `annotate.py download` fetch, reduce and delete
 /raw/*.xml.bz2
-# the revision-history dump `annotate.py download` fetches
 /raw/*.xml.gz
 # temporary and partial files
 *.tmp

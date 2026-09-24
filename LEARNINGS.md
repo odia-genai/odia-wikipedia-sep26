@@ -346,6 +346,15 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   compared JSONL with Parquet exactly only because the agent had saved a copy of the old corpus
   first. — Snapshot an input before migrating it while others may rebuild it. — done.
 
+- **54.5 MB of annotation inputs were 1.5 MB of facts** (2026-09-25). `annotate.py` needed from
+  the 44 MB revision history only per-article facts (Wikidata item, revision counts, first and
+  last revision, later editors) and 7,535 of 315,883 revisions (CX tags, "translat" summaries).
+  Four SQL dumps (8.3 MB) reduce to a 52 KB category graph. Results are identical for all 18,694
+  articles. — Cache facts, not decisions, so rules can still change offline. — done:
+  `raw/orwiki-20260901-article-facts.jsonl.gz`, `category-graph.jsonl.gz`, provenance in
+  `caches.json`; `download` rebuilds them when a source SHA-1 changes.
+- **gzip writes a timestamp into its header** (2026-09-25), so rebuilding the same cache changed
+  its SHA-1. — Write gzip with `mtime=0` and no file name when provenance records hashes. — done.
 - **JSON lines cost 11–20× Parquet's disk** (2026-09-25): topics 7.5 MB against 0.66 MB,
   translation 8.7 MB against 0.43 MB, mostly repeated key names. — Readability has a disk price
   on a nearly full drive. — idea: accept it; gzip a file only if disk runs short.
@@ -361,6 +370,12 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   the corpus's ASCII-digit titles. — Record every exclusion as data (`id`, `revid`, `title`,
   `reason`, `detail`), and check that corpus and exclusions partition the index. — done:
   `excluded.jsonl`, `check.py` consistency check (it catches a single missing page).
+- **The dump was a second copy of the text** (2026-09-25). After rendering, the build read
+  only ids, titles, revision ids, timestamps and two template flags from the 41 MB dump. —
+  Reduce a raw input to the facts the build uses, with provenance to fetch it again. — done:
+  `raw/orwiki-20260901-articles.jsonl` (3.3 MB) and `raw/orwiki-20260901-dump.json`;
+  `download` deletes the dump after indexing (`--keep-dump` keeps it). The Parquet copy of
+  the corpus (21 MB), `markdown/` (135 MB) and `removed/` went too.
 - **Separate exports drifted; one command keeps them in step** (2026-09-25). Translations,
   annotations and scores were each re-run by hand after a build. — One pipeline, stopping at
   the first failing step. — done: `pipeline.py` (build, topics, translation, bpb carry-over,

@@ -8,7 +8,10 @@
 Steps, each re-runnable from cached inputs, all output under this directory:
 
   download     dump files -> raw/ (from the ACC mirror, else dumps.wikimedia.org), SHA-1 checked
-               against dumps.wikimedia.org's dumpstatus.json.
+               against dumps.wikimedia.org's dumpstatus.json. The revision history and the page,
+               category and tag tables are reduced to two small caches (per-article facts, the
+               category graph; provenance in raw/<wiki>-<date>-caches.json) and then deleted;
+               the tiny change_tag_def and user group tables are kept as they are.
   wikidata     P31/P106/P2175/P279 of the Wikidata items of articles that categories and titles
                leave without direct evidence -> raw/<wiki>-<date>-wikidata*.jsonl.gz (incremental)
   translation  change tags -> Content Translation flags -> annotations/translation.jsonl
@@ -27,7 +30,8 @@ Usage (uv reads the dependencies from the header above; nothing is installed in 
     uv run annotate.py all
 
 `download` and `wikidata` send ODIA_WIKI_CONTACT (an email or URL, never stored in a file) in the
-user-agent: Wikimedia throttles bulk clients without contact details.
+user-agent: Wikimedia throttles bulk clients without contact details. With the caches built,
+`translation` and `topics` run offline (`download` too: it only checks what is there).
 """
 
 import argparse
@@ -69,11 +73,14 @@ UA = ("odia-wikipedia-sep26/0.1 (research: annotating an Odia LLM training corpu
 CORPUS = ROOT / f"{WIKI}-{DATE}.jsonl"  # the built corpus (prepare.py build): which articles get rows
 INDEX = RAW / f"{WIKI}-{DATE}-articles.jsonl"  # every dump article (prepare.py download): id, title, revid
 
-# Dump files this script reads (job name in dumpstatus.json, file suffix).
-DUMP_FILES = [
+# Dump files kept in raw/ as they are: tiny, read at run time (job name in dumpstatus.json, suffix).
+KEEP_FILES = [
     ("changetagdeftable", "change_tag_def.sql.gz"),  # tag names and how often each was applied
     ("usergroupstable", "user_groups.sql.gz"),  # bot accounts, now ...
     ("userformergroupstable", "user_former_groups.sql.gz"),  # ... and in the past
+]
+# Dump files reduced to the caches below by `download`, then deleted (--keep-dumps keeps them).
+REDUCED_FILES = [
     ("xmlstubsdump", "stub-meta-history.xml.gz"),  # every revision's page, time, user, summary, size
     ("changetagstable", "change_tag.sql.gz"),  # tags on revisions
     ("pagepropstable", "page_props.sql.gz"),  # Wikidata items; hidden categories
@@ -81,6 +88,9 @@ DUMP_FILES = [
     ("linktargettable", "linktarget.sql.gz"),  # category link targets
     ("categorylinkstable", "categorylinks.sql.gz"),  # category -> parent category
 ]
+FACTS = RAW / f"{WIKI}-{DATE}-article-facts.jsonl.gz"  # one line per dump article
+GRAPH = RAW / f"{WIKI}-{DATE}-category-graph.jsonl.gz"  # one line per category page
+PROVENANCE = RAW / f"{WIKI}-{DATE}-caches.json"  # the dump files the caches were made from
 MAX_DOWNLOAD = 1_000_000_000  # stop rather than pull anything over ~1 GB onto the laptop
 # Where dump files come from, in order. dumps.wikimedia.org served 2-3 kB/s on 2026-09-24, so the
 # official mirror at ACC Umea goes first (~400 kB/s). Checksums always come from
@@ -240,18 +250,93 @@ def fetch_dump_file(job, suffix, status):
 
 
 def download(args):
+    """Fetch the kept dump files; build the caches from the reduced ones unless they are current
+    (same source SHA-1s, same article index, cache files intact); then delete the reduced ones."""
     RAW.mkdir(parents=True, exist_ok=True)
     status = dumpstatus()
-    for job, suffix in DUMP_FILES:
+    for job, suffix in KEEP_FILES:
         fetch_dump_file(job, suffix, status)
+    stale = caches_stale(status)
+    if stale or args.rebuild_caches:
+        print(f"building the caches ({stale or 'rebuild asked'})", file=sys.stderr)
+        for job, suffix in REDUCED_FILES:
+            fetch_dump_file(job, suffix, status)
+        build_caches(status)
+    else:
+        print(f"{FACTS.name}, {GRAPH.name}: current", file=sys.stderr)
+    if not args.keep_dumps:
+        for _, suffix in REDUCED_FILES:
+            if dump_file(suffix).exists():
+                dump_file(suffix).unlink()
+                print(f"deleted {dump_file(suffix).name} (reduced to the caches)", file=sys.stderr)
 
 
-# ------------------------------------------------------------------------- article facts
+# --------------------------------------------------------------------------------- caches
+#
+# The revision history (44 MB) and the page, category and tag tables (10 MB) are read once, by
+# `download`, and reduced to what `translation` and `topics` need. The caches keep facts, not
+# decisions: the rules (CX tags, the MDWiki summary, bot names, the tool share threshold, the
+# topic rules) are applied at run time, so they can change without the dumps.
 
-# Revisions kept in full in the facts: any tag of Content Translation, or an edit summary
+# Revisions kept in full in the facts cache: any tag of Content Translation, or an edit summary
 # about translating (CX's and MDWiki's "Created by translating ...", and hand-written ones).
 TRANSLATION_SUMMARY = re.compile(r"(?i)translat")
 CX_TAG_PREFIXES = ("contenttranslation", "sectiontranslation")
+
+FACTS_FIELDS = {
+    "id": "page id",
+    "wikidata": "the page's Wikidata item (page_props wikibase_item), or null",
+    "revisions": "revisions of the page up to the dump",
+    "first": "the first revision by time: rev, parent (0: none), ts, user (null: hidden; 'ip:<address>' for "
+             "IP edits), uid (null: IP or hidden)",
+    "last": "the last revision by time, which is the dump revision: rev, ts, bytes (wikitext size)",
+    "later_editors": "[user, uid, revisions] for every contributor of the revisions after the first, in "
+                     "order of their first such revision",
+    "translation_revs": "revisions with a Content Translation tag or an edit summary matching /translat/i, "
+                        "in time order: rev, parent, ts, bytes, prev_bytes (size of the parent revision, "
+                        "else of the revision before it in time, else 0), tags (all change tags on it), "
+                        "comment (the edit summary)",
+}
+GRAPH_FIELDS = {
+    "category": "category page title, spaces for underscores, as on the wiki (Odia digits kept)",
+    "hidden": "the category is hidden (__HIDDENCAT__, page_props hiddencat)",
+    "parents": "categories this one is in (categorylinks of type subcat), sorted; a parent may have no "
+               "page (a red link)",
+}
+
+
+# The dump files each cache is made from (suffixes); every one of them is in KEEP_FILES or REDUCED_FILES.
+CACHE_SOURCES = {
+    FACTS: ["stub-meta-history.xml.gz", "change_tag.sql.gz", "change_tag_def.sql.gz", "page_props.sql.gz"],
+    GRAPH: ["page.sql.gz", "page_props.sql.gz", "linktarget.sql.gz", "categorylinks.sql.gz"],
+}
+JOBS = {suffix: job for job, suffix in KEEP_FILES + REDUCED_FILES}
+
+
+def source_names():
+    """File names of every dump file the caches are made from, in REDUCED_FILES/KEEP_FILES order."""
+    wanted = {s for suffixes in CACHE_SOURCES.values() for s in suffixes}
+    return [f"{WIKI}-{DATE}-{s}" for _, s in REDUCED_FILES + KEEP_FILES if s in wanted]
+
+
+def caches_stale(status):
+    """Why the caches need building, or '' when they are current: every source file's SHA-1 in
+    dumpstatus.json is the one recorded, the article index is the same, the caches are intact."""
+    if not PROVENANCE.exists():
+        return f"no {PROVENANCE.name}"
+    if not INDEX.exists():
+        return f"no {INDEX.name}"
+    prov = json.loads(PROVENANCE.read_text(encoding="utf-8"))
+    for name in source_names():
+        job = JOBS[name.removeprefix(f"{WIKI}-{DATE}-")]
+        if prov["sources"].get(name, {}).get("sha1") != status["jobs"][job]["files"][name]["sha1"]:
+            return f"{name} is not the file recorded"
+    if prov["index"]["sha1"] != sha1_of(INDEX):
+        return f"{INDEX.name} changed"
+    for path in CACHE_SOURCES:
+        if not path.exists() or sha1_of(path) != prov["caches"].get(path.name, {}).get("sha1"):
+            return f"{path.name} is missing or changed"
+    return ""
 
 
 def revision_tags():
@@ -264,8 +349,8 @@ def revision_tags():
     return {rev: sorted(t) for rev, t in out.items()}
 
 
-def page_facts(pid, revs, tags):
-    """The facts of one article from its revisions (history()) and the change tags."""
+def page_facts(pid, revs, tags, qid):
+    """The facts cache line of one article from its revisions (history()) and the change tags."""
     revs = sorted(revs, key=lambda r: (r["ts"], r["id"]))
     by_id = {r["id"]: r for r in revs}
     editors = {}
@@ -279,7 +364,7 @@ def page_facts(pid, revs, tags):
             kept.append({"rev": r["id"], "parent": r["parent"], "ts": r["ts"], "bytes": r["bytes"],
                          "prev_bytes": prev["bytes"] if prev else 0, "tags": t, "comment": r["comment"]})
     first, last = revs[0], revs[-1]
-    return {"id": pid, "revisions": len(revs),
+    return {"id": pid, "wikidata": qid, "revisions": len(revs),
             "first": {"rev": first["id"], "parent": first["parent"], "ts": first["ts"], "user": first["user"],
                       "uid": first["uid"]},
             "last": {"rev": last["id"], "ts": last["ts"], "bytes": last["bytes"]},
@@ -287,13 +372,79 @@ def page_facts(pid, revs, tags):
             "translation_revs": kept}
 
 
-@functools.cache
-def load_facts():
-    """{page id: facts} of every dump article, from the revision history and the change tags."""
-    ids = {a["id"] for a in load_index()}
+def build_caches(status):
+    """Reduce the REDUCED_FILES to FACTS and GRAPH, and record where they came from."""
+    if not INDEX.exists():
+        raise SystemExit(f"no {INDEX.name}: run prepare.py download first (it writes the article index)")
+    index = load_index()
+    ids = {a["id"] for a in index}
+    catpage = {r["page_id"]: r["page_title"].replace("_", " ")
+               for r in sql_rows(dump_file("page.sql.gz")) if r["page_namespace"] == 14}
+    qids, hidden = {}, set()  # from page_props: Wikidata items of the articles, hidden categories
+    for r in sql_rows(dump_file("page_props.sql.gz")):
+        if r["pp_propname"] == "wikibase_item" and r["pp_page"] in ids:
+            qids[r["pp_page"]] = r["pp_value"]
+        elif r["pp_propname"] == "hiddencat" and r["pp_page"] in catpage:
+            hidden.add(catpage[r["pp_page"]])
+    target = {r["lt_id"]: r["lt_title"].replace("_", " ")
+              for r in sql_rows(dump_file("linktarget.sql.gz")) if r["lt_namespace"] == 14}
+    parents = collections.defaultdict(set)
+    for r in sql_rows(dump_file("categorylinks.sql.gz")):
+        if r["cl_type"] == "subcat" and r["cl_from"] in catpage and r["cl_target_id"] in target:
+            parents[catpage[r["cl_from"]]].add(target[r["cl_target_id"]])
+    graph = [{"category": c, "hidden": c in hidden, "parents": sorted(parents.get(c, ()))}
+             for c in sorted(set(catpage.values()))]
+    write_jsonl_gz(GRAPH, graph)
+    print(f"{GRAPH.name}: {len(graph):,} categories", file=sys.stderr)
     tags = revision_tags()
     print("streaming the revision history", file=sys.stderr)
-    return {pid: page_facts(pid, revs, tags) for pid, revs in history(ids)}
+    facts = {pid: page_facts(pid, revs, tags, qids.get(pid)) for pid, revs in history(ids)}
+    if len(facts) != len(ids):
+        raise SystemExit(f"the history has {len(facts):,} of the {len(ids):,} dump articles")
+    write_jsonl_gz(FACTS, (facts[a["id"]] for a in index))
+    print(f"{FACTS.name}: {len(facts):,} articles", file=sys.stderr)
+    sources = {}
+    kept = {s for _, s in KEEP_FILES}
+    for name in source_names():
+        suffix = name.removeprefix(f"{WIKI}-{DATE}-")
+        info = status["jobs"][JOBS[suffix]]["files"][name]
+        sources[name] = {"sha1": info["sha1"], "size": info["size"],
+                         "url": "https://dumps.wikimedia.org" + info["url"],
+                         "dump_date": f"{DATE[:4]}-{DATE[4:6]}-{DATE[6:]}",
+                         "dump_job": JOBS[suffix], "dump_job_finished": status["jobs"][JOBS[suffix]].get("updated"),
+                         "kept_in_raw": suffix in kept}
+    descriptions = {FACTS: "one line per dump article (the article index), in index order: what annotate.py "
+                           "translation needs from the revision history, the change tags and page_props",
+                    GRAPH: "one line per category page: the category tree and the hidden categories that "
+                           "annotate.py topics reads"}
+    prov = {
+        "description": "Caches that annotate.py translation and topics read instead of the dump files listed "
+                       "in sources. `annotate.py download` reduced those files to the caches and deleted the "
+                       "ones not kept_in_raw. Run it again to fetch them (SHA-1 checked against "
+                       "dumpstatus.json, whose SHA-1s are the ones here) and rebuild the caches: it does so "
+                       "whenever a SHA-1 or the article index changes, or with --rebuild-caches "
+                       "(--keep-dumps keeps the files).",
+        "created": now(),
+        "script": "annotate.py download",
+        "sources": sources,
+        "index": {"file": INDEX.name, "sha1": sha1_of(INDEX), "articles": len(index)},
+        "caches": {path.name: {"rows": len(facts) if path == FACTS else len(graph),
+                               "bytes": path.stat().st_size, "sha1": sha1_of(path),
+                               "made_from": [f"{WIKI}-{DATE}-{s}" for s in CACHE_SOURCES[path]],
+                               "description": descriptions[path],
+                               "fields": FACTS_FIELDS if path == FACTS else GRAPH_FIELDS}
+                   for path in CACHE_SOURCES},
+    }
+    write_atomic(PROVENANCE, json.dumps(prov, indent=1, ensure_ascii=False) + "\n")
+    print(f"{PROVENANCE.name}", file=sys.stderr)
+
+
+@functools.cache
+def load_facts():
+    """{page id: facts} of every dump article, from the facts cache (read-only: shared by callers)."""
+    if not FACTS.exists():
+        raise SystemExit(f"no {FACTS.name}: run `annotate.py download` first")
+    return {r["id"]: r for r in read_jsonl_gz(FACTS)}
 
 
 # ----------------------------------------------------------------------------- sql dumps
@@ -371,9 +522,8 @@ def load_corpus():
 
 
 def wikibase_items():
-    """{page id: Wikidata QID} from page_props."""
-    return {r["pp_page"]: r["pp_value"] for r in sql_rows(dump_file("page_props.sql.gz"))
-            if r["pp_propname"] == "wikibase_item"}
+    """{page id: Wikidata QID} of the dump articles that have one (page_props, via the facts cache)."""
+    return {i: f["wikidata"] for i, f in load_facts().items() if f["wikidata"]}
 
 
 # ------------------------------------------------------------------------------ wikidata
@@ -435,9 +585,10 @@ def wbgetentities(qids, props, label=False):
 
 
 def write_jsonl_gz(path, rows):
-    """Gzipped JSON lines through a temp file."""
+    """Gzipped JSON lines through a temp file. The gzip header carries no name or time, so the same
+    rows always give the same bytes (and SHA-1)."""
     def write(tmp):
-        with gzip.open(tmp, "wb") as gz:
+        with open(tmp, "wb") as raw, gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as gz:
             for r in rows:
                 gz.write((json.dumps(r, ensure_ascii=False) + "\n").encode("utf-8"))
     replace_atomic(path, write)
@@ -749,17 +900,16 @@ def category_rule(name):
 
 
 def load_category_graph():
-    """({category: parent categories}, hidden categories) from the SQL dumps."""
-    catpage = {r["page_id"]: r["page_title"].replace("_", " ")
-               for r in sql_rows(dump_file("page.sql.gz")) if r["page_namespace"] == 14}
-    hidden = {catpage[r["pp_page"]] for r in sql_rows(dump_file("page_props.sql.gz"))
-              if r["pp_propname"] == "hiddencat" and r["pp_page"] in catpage}
-    target = {r["lt_id"]: r["lt_title"].replace("_", " ")
-              for r in sql_rows(dump_file("linktarget.sql.gz")) if r["lt_namespace"] == 14}
-    parents = collections.defaultdict(set)
-    for r in sql_rows(dump_file("categorylinks.sql.gz")):
-        if r["cl_type"] == "subcat" and r["cl_from"] in catpage and r["cl_target_id"] in target:
-            parents[catpage[r["cl_from"]]].add(target[r["cl_target_id"]])
+    """({category: parent categories}, hidden categories) from the category graph cache (built by
+    `download` from the page, page_props, linktarget and categorylinks dumps)."""
+    if not GRAPH.exists():
+        raise SystemExit(f"no {GRAPH.name}: run `annotate.py download` first")
+    parents, hidden = {}, set()
+    for r in read_jsonl_gz(GRAPH):
+        if r["parents"]:
+            parents[r["category"]] = set(r["parents"])
+        if r["hidden"]:
+            hidden.add(r["category"])
     return parents, hidden
 
 
@@ -940,9 +1090,9 @@ TOPICS_SIDECAR = {
                    "one per article of the corpus, in corpus order. See quality/topics.md.",
     "source": f"{WIKI}-{DATE}: categories from the rendered HTML of the dump revision "
               f"(raw/html); hidden categories and the category tree from the page, page_props, "
-              f"linktarget and categorylinks SQL dumps; for articles without a direct category or "
-              f"title match, the Wikidata item from page_props and its P31/P106/P2175/P279 fetched "
-              f"from the Wikidata API, "
+              f"linktarget and categorylinks SQL dumps (reduced to raw/{GRAPH.name}); for articles "
+              f"without a direct category or title match, the Wikidata item from page_props (in "
+              f"raw/{FACTS.name}) and its P31/P106/P2175/P279 fetched from the Wikidata API, "
               f"wbgetentities (raw/{WD_ITEMS.name}); annotate.py topics",
     "created": None,  # set when written
     "columns": {
@@ -1254,7 +1404,8 @@ def topics_report(rows, wd, n_fallback):
         "1. **Its categories.** They come from the rendered HTML of the dump revision (`raw/html`), where "
         "Parsoid lists every category as `<link rel=\"mw:PageProp/Category\">`, including those added by "
         "templates. (Category links nested in references' `data-mw` repeat top-level ones or are maintenance, "
-        "and are ignored.) Hidden categories (`hiddencat` in `page_props`) are dropped, and so are visible "
+        "and are ignored.) Hidden categories (`hiddencat` in `page_props`, kept in "
+        f"`raw/{GRAPH.name}`) are dropped, and so are visible "
         "maintenance ones: English tracking categories that templates copied from English Wikipedia "
         "(`Pages using …`, `CS1 …`, `Articles with …`) and Odia cleanup ones (ଆଧାରହୀନ \"unreferenced\", "
         "ସଜଡ଼ା ହେବାକୁ \"to be cleaned up\", bot and edit-a-thon bookkeeping). What is left is the `categories` "
@@ -1282,8 +1433,9 @@ def topics_report(rows, wd, n_fallback):
         "- *A bare district* (`କଟକ ଜିଲ୍ଲା`) holds articles of every kind located there, so it is weak "
         "`geography` evidence (0.4, against 1.0 for a rule match). A bare country, state or continent "
         "(`ଭାରତ`, `ଜାପାନ`, `ଏସିଆ`) matches no rule at all (see the walk).",
-        "- *No rule matches*: the category's parents are searched, up to 3 levels up (the graph from the "
-        "`categorylinks`/`linktarget`/`page` dumps has cycles). The nearest level with a match decides, at weight "
+        "- *No rule matches*: the category's parents are searched, up to 3 levels up. The graph comes from the "
+        "`page`, `linktarget` and `categorylinks` dumps, reduced to "
+        f"`raw/{GRAPH.name}`, and it has cycles. The nearest level with a match decides, at weight "
         "0.5. The walk does not continue through people categories or through general hubs. If the first level "
         "only says `geography`, the category is itself a place (ଜାପାନ in ଏସିଆର ଦେଶ \"Asian countries\"): its "
         "articles are things of that place (a dish, a myth, a census), so the walk gives nothing. A bare year "
@@ -1484,7 +1636,7 @@ def bot_accounts():
 
 def history(page_ids):
     """Stream the revision-metadata dump: yield (page id, [revision dict, ...]) for the given pages.
-    One page's revisions are in memory at a time."""
+    One page's revisions are in memory at a time. Read only by `download`, to build the facts cache."""
     import xml.etree.ElementTree as ET
 
     ns = "{http://www.mediawiki.org/xml/export-0.11/}"
@@ -1514,8 +1666,8 @@ def history(page_ids):
 
 
 def translation_row(f, bots):
-    """The translation annotation of one article from its facts (page_facts()). Only the
-    revisions in translation_revs can carry a CX tag or the MDWiki summary (the facts keep every
+    """The translation annotation of one article from its facts (the facts cache line). Only the
+    revisions in translation_revs can carry a CX tag or the MDWiki summary (the cache keeps every
     revision with a CX tag or a summary matching /translat/i), so the rest are not needed."""
     def is_bot(user, uid):
         return uid in bots or bool(user and BOT_NAME.search(user))
@@ -1567,8 +1719,8 @@ TRANSLATION_SIDECAR = {
                    "object per line (translation.jsonl), one per article of the corpus, in corpus order. "
                    "See quality/translation.md.",
     "source": f"{WIKI}-{DATE}: stub-meta-history (every revision's id, timestamp, contributor, edit summary, "
-              f"size) and the change_tag and change_tag_def SQL dumps (tags on revisions); user_groups "
-              f"and user_former_groups SQL dumps (bot accounts); "
+              f"size) and the change_tag and change_tag_def SQL dumps (tags on revisions), reduced to "
+              f"raw/{FACTS.name}; user_groups and user_former_groups SQL dumps (bot accounts); "
               f"annotate.py translation",
     "created": None,  # set when written
     "columns": {
@@ -1626,8 +1778,10 @@ def english_dominant(par):
 def translation(args):
     index = load_index()
     facts = load_facts()
-    if len(facts) != len(index):
-        raise SystemExit(f"the history has {len(facts):,} of the {len(index):,} dump articles")
+    missing = [a["id"] for a in index if a["id"] not in facts]
+    if missing or len(facts) != len(index):
+        raise SystemExit(f"{FACTS.name} has {len(facts):,} articles, the index {len(index):,} "
+                         f"({len(missing):,} missing): run `annotate.py download --rebuild-caches`")
     stale = [a["id"] for a in index if facts[a["id"]]["last"]["rev"] != a["revid"]]
     if stale:
         raise SystemExit(f"{len(stale)} articles' last revision is not the dump revision, e.g. {stale[:5]}")
@@ -1678,6 +1832,7 @@ def translation_report(rows, n_index, template_pages, tag_defs, first_has_parent
     # equal to the change_tag rows of each tag, all of them on revisions).
     tag_counts = sorted(((d["ctd_name"], d["ctd_count"]) for d in tag_defs if d["ctd_name"] in CT_TAGS),
                         key=lambda tc: -tc[1])
+    facts_mb = FACTS.stat().st_size / 1e6
     lines = [
         "# Machine-assisted translations in Odia Wikipedia",
         "",
@@ -1694,7 +1849,10 @@ def translation_report(rows, n_index, template_pages, tag_defs, first_has_parent
         "`contenttranslation-high-unmodified-mt-text`. Revisions carrying these tags in the whole wiki "
         "(`change_tag_def` counts): " + ", ".join(f"`{t}` {c:,}" for t, c in tag_counts) + ".",
         "- **Revisions to pages.** `stub-meta-history` (44 MB) gives every revision's page, "
-        "timestamp, contributor, edit summary and size. The last revision of each article is exactly the "
+        "timestamp, contributor, edit summary and size. `annotate.py download` reduces it, with the tags, to "
+        f"per-article facts (`raw/{FACTS.name}`, {facts_mb:.1f} MB): the first and last revision, the "
+        "revision count, each later editor's revision count, and every revision with a CX tag or an edit "
+        "summary about translating. The last revision of each article is exactly the "
         f"corpus revision (checked for all {n_index:,} dump articles).",
         "- **Edit summaries are English, not localised**: `Created by translating the page "
         '"[[:en:Special:Redirect/revision/663243963|Devdutt Pattanaik]]"`, `... the section "History" from '
@@ -1825,6 +1983,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("step", choices=["download", "wikidata", "translation", "topics", "all"])
     ap.add_argument("--refresh", action="store_true", help="fetch Wikidata again (wikidata)")
+    ap.add_argument("--keep-dumps", action="store_true",
+                    help="keep the dump files reduced to the caches instead of deleting them (download)")
+    ap.add_argument("--rebuild-caches", action="store_true",
+                    help="rebuild the caches even when they are current (download; fetches the dump files)")
     args = ap.parse_args()
     if args.step in ("download", "all"):
         download(args)
