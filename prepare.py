@@ -1,17 +1,19 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = []
+# dependencies = ["lxml>=5"]
 # ///
 """Download Odia Wikipedia and turn every article into clean text for LLM training.
 
-Steps, each resumable, all output under this directory:
+Three steps, each resumable, all output under this directory:
 
   download  the latest complete orwiki pages-articles dump (XML) -> raw/, SHA-1 checked and
             indexed into raw/<wiki>-<date>-articles.jsonl (id, title, revid, timestamp, bot and
             stub flags of every article), with its provenance in raw/<wiki>-<date>-dump.json
   render    Wikipedia's own rendering (Parsoid HTML) of each article's dump revision
             -> raw/html/chunk-*.jsonl.gz, 500 articles per chunk
+  build     HTML -> Markdown-style text -> orwiki-<date>.jsonl (the corpus, one article per line),
+            the build statistics and README.md
 
 Why render instead of stripping the wikitext: Odia articles build whole sentences out of
 templates ('''{{PAGENAME}}''' ଏକ ଭାରତୀୟ {{TownType|M}}, {{Birth date|...}}, {{convert|...}},
@@ -22,6 +24,8 @@ corpus an exact snapshot of the dump.
 Usage (uv reads the dependencies from the header above; nothing is installed in the repo):
     uv run prepare.py download            # or --dump 20260901
     ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render
+    uv run prepare.py build
+    uv run prepare.py all                 # the three in turn
 
 `render` takes about 1.5 h for 21k articles with 6 workers. It needs ODIA_WIKI_CONTACT (an email
 or URL for the user-agent): Wikimedia throttles bulk clients without contact details to about a
@@ -42,6 +46,7 @@ import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -51,9 +56,16 @@ ROOT = Path(__file__).resolve().parent  # the repository root: everything is wri
 RAW = ROOT / "raw"
 HTML_DIR = RAW / "html"
 
+# The Odia text rules (odia_text.py, a copy of odia-llm-trainer's odia_llm.text): ୟ spelling fix,
+# never NFC. Importing must not leave __pycache__ here.
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(ROOT))
+from odia_text import normalize_odia, odia_ratio, odia_words  # noqa: E402
+
 WIKI = "orwiki"
 DUMPS = f"https://dumps.wikimedia.org/{WIKI}"
 REST = "https://or.wikipedia.org/w/rest.php/v1"
+SITE = "https://or.wikipedia.org/wiki/"
 CONTACT = os.environ.get("ODIA_WIKI_CONTACT", "").strip()
 UA = ("odia-wikipedia-sep26/0.1 (research: Odia LLM training corpus from Wikipedia dumps"
       + (f"; {CONTACT}" if CONTACT else "") + ") python-urllib")
@@ -108,6 +120,11 @@ def latest_dump():
 
 def dump_path(date):
     return RAW / f"{WIKI}-{date}-pages-articles.xml.bz2"
+
+
+def corpus_stem(date):
+    """orwiki-<date>: the corpus is <stem>.jsonl, its build statistics <stem>-build.json."""
+    return f"{WIKI}-{date}"
 
 
 def provenance_path(date):
@@ -278,17 +295,517 @@ def render(args):
                   f"{rate:.1f} pages/s, ~{left:.0f} min left", file=sys.stderr, flush=True)
 
 
+def read_chunks(date):
+    for p in sorted((HTML_DIR / date).glob("chunk-*.jsonl.gz")):
+        with gzip.open(p, "rt", encoding="utf-8") as f:
+            yield from (json.loads(line) for line in f)
+
+
+# --------------------------------------------------------------------------- html -> text
+
+# Reference-type and link sections, dropped with their subsections (matched by heading_key).
+DROP_SECTIONS = {
+    # Odia
+    "ବାହାର ଆଧାର", "ବାହାର ତଥ୍ୟ", "ବାହାର ସ୍ରୋତ", "ଅଧିକ ତଥ୍ୟ", "ଦ୍ରଷ୍ଟବ୍ୟ", "ଆଗକୁ ପଢ଼ିବେ",
+    "ଗ୍ୟାଲେରି", "ଛବି", "ଆଧାର", "ଆଧାରସୂତ୍ର", "ଆଧାର ସୂତ୍ର", "ଆଧାର ଗ୍ରନ୍ଥ", "ଆଧାରଗ୍ରନ୍ଥ", "ଆଧାର ଓ ଟୀକା", "ଟୀକା",
+    "ଟୀକା ଓ ଆଧାର", "ପାଦଟୀକା", "ଟିପ୍ପଣୀ", "ଉତ୍ସ", "ତଥ୍ୟସୂତ୍ର", "ତଥ୍ୟ ସୂତ୍ର", "ସୂତ୍ର",
+    "ଆହୁରି ଦେଖନ୍ତୁ", "ଆହୁରି ଦେଖିବେ", "ଅଧିକ ଦେଖନ୍ତୁ", "ଏହା ବି ଦେଖନ୍ତୁ", "ଆହୁରି ପଢ଼ନ୍ତୁ",
+    "ଅଧିକ ପଢ଼ନ୍ତୁ", "ଅଧିକ ପଠନ", "ବାହାର ଲିଙ୍କ", "ବାହାରର ଲିଙ୍କ", "ବାହାର ଲିଂକ", "ବାହ୍ୟ ଲିଙ୍କ",
+    "ବାହ୍ୟ ସଂଯୋଗ", "ବାହାର ସଂଯୋଗ", "ବାହାର ଯୋଗସୂତ୍ର", "ବାହ୍ୟ ଯୋଗସୂତ୍ର", "ଗ୍ୟାଲେରୀ",
+    "ଚିତ୍ର ଗ୍ୟାଲେରୀ", "ଚିତ୍ରଶାଳା", "ଚିତ୍ରାବଳୀ", "ଗ୍ରନ୍ଥସୂଚୀ",
+    # English headings left untranslated
+    "see also", "notes", "note", "references", "reference", "further reading",
+    "external links", "external link", "bibliography", "sources", "citations",
+    "footnotes", "works cited", "notes and references", "references and notes", "gallery",
+}
+# Elements dropped wherever they appear: citations, infoboxes, navboxes, tables, images,
+# maintenance banners, hatnotes, coordinates.
+DROP_TAGS = {"style", "script", "link", "meta", "figure", "figcaption", "img", "table",
+             "audio", "video", "map", "noscript", "caption"}
+DROP_CLASSES = {
+    "reference", "mw-ref", "mw-references-wrap", "references", "reflist", "refbegin",
+    "navbox", "vertical-navbox", "navbox-styles", "infobox", "metadata", "ambox", "mbox-small",
+    "hatnote", "dablink", "rellink", "noprint", "mw-empty-elt", "gallery", "thumb",
+    "sistersitebox", "sister-project", "mw-editsection", "shortdescription", "toc", "portal",
+    "portalbox", "catlinks", "geo-default", "geo", "coordinates", "asbox", "stub",
+    "authority-control", "mw-kartographer-maplink", "cs1-visible-error", "error",
+    "mw-cite-backlink", "sidebar", "succession-box", "mw-halign-right", "mw-halign-left",
+    "tright", "tleft", "floatright", "floatleft", "haudio", "mediaContainer", "plainlist-refs",
+    "side-box", "NavFrame", "NavHead", "NavContent", "mbox", "tmbox", "ombox", "cmbox", "fmbox",
+    "citation", "Z3988", "IPA", "rt-commentedText",
+}
+# Templates whose output is dropped (lowercased names; a trailing * matches a prefix): archive
+# and dead-link notes, maintenance banners, pronunciation, coordinates, sister projects.
+DROP_TEMPLATES = {
+    "webarchive", "wayback", "dead link", "deadlink", "citation needed", "cn", "fact",
+    "wikify", "cleanup*", "unreferenced*", "refimprove*", "more citations needed*", "pov*",
+    "ipa*", "ipac-*", "respell", "audio*", "pronunciation*", "coord", "coord missing",
+    "commons*", "wiktionary*", "wikiquote*", "wikisource*", "wikivoyage*", "sister project*",
+    "authority control", "portal*", "ମୁଣ୍ଡିଆ*", "ଅଧାଗଢ଼ା", "ଅଧାଗଢା", "ବଟ୍ ତିଆରି", "ଆଧାର",
+    "reflist", "notelist", "use dmy dates", "use mdy dates", "stub*", "*-stub", "about",
+    "other uses*", "redirect*", "distinguish", "main", "see also", "further", "for",
+}
+DROP_TYPEOF = ("mw:Extension/ref", "mw:Extension/references", "mw:Extension/gallery",
+               "mw:Extension/templatestyles", "mw:Extension/graph", "mw:Extension/timeline",
+               "mw:Extension/mapframe", "mw:Extension/maplink", "mw:Extension/imagemap",
+               "mw:File", "mw:Error", "mw:Extension/score", "mw:Extension/inputbox")
+DROP_ROLES = {"note", "navigation", "presentation", "figure"}
+BLOCK = {"p", "div", "section", "ul", "ol", "dl", "li", "dd", "dt", "blockquote", "pre",
+         "h1", "h2", "h3", "h4", "h5", "h6", "center", "body", "poem", "hr"}
+CONTROL = re.compile("[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+INVISIBLE = re.compile("[\u00ad\u200b\u2060\ufeff]")  # soft hyphen, ZWSP, word joiner, BOM
+SPACES = re.compile("[ \t\r\n\u00a0\u2002\u2003\u2009\u202f]+")  # not ZWJ/ZWNJ: Odia uses them
+
+
+def template_names(el):
+    try:
+        parts = json.loads(el.get("data-mw") or "{}").get("parts", [])
+    except ValueError:
+        return []
+    return [p["template"]["target"].get("wt", "").strip().lower().replace("_", " ")
+            for p in parts if isinstance(p, dict) and "template" in p]
+
+
+def unwanted_template(name):
+    return any(name == t or (t.endswith("*") and name.startswith(t[:-1]))
+               or (t.startswith("*") and name.endswith(t[1:])) for t in DROP_TEMPLATES)
+
+
+def drop_templates(body):
+    """Remove everything a dropped template produced (Parsoid marks it with one about id)."""
+    abouts = set()
+    for el in body.xpath('//*[contains(@typeof, "mw:Transclusion")]'):
+        names = template_names(el)
+        # Also drop a template that renders only an error message ("ତୃଟି: ...") or, when it
+        # does not exist, a red link to itself ("ଛାଞ୍ଚ:ବାଲେଶ୍ୱର").
+        shown = el.text_content().lstrip()
+        if any(unwanted_template(n) for n in names) or shown.startswith(("ତୃଟି", "ଛାଞ୍ଚ:", "Template:")):
+            abouts.add(el.get("about"))
+    for el in body.xpath("//*[@about]"):
+        if el.get("about") in abouts and el.getparent() is not None:
+            el.drop_tree()
+
+
+def link_only_item(li):
+    """A list item that is an external link or a citation with little Odia: an external-links
+    or bibliography list under a heading we did not recognise."""
+    if not li.xpath('.//a[contains(@rel, "mw:ExtLink")]|.//cite') and "ISBN" not in li.text_content():
+        return False
+    return odia_ratio(li.text_content()) < 0.5
+
+
+def droppable(el):
+    if not isinstance(el.tag, str) or el.tag in DROP_TAGS:
+        return True
+    cls = set((el.get("class") or "").split())
+    if cls & DROP_CLASSES:
+        return True
+    typeof = el.get("typeof") or ""
+    if any(t in typeof for t in DROP_TYPEOF):
+        return True
+    if el.get("role") in DROP_ROLES:
+        return True
+    style = (el.get("style") or "").replace(" ", "").lower()
+    return "display:none" in style
+
+
+def tex_of(el):
+    """The math element as $TeX$, or $$TeX$$ for display math (Parsoid keeps its TeX in data-mw)."""
+    try:
+        src = json.loads(el.get("data-mw") or "{}")["body"]["extsrc"].strip()
+    except (KeyError, ValueError, TypeError):
+        m = el.find(".//{*}math")
+        src = (m.get("alttext") or "") if m is not None else ""
+        src = re.sub(r"^\{\\(?:displaystyle|textstyle)\s*(.*)\}$", r"\1", src.strip(), flags=re.S)
+    data = el.get("data-mw") or ""
+    tex = SPACES.sub(" ", src)
+    return f"$${tex}$$" if '"display":"block"' in data.replace(" ", "") else f"${tex}$"
+
+
+class Writer:
+    """Walks the DOM and collects blocks (kind, level, prefix, text): kind is "h" (heading of
+    that level), "p" (paragraph) or "li" (list item; prefix is its indent and marker)."""
+
+    def __init__(self):
+        self.blocks = []
+        self.inline = []
+
+    def flush(self, kind="p", level=0, prefix=""):
+        lines = (SPACES.sub(" ", line).strip() for line in "".join(self.inline).split("\x00"))
+        text = "\n".join(line for line in lines if line)
+        self.inline = []
+        if text:
+            self.blocks.append((kind, level, prefix, text))
+
+    def walk(self, el, in_item=False):
+        """in_item: inside a list item, where blocks (<p>, <div>) run on inline."""
+        if droppable(el):
+            if el.tail:
+                self.inline.append(el.tail)
+            return
+        tag, cls = el.tag, el.get("class") or ""
+        if "mwe-math-element" in cls or (el.get("typeof") or "").startswith("mw:Extension/math"):
+            self.inline.append(tex_of(el))
+        elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
+            self.flush()
+            self.children(el, True)
+            self.flush("h", int(tag[1]))
+        elif tag in ("ul", "ol"):
+            self.flush()
+            self.walk_list(el, "")
+        elif tag == "br":
+            self.inline.append("\x00")
+        elif tag in BLOCK:
+            if in_item:
+                self.inline.append(" ")
+                self.children(el, True)
+                self.inline.append(" ")
+            else:
+                self.flush()
+                self.children(el, False)
+                self.flush()
+        else:  # inline: a, b, i, span, sub, sup, abbr, small, code, ...
+            self.children(el, in_item)
+        if el.tail:
+            self.inline.append(el.tail)
+
+    def children(self, el, in_item):
+        if el.text:
+            self.inline.append(el.text)
+        for c in el:
+            self.walk(c, in_item)
+
+    def walk_list(self, lst, indent):
+        """Items get "- " or "1. "; a sublist is indented two spaces deeper than its item."""
+        items = [c for c in lst if isinstance(c.tag, str) and c.tag == "li"
+                 and not droppable(c) and not link_only_item(c)]
+        for i, li in enumerate(items):
+            marker = f"{i + 1}. " if lst.tag == "ol" else "- "
+            prefix, inner = indent + marker, indent + "  "
+            if li.text:
+                self.inline.append(li.text)
+            for c in li:
+                if isinstance(c.tag, str) and c.tag in ("ul", "ol") and not droppable(c):
+                    self.flush("li", 0, prefix)
+                    prefix = inner  # text after a sublist continues the item
+                    self.walk_list(c, inner)
+                    if c.tail:
+                        self.inline.append(c.tail)
+                else:
+                    self.walk(c, True)
+            self.flush("li", 0, prefix)
+
+
+def clean_block(block):
+    """Clean one block's text (not its prefix); "" drops it."""
+    kind, level, prefix, text = block
+    # Parentheses emptied by dropped pronunciation templates: "ବଙ୍ଗଳା ଭାଷା (), ..." "(; বাংলা)"
+    text = re.sub(r" ?\([\s,;:]*\)", "", text)
+    text = re.sub(r"\((?:\s*[,;:])+\s*", "(", text)
+    text = re.sub(r"\s*(?:[,;:]\s*)+\)", ")", text)
+    text = re.sub(r"[ \t]{2,}", " ", text).strip()
+    if kind == "p" and re.fullmatch(r"\$[^$]+\$[.,]?", text):  # a formula on its own: display math
+        text = "$" + text.rstrip(".,") + "$"
+    return kind, level, prefix, text
+
+
+def heading_key(text):
+    """Heading for matching: lowercased, nukta letters folded (ଡ଼/ଢ଼ come precomposed or not)."""
+    text = text.replace("\u0b5c", "\u0b21").replace("\u0b5d", "\u0b22").replace("\u0b3c", "")
+    return SPACES.sub(" ", text).strip().rstrip(":").strip().lower()
+
+
+DROP_KEYS = {heading_key(h) for h in DROP_SECTIONS}
+
+
+def section_heading(sec):
+    h = next((c for c in sec if isinstance(c.tag, str) and re.fullmatch(r"h[1-6]", c.tag)), None)
+    return SPACES.sub(" ", h.text_content()).strip() if h is not None else None
+
+
+def html_to_text(doc):
+    """(Markdown text without the title, info) for one Parsoid HTML page."""
+    from lxml import html as lhtml
+
+    root = lhtml.document_fromstring(doc)
+    info = {"disambiguation": bool(root.xpath('//meta[@property="mw:PageProp/disambiguation"]'))}
+    body = root.find("body")
+    # Reference/navigation sections go whole, with their subsections.
+    for sec in list(body.iter("section")):
+        head = section_heading(sec)
+        if head and heading_key(head) in DROP_KEYS and sec.getparent() is not None:
+            sec.drop_tree()
+    drop_templates(body)
+    w = Writer()
+    w.walk(body)
+    w.flush()
+    blocks = [clean_block(b) for b in w.blocks]
+    # Drop headings with no content before the next heading of the same or higher level.
+    keep = []
+    for k in reversed(range(len(blocks))):
+        kind, level, prefix, text = blocks[k]
+        if not text:
+            continue
+        if kind == "h" and (not keep or (keep[-1][0] == "h" and keep[-1][1] <= level)):
+            continue
+        keep.append((kind, level, prefix, text))
+    keep.reverse()
+    out = []
+    for i, (kind, level, prefix, text) in enumerate(keep):
+        if kind == "h":
+            text = "#" * level + " " + text
+        elif kind == "li":
+            text = prefix + text
+        # Consecutive list items stay together; everything else is a paragraph of its own.
+        sep = "\n" if kind == "li" and i and keep[i - 1][0] == "li" else "\n\n"
+        out.append((sep if out else "") + text)
+    text = CONTROL.sub("", INVISIBLE.sub("", "".join(out)))
+    return normalize_odia(text).strip(), info
+
+
+# --------------------------------------------------------------------------------- build
+
+MAIN_PAGE = "ପ୍ରଧାନ ପୃଷ୍ଠା"  # orwiki's main page lives in the article namespace
+
+
+def md_heading(title):
+    return re.sub(r"(\s)(#+)$", r"\1\\\2", title)  # a trailing "#" would close the heading
+
+
+def convert(row):
+    body, info = html_to_text(row["html"])
+    return row["id"], body, info
+
+
+def build(args):
+    """HTML -> the corpus (JSON lines), the build statistics and README.md."""
+    date = find_date(args.dump)
+    arts = {a["id"]: a for a in load_index(date)}
+    prov = json.loads(provenance_path(date).read_text(encoding="utf-8")) if provenance_path(date).exists() else {}
+    n_chunks = -(-len(arts) // CHUNK)
+    have = len(list((HTML_DIR / date).glob("chunk-*.jsonl.gz")))
+    if have < n_chunks and not args.partial:
+        raise SystemExit(f"{have}/{n_chunks} chunks rendered; run `render` first (or --partial)")
+    records, excluded, seen = [], [], {}
+
+    def exclude(a, reason, detail=""):
+        excluded.append({"title": a["title"], "reason": reason, "detail": detail})
+
+    print(f"converting {len(arts):,} pages", file=sys.stderr)
+    for r in read_chunks(date):  # streamed: the HTML of all pages is ~1.3 GB
+        a = arts[r["id"]]
+        if r["status"] != 200:
+            exclude(a, "not rendered", f"HTTP {r['status']}")
+            continue
+        if a["title"] == MAIN_PAGE:
+            exclude(a, "main page")
+            continue
+        _, body, info = convert(r)
+        if info["disambiguation"]:
+            exclude(a, "disambiguation")
+            continue
+        if len(odia_words(body)) < args.min_words:
+            exclude(a, f"under {args.min_words} Odia words")
+            continue
+        key = hashlib.sha1(body.encode()).hexdigest()
+        if key in seen:
+            first = seen[key]
+            exclude(a, "duplicate text", f"same text as id {first['id']} ({first['title']})")
+            continue
+        seen[key] = a
+        text = f"# {md_heading(a['title'])}\n\n{body}"
+        records.append({
+            "id": a["id"],
+            "title": a["title"],
+            "url": SITE + urllib.parse.quote(a["title"].replace(" ", "_")),
+            "revid": a["revid"],
+            "timestamp": a["timestamp"],
+            "text": text,
+            "words": len(odia_words(text)),
+            "chars": len(text),
+            "odia_ratio": round(odia_ratio(text), 4),
+            "bot_created": a["bot_created"],
+            "stub": a["stub"],
+        })
+
+    stem = corpus_stem(date)
+    jl = ROOT / f"{stem}.jsonl"
+    tmp = jl.with_suffix(".tmp")  # readers never see a half-written file
+    write_jsonl(tmp, records)
+    tmp.replace(jl)
+
+    dropped = collections.Counter(e["reason"] for e in excluded)
+    stats = {
+        "dump": prov.get("dump"), "dump_sha1": prov.get("sha1"), "built": datetime.date.today().isoformat(),
+        "pages_in_dump": len(arts), "articles": len(records), "excluded": len(excluded),
+        "words": sum(r["words"] for r in records), "chars": sum(r["chars"] for r in records),
+        "utf8_bytes": sum(len(r["text"].encode()) for r in records),
+        "bot_created": sum(r["bot_created"] for r in records),
+        "stub": sum(r["stub"] for r in records),
+        "min_words": args.min_words,
+        "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
+        "dropped_titles": excluded,
+    }
+    (ROOT / f"{stem}-build.json").write_text(json.dumps(stats, indent=1, ensure_ascii=False) + "\n",
+                                             encoding="utf-8")
+    write_readme(stats, records, stem)
+    print(f"{len(records):,} articles, {stats['words']:,} Odia words -> {jl.name}; "
+          f"{len(excluded):,} dropped ({dict(dropped)})", file=sys.stderr)
+
+
+def write_jsonl(path, rows):
+    with open(path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def write_readme(stats, records, stem):
+    date = stats["dump"].split("-")[1]
+    pretty = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+    words = sorted(r["words"] for r in records)
+    q = lambda f: words[min(len(words) - 1, int(f * len(words)))]  # noqa: E731
+    bot = [r for r in records if r["bot_created"]]
+    size_rows = []
+    for lo, hi in [(0, 50), (50, 200), (200, 1000), (1000, 5000), (5000, None)]:
+        rs = [r for r in records if r["words"] >= lo and (hi is None or r["words"] < hi)]
+        label = f"{lo:,}+" if hi is None else f"{lo:,}–{hi - 1:,}"
+        size_rows.append(f"| {label} | {len(rs):,} | {sum(r['words'] for r in rs):,} |")
+    sample = min((r for r in records if 60 <= r["words"] <= 90 and not r["bot_created"]
+                  and r["odia_ratio"] > 0.9), key=lambda r: r["id"], default=records[0])
+    sample_json = json.dumps(sample, ensure_ascii=False, indent=2)
+    dropped = "\n".join(f"| {k} | {v:,} |" for k, v in stats["dropped"].items())
+    readme = f"""# Odia Wikipedia, cleaned for LLM training
+
+Every article on [Odia Wikipedia](https://or.wikipedia.org) in the **{pretty} dump**
+(`{stats['dump']}`, the latest complete dump when built on {stats['built']}), as clean
+Markdown-style text, one article per record: **{stats['articles']:,} articles, {stats['words']:,}
+Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
+
+| File | What it is |
+|---|---|
+| `{stem}.jsonl` | the corpus, one JSON object per line (fields below) |
+| `{stem}-build.json` | build statistics and the title of every page left out, with the reason |
+| `prepare.py` | the script that made all of it (download, render, build) |
+| `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
+| `raw/` | inputs kept for rebuilds: the dump, the article index, Wikipedia's rendered HTML of every article |
+
+## Record format
+
+| Field | Meaning |
+|---|---|
+| `id` | page id on or.wikipedia.org |
+| `title` | article title |
+| `url` | article URL |
+| `revid` | revision in the dump; `https://or.wikipedia.org/w/index.php?oldid=<revid>` is exactly this text |
+| `timestamp` | when that revision was saved |
+| `text` | the article: `# title`, then the lead, `##`/`###` section headings, paragraphs separated by a blank line, `- ` / `1. ` lists, math as `$...$` |
+| `words` | Odia words in `text` (runs of Odia-script characters) |
+| `chars` | characters in `text` |
+| `odia_ratio` | share of non-space characters in the Odia block (`odia_text.odia_ratio`) |
+| `bot_created` | the page carries `{{{{ବଟ୍ ତିଆରି}}}}`: made by a bot (year pages, town stubs), formulaic text |
+| `stub` | the page carries a stub template (`{{{{ମୁଣ୍ଡିଆ}}}}`, `{{{{ଅଧାଗଢ଼ା}}}}`) |
+
+A short example record:
+
+```json
+{sample_json}
+```
+
+## How it was made
+
+1. **Download.** `{stats['dump']}` from dumps.wikimedia.org, with its SHA-1
+   (`{stats['dump_sha1']}`) checked against the dump's `dumpstatus.json`.
+2. **Render.** Every main-namespace page that is not a redirect ({stats['pages_in_dump']:,} pages)
+   was fetched as Wikipedia's own rendering (Parsoid HTML) **of the exact revision in the
+   dump**, from `/w/rest.php/v1/revision/<revid>/html`. Odia articles build whole sentences out
+   of templates: `'''{{{{PAGENAME}}}}''' ଏକ ଭାରତୀୟ {{{{TownType|M}}}}` in over 1,600 town stubs, and
+   `{{{{Birth date}}}}`, `{{{{convert}}}}`, `{{{{flag}}}}` and other Lua-module templates across
+   the wiki. Stripping the wikitext would leave holes in those sentences. The rendered HTML has
+   what a reader sees.
+3. **Clean** (HTML to text). Prose, headings, lists and math are kept. Dropped:
+   - citations, reference lists, and reference-type sections (ଆଧାର, ଟୀକା, ଆହୁରି ଦେଖନ୍ତୁ,
+     ବାହାର ଲିଙ୍କ, ଅଧିକ ପଢ଼ନ୍ତୁ, ଗ୍ୟାଲେରୀ, … and their English equivalents)
+   - all tables (infoboxes, navboxes, data tables), images, galleries, captions, maps
+   - hatnotes, maintenance and stub banners, coordinates, pronunciation (IPA), sister-project
+     boxes, archive notes ("Archived … at the Wayback Machine"), template error messages
+   - list items that are only an external link or a book citation, under any heading
+   - empty sections, and parentheses emptied by the removed pronunciations
+4. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
+   U+0B5F). Soft hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
+   collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
+   Unicode normalisation (by design).
+5. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
+   `{stem}-build.json`. Stubs are kept and flagged, not dropped.
+
+| Reason | Pages |
+|---|---:|
+{dropped}
+
+## Size
+
+The median article has {q(0.5):,} Odia words (10th percentile {q(0.1):,}, 90th {q(0.9):,}).
+{len(bot):,} articles ({sum(r['words'] for r in bot):,} words) are bot-created and formulaic;
+{stats['stub']:,} are marked as stubs.
+
+| Odia words per article | Articles | Words |
+|---|---:|---:|
+{chr(10).join(size_rows)}
+
+## Using it
+
+```python
+import json
+docs = [r["text"] for r in map(json.loads, open("{stem}.jsonl", encoding="utf-8"))
+        if r["words"] >= 50 and not r["bot_created"]]  # e.g. without tiny and bot-made pages
+```
+
+- In odia-llm-trainer, `odia-build-cpt --local {stem}.jsonl --local-upsample 1` adds all of it
+  to a continued-pretraining build. `--local` upsamples 3× by default, which is meant for
+  textbooks. The builder's own `wikipedia` source still reads the older Hugging Face snapshot
+  (`wikimedia/wikipedia`, `20231101.or`).
+- The text is already normalised with `normalize_odia`, so a pipeline that applies it again
+  (and line dedup) barely touches it.
+
+## License
+
+The text is by Odia Wikipedia contributors, licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Anything derived from it must
+keep that license and credit Wikipedia. Each record's `revid` names its exact source revision,
+whose history lists the authors.
+
+## Rebuild
+
+```bash
+uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD
+ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~1.5 h, resumable
+uv run prepare.py build      # about a minute
+```
+
+`render` needs contact details in the user-agent (`ODIA_WIKI_CONTACT`). Wikimedia throttles
+anonymous bulk clients to about one request a minute per connection. With contact details and 6
+parallel requests it ran at about 4 pages/s, backing off on the occasional 429 as `Retry-After`
+asks. Rendered chunks are cached in `raw/html/<date>/`, so a rerun fetches only what is
+missing. The script writes only inside this directory. uv keeps its environment in its own cache.
+"""
+    (ROOT / "README.md").write_text(readme, encoding="utf-8")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("step", choices=["download", "render"])
+    ap.add_argument("step", choices=["download", "render", "build", "all"])
     ap.add_argument("--dump", help="dump date YYYYMMDD (default: latest)")
     ap.add_argument("--workers", type=int, default=6, help="parallel HTTP requests (render)")
     ap.add_argument("--limit-chunks", type=int, help="render at most this many chunks")
+    ap.add_argument("--min-words", type=int, default=5,
+                    help="drop articles with fewer Odia words than this after cleaning")
+    ap.add_argument("--partial", action="store_true", help="build from the chunks rendered so far")
     args = ap.parse_args()
-    if args.step == "download":
+    if args.step in ("download", "all"):
         args.dump = download(args)
-    if args.step == "render":
+    if args.step in ("render", "all"):
         render(args)
+    if args.step in ("build", "all"):
+        build(args)
 
 
 if __name__ == "__main__":
