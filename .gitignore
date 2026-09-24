@@ -9,5 +9,8 @@
 # temporary and partial files
 *.tmp
 *.part
+*.bad
 __pycache__/
 .cache/
+# translation work batches: scratch between `translate.py batches` and `merge`
+translations/work/

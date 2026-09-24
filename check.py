@@ -44,6 +44,7 @@ RESIDUE = {  # name -> pattern that must not occur (math masked for the wikitext
     "category link": r"(?m)Category:|ଶ୍ରେଣୀ:(?:\S|$)",
     "Content Translation markup": r"cx-link|data-linkid|data-cx=|mw-redirect",
     "HTML entity": r"&(?:amp|lt|gt|quot|nbsp|#1[03]);",
+    "template error message": r"Error: (?:\{\{|Lang|This is not a valid|Transliteration)",
     "Odia digit": "[୦-୯]",
     "unassigned danda U+0B64/65": "[୤୥]",
     "ଯ + nukta": "ଯ଼",

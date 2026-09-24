@@ -76,7 +76,7 @@ LIST_ITEM = re.compile(r"^\s*(?:[-*+]|[0-9]+[.)])\s")
 
 def para_kind(block):
     """heading / table / list / math / text, from the block's leading characters."""
-    if block.startswith("#"):
+    if re.match(r"#{1,6} ", block):  # a Markdown heading, not a "#!/usr/bin/perl" code line
         return "heading"
     if block.startswith("|"):
         return "table"

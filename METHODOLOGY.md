@@ -15,14 +15,16 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 | Paragraphs | 162,052, of which 143,357 are not the title |
 | Data tables | 2,962 in 1,727 articles, 168,947 Odia words |
 | Pages left out | 137 under 5 Odia words, 112 disambiguation, 7 exact duplicates, the main page |
+| English inside articles | 899 paragraphs and headings translated into Odia (in 368 articles), 5,754 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
 
 The steps are scripts of their own, all in this folder:
 
-1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, filtering, outputs, `README.md`).
+1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, translation insertion, filtering, outputs, `README.md`).
 2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, and no cleaned-away residue may be left.
-3. `annotate.py`: topics and translation flags from the dump's metadata tables.
-4. `score_bpb.py`: Sarvam-1 bits per byte on a GPU pod, and the review-first ranking.
+3. `translate.py`: translation rounds for the English prose left in articles. It makes work batches, checks and merges the translations, and marks junk.
+4. `annotate.py`: topics and translation flags from the dump's metadata tables.
+5. `score_bpb.py`: Sarvam-1 bits per byte on a GPU pod, and the review-first ranking.
 
 The outputs are `orwiki-20260901.jsonl` / `.parquet` (one record per article), `markdown/<title>.md`, `annotations/*.parquet`, and the reports in `quality/`. The fields are described in `README.md`, and what each step taught us is in `LEARNINGS.md`.
 
@@ -64,6 +66,15 @@ Many of these are Lua modules, which only MediaWiki can run. So `prepare.py rend
 | External links | ବାହାର ଲିଙ୍କ, ବାହାରର ଲିଙ୍କ, ବାହାର ଲିଂକ, ବାହ୍ୟ ଲିଙ୍କ, ବାହ୍ୟ ସଂଯୋଗ, ବାହାର ସଂଯୋଗ, ବାହାର ଯୋଗସୂତ୍ର, ବାହ୍ୟ ଯୋଗସୂତ୍ର, ବାହାର ଆଧାର, ବାହାର ତଥ୍ୟ, ବାହାର ସ୍ରୋତ, ଅଧିକ ତଥ୍ୟ |
 | Galleries | ଗ୍ୟାଲେରୀ, ଗ୍ୟାଲେରି, ଚିତ୍ର ଗ୍ୟାଲେରୀ, ଚିତ୍ରଶାଳା, ଚିତ୍ରାବଳୀ, ଛବି |
 | English, left untranslated | see also, notes, note, references, reference, further reading, external links, external link, bibliography, sources, citations, footnotes, works cited, notes and references, references and notes, gallery |
+
+**Spelling variants, by pattern** (`DROP_SECTION_PATTERNS`, `reference_heading()`). The same headings are typed with a virama more or less and in different words: "ବାହାର ଲିଙ୍କ୍" (64 sections), "ଏହା ମଧ୍ୟ ଦେଖନ୍ତୁ" (62), "ବାହ୍ୟ ଆଧାର" (20), "ଆଉରି ଦେଖନ୍ତୁ" (20), "ଏହା ମଧ୍ୟ ଦେଖିବେ", "ଅଧିକ ଜାଣିବା ପାଇଁ ପଢ଼ନ୍ତୁ", "ପଠନ ତାଲିକା". They are matched on `heading_key()`:
+- a heading ending in ଦେଖନ୍ତୁ or ଦେଖିବେ ("see …")
+- a heading ending in ପଢ଼ନ୍ତୁ ("read …")
+- ବାହ୍ୟ / ବାହାର / ବାହର / ଅନ୍ୟାନ୍ୟ followed by ଲିଙ୍କ, ଲିଂକ, ଆଧାର, ସଂଯୋଗ, ଯୋଗସୂତ୍ର, ସ୍ରୋତ, ତଥ୍ୟ or ଉତ୍ସ
+- a bare ଲିଙ୍କ / ଲିଂକ
+- ପଠନ ତାଲିକା
+
+Content headings that share a word stay, e.g. ଉତ୍ସବ ("festival"), ଖାଦ୍ୟ ଉତ୍ସ ("food sources") and ଆର୍କିମିଡିସଙ୍କ ସୂତ୍ର ("Archimedes' principle"). Found on 2026-09-24 by scanning the remaining headings for reference words.
 
 **How the list was found.** By measurement, not guessing: every section heading in the first 2,500 rendered pages was ranked by external links, list items and Odia characters per section. ଅଧିକ ତଥ୍ୟ ("more information") appeared 390 times and was always external links; ଦ୍ରଷ୍ଟବ୍ୟ (80 sections, ~51 list items each) was "see also" lists. Headings are compared after `heading_key()`: lower-cased, spaces collapsed, a trailing colon removed and **nukta letters folded**, because the same heading is typed with precomposed ଡ଼/ଢ଼ (U+0B5C/U+0B5D) or with ଡ/ଢ + nukta (ପଢ଼ନ୍ତୁ both ways).
 
@@ -135,6 +146,10 @@ A block is dropped entirely when it contains:
 | raw Parsoid HTML pasted as text: `data-mw=`, `data-cx=`, `about="#mwt`, `typeof="mw:` | `HTML_RESIDUE` | a Content Translation bug in a FIFA-ranking table |
 | no letter or digit at all | | a lone `।` or `,` |
 | only a template name | | `Template:Infobox medical intervention` |
+
+**Also dropped** (2026-09-24):
+- A block that is only a category link: `Category:…`, `[[ଶ୍ରେଣୀ:]]` or `ଶ୍ରେଣୀ:<name>`, brackets or not. A leftover like this sat at the end of 2 articles. "ଶ୍ରେଣୀ: ସ୍ତନ୍ୟପାୟୀ" (Odia for "class: mammals") has a space after the colon and stays.
+- English template error messages, e.g. "Error: {{Lang}}: text has italic markup (help)" and "Error: This is not a valid number …". There were 59 of them, in the red span MediaWiki prints them in, or a `strong.error`, linking to an error category. They are removed in `drop_templates()`. A `print("Error:")` inside a code example stays.
 
 ### Residue stripped inside a block
 
@@ -213,6 +228,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 | under 5 Odia words | 137 | fewer than 5 runs of Odia letters in the body after cleaning (`--min-words`) | one-line stubs: ଛତିଶଗଡ଼ ("ଛତିଶଗଡ଼, ଭାରତର ଏକ ରାଜ୍ୟ ।"), ତ୍ରିପୁରା, ଲାକ୍ଷାଦ୍ୱୀପ |
 | disambiguation | 112 | Parsoid's `mw:PageProp/disambiguation` | ଓଡ଼ିଆ, ବୌଦ୍ଧ, ସମାଜ, ସମୟ |
 | exact duplicate | 7 | the same body text as an earlier article (sha1) | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
+| mostly English | 2 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ, whose English is all citations |
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
 
 Every left-out title and its reason is in `orwiki-20260901-build.json`. Stubs (1,910) and bot-created pages (1,495) are kept and flagged (`stub`, `bot_created`), not dropped. Articles whose `odia_ratio` is under 0.6 (332, 56,627 Odia words) are kept; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
@@ -396,7 +412,7 @@ Four problems found by the measurements and the review queue, fixed in `prepare.
 
 In total the rules removed 8,046 characters of leftovers.
 
-### English-dominant blocks
+### English-dominant blocks: translate prose, keep data, drop citations
 
 **Which blocks.** A block is English-dominant when it has more than twice as many Latin letters as Odia letters. Only letters count (digits are ASCII by then) and math is ignored (`english_dominant()` in `prepare.py`). The unit and its minimum:
 
@@ -407,7 +423,57 @@ In total the rules removed 8,046 characters of leftovers.
 | list item | at least 10 Latin letters |
 | table | at least 30 Latin letters and fewer than 200 Odia letters |
 
-**What happens to them.** They are removed and kept aside in `removed/english-paragraphs.parquet`: 6,622 blocks (513 paragraphs, 5,591 list items, 518 tables).
+**What happens to them** (the owner's decision, 2026-09-24):
+
+| Block | Action | Count |
+|---|---|---:|
+| citation (bibliography entry), any unit | removed | 133 |
+| paragraph or heading with a translation | replaced in place by its Odia translation | 908 in the text (374 articles) |
+| paragraph the translator judged not prose (code, names, garbled OCR, verse in Latin script) | kept as it is | 72 |
+| paragraph marked junk: vandalism, leaked template instructions, and reference lines the citation rule missed ("Source: …", numbered news references, a Gazette notification) | removed | 15 blocks (12 table entries) |
+| list item, table | kept as it is: names, titles, data | the rest of the 5,754 kept |
+
+A paragraph or heading with no translation yet is taken out and kept aside in `removed/` (reason "awaiting translation"), where `translate.py batches` finds it for the next translation round. None are waiting now. The citations (133) and junk blocks (15) that were cut out are listed there too, each with the article's `id` and `title`.
+
+**Citations** (`is_citation()`). Structural signals count for any block:
+- ISBN, ISSN, DOI or OCLC
+- page or volume numbers
+- "Retrieved"
+- the "Surname, A. B." author format
+
+For list items, "(1997). Title" also counts, as do publisher words (Press, Publishers, Journal, …) together with a year. Prose that mentions a film "(1962)." or a "journal" is not a citation. A first, looser version flagged such prose: Waheeda Rehman's career, and a Param Vir Chakra citation. So did an anthology title in a poet's list of works ("The Notion Press Book of Modern Odia Poetry"). Taxonomic authorities ("Gu et al. 2008") are names, not citations.
+
+**Why not remove it all, as at first.** The first version of this rule removed every English-dominant block (6,622). It left skeleton articles: the lists of lakes, mountains and rivers kept only their headings. So the owner decided:
+- translate the prose
+- keep tables, names and titles, which are useful even in Latin script
+- drop citations
+- headings were left to the maintainer, who translated them
+
+**Translations.**
+- **Source table.** They live in `translations/english-to-odia.jsonl` (in git), keyed by the sha1 of the English block as the build produces it. Each entry records the source, the Odia text, the translator, notes and the automatic checks.
+- **Who translated.** Nine parallel Claude Opus translator agents wrote them on 2026-09-24: 524 unique paragraphs (21,617 English words) in 8 batches, and 352 unique headings with one shared glossary (Early life → ପ୍ରାରମ୍ଭିକ ଜୀବନ, Filmography → ଚଳଚ୍ଚିତ୍ର ତାଲିକା, Awards → ପୁରସ୍କାର ଓ ସମ୍ମାନ, Personal life → ବ୍ୟକ୍ତିଗତ ଜୀବନ).
+- **Guidelines.**
+  - formal Odia as on Odia Wikipedia, faithful, nothing added or dropped
+  - ASCII digits exactly as in the source, and Odia month names
+  - established Odia spellings of names (checked against the corpus)
+  - scientific names and common Latin acronyms stay in Latin
+  - ୟ written precomposed, and " ।" at the end of a sentence
+- **Checks.** `translate.py merge` checks every item:
+  - no digit sequence lost
+  - no Bengali or Devanagari letters
+  - Odia letters at least half of the letters
+  - length ratio 0.5–2.5
+  - no ଯ + nukta
+
+  Only two paragraphs fail, both for kept Latin names (frog family names, a Commons link target). The flagged headings are short ones and Latin binomials.
+- **Review.** The maintainer read a random sample of 8 against their sources: accurate, natural Odia word order, names and numbers kept.
+- **Provenance.** Each record has `translated_paragraphs`, the number of machine-translated paragraphs and headings in its final text. It is counted after empty sections are dropped; a first version counted 980, because it included 50 headings whose sections were later dropped. The count lets the text be separated by origin, as in E06-style ablations. Translated text is about 18k Odia words, 0.4% of the corpus.
+- **How natural the translations are.** Sarvam-1 scores translated paragraphs at 0.519 bits per byte pooled, the same as native Odia prose (0.519). Within length bands, their median sits at the 44th percentile, and 1.2% / 2.1% fall in the bottom / top 1%. Long translations are about 5% more predictable than native text of the same length. There is no sign of unnatural or formulaic Odia (`quality/bpb.md`).
+- **Missed citations.** The re-scoring's review queue found 9 translated reference lines that `is_citation()` had missed: "Source: …" lines, numbered news references, a Gazette notification, and a "ଆଧାର: 1) …" source list. They are marked junk with `translate.py mark --drop`. Quote attributions ("— Maj A. H. Amin …") and a quoted court judgment stay.
+
+**Articles that come back.** The corpus has 51 more articles than under the first rule (20,785 → 20,836): pages that had been dropped as mostly English are back, translated or with their lists and tables. The 2 still left out as mostly English (ଆବ୍ରୋସରସ, ଈଲୋସରସ) had only citations in English. `gutted()` still drops a page whose removed English (now only citations and untranslated prose) leaves under 25 Odia words outside headings.
+
+**How a later round works.** `translate.py batches` (items awaiting translation) → translators → `translate.py merge` → `translate.py mark --drop` for junk → `prepare.py build` → `check.py` → re-scoring of the new paragraphs.
 
 ### List nesting after removals
 
@@ -428,10 +494,19 @@ In total the rules removed 8,046 characters of leftovers.
 
 **Queue.** The review queue was rebuilt on the cleaned text, and every `review_para` points at a current paragraph (see [Review-first queue](#review-first-queue)).
 
+**Run 3, after the translations (2026-09-25).**
+- **What was scored.** 2,445 new texts in 1,064 articles: translated paragraphs and headings, restored English lists and tables, and paragraphs changed by the error-message rule. That is 497,209 tokens, well over the 206k estimate: Latin-script lists and tables run at about 2.3 bytes per token, against about 7.1 for Odia.
+- **Pod.** The RTX 4000 Ada was out of stock, so it ran on an RTX A6000 Secure at $0.53/h: 34.5 s of GPU time and 3 min 38 s of pod time, **$0.03**. All three runs together cost $0.32.
+- **Recheck.** 200 already-scored texts came out 126 identical, with a median change of 0.00% and a maximum of 1.79%.
+- **Scores.** Corpus bpb 0.5500 → 0.5544, as Latin-script lists and tables returned. Prose 0.5221; translated paragraphs 0.519; restored lists and tables 0.96.
+- **Afterwards.** Removing the 9 missed reference lines needed no GPU: removals leave no new text to score, and `score_bpb.py build` carries every other score over.
+
 ## Known limitations and open issues
 
 - **Boilerplate.** 6.8% of paragraphs repeat, with names and numbers masked, in 5 or more articles (year-page sentences, coordinates, census sentences, the Hindi-official-language sentence); `bot_created` covers only about a fifth of them. A per-article templated share and a repeat cap for the training mix are still to do.
 - **Paragraph granularity.** A list is one paragraph, so a paragraph drop removes the whole list block.
+- **Translations are LLM output.** They passed automatic checks and a sample review, not a full human review. They are marked per article (`translated_paragraphs`) and listed with their sources in `translations/english-to-odia.jsonl`.
+- **English lists and tables stay.** 5,754 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
 - **Topics.** The small topics have thin evidence (science and society 5/8 in the stratified check); `odisha` misses articles without categories; Wikidata was read live on 2026-09-24, not from a dump.
 - **Translation.** Untagged machine translation cannot be detected from the dumps.
 - **bpb.** Per-paragraph ranks carry bf16 noise; short paragraphs (under 100 B) are only flagged through their article.
@@ -444,6 +519,18 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
+- **2026-09-25: re-scoring run 3 and follow-ups.**
+  - 2,445 new texts scored ($0.03); translations score like native Odia.
+  - 9 missed reference lines marked junk.
+  - `translated_paragraphs` counted after empty sections are dropped (908 blocks, 374 articles).
+  - Topic and translation annotations recomputed for the current articles.
+  - A code block starting `#!/usr/bin/perl` is no longer classified as a heading: headings need `#` to `######` and a space, in `score_bpb.py` and edaapp.
+- **2026-09-24: English policy changed from "remove" to "translate prose, keep data, drop citations".**
+  - 980 paragraphs and headings translated in place; 5,754 lists and tables restored; 133 citations and 3 junk blocks removed.
+  - 51 articles are back (20,785 → 20,836).
+  - More reference headings dropped by pattern.
+  - Category-only blocks and 59 English template error messages removed.
+  - New `check.py` (Markdown, pandoc, residue) and `translate.py` (translation rounds).
 - **2026-09-24: re-scoring after the cleanups.**
   - Scores carried over by `para_sha1`; only 1,379 new texts scored.
   - Cost: $0.02 on an RTX 4000 Ada.

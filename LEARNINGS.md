@@ -47,6 +47,38 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **Removing all English left skeletons; the fix was translate prose, keep data, drop
+  citations** (2026-09-24, owner's decision).
+  - The first English filter removed 6,622 blocks. List articles (lakes, mountains, rivers) kept
+    only their headings, and 56 pages had to be dropped as mostly English.
+  - The owner chose instead: translate the prose, keep tables, names and titles, and drop
+    citations; headings were left to the maintainer, who translated them.
+  - Result: 980 paragraphs and headings translated in place (396 articles), 5,754 lists and
+    tables kept, 133 citations and 3 junk blocks removed. The corpus has 51 more articles.
+
+  — Filter by what a block *is*, not only by its script. — done: `prepare.py` English
+  handling, `translate.py`, `translations/english-to-odia.jsonl`, and the
+  `translated_paragraphs` count per record.
+- **Nine parallel translator agents: 21.6k English words in about 15 minutes, and they found
+  junk** (2026-09-24).
+  - Output: 449 paragraphs and 351 headings translated; 72 kept as they are (code, name lists,
+    garbled OCR, verse in Latin script).
+  - Junk they flagged: vandalism in the mouse article, leaked template instructions in the
+    jaundice article, and a template error in the Latin article.
+  - `translate.py merge` checks every item. Only 2 paragraph translations fail, both for Latin
+    names kept on purpose. The length check (0.5–2.5) flags short headings ("Awards" → "ପୁରସ୍କାର
+    ଓ ସମ୍ମାନ"), so read failures by kind.
+  - A random sample of 8 read against the sources was accurate and natural.
+
+  — Give translators a "not content" way out; check before merging. — done: `translate.py
+  mark --drop`, and the build removes marked junk. idea: a length band per kind, and a
+  back-translation spot check for a larger sample.
+- **Citation detection must not rely on "(1962). "** (2026-09-24). A looser rule flagged prose
+  that cites a film's year ("…Satyajit Ray's film Abhijan (1962). Following this…"), prose that
+  says "journal", and an anthology title with "Press" in it. — done: paragraphs need structural
+  signals (ISBN/DOI, page or volume numbers, "Retrieved", the "Surname, A." format). List items
+  also count "(YYYY). " and publisher words, but only together with a year.
+
 - **Boilerplate after the cleanups: 6.3% of paragraphs but only 2.1% of Odia words, and some
   of it wrong** (2026-09-24).
   - 151 sentence frames repeat in 5 or more articles, once names and numbers are masked:
@@ -257,6 +289,51 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   kept (it is real content), link lists dropped.
 
 ## Tooling and automation
+
+- **Re-scoring after the translations: $0.03, and the translations read like native Odia**
+  (2026-09-25).
+  - The job: 2,445 new texts (497k tokens) on an RTX A6000, because the RTX 4000 Ada was out of
+    stock; 3.6 min of pod time.
+  - The translations score 0.519 bits per byte, the same as native prose, with no sign of
+    unnatural text.
+  - Other findings from the run:
+    - Latin-script text tokenises at about 2.3 bytes per token against 7.1 for Odia, so a
+      byte-based estimate (206k tokens) was 2.4× low.
+    - `nohup … &` over ssh held the connection open until the job ended, because stdin wasn't
+      redirected.
+    - The image needs `pip install --break-system-packages` and numpy.
+    - Fish shell doesn't split a variable holding several ssh options.
+    - `translated_paragraphs` counted 50 headings whose sections were later dropped.
+    - 9 translated reference lines had slipped past `is_citation()`.
+    - `para_kind` read a Perl `#!/usr/bin/perl` block as a heading.
+  - — Estimate tokens per script; detach remote jobs with `< /dev/null` (or `setsid`); count
+    after the final pass; take whichever approved GPU is in stock.
+  - — done: the count is fixed, the 9 lines are marked junk, and the heading rule (`#{1,6} `) is
+    fixed in `score_bpb.py` and edaapp (SQL too). idea: the pod install line and detaching go in
+    `score_bpb.py`'s docstring; keep pod score outputs under `raw/bpb/`.
+- **Re-run `annotate.py` after every corpus rebuild, before `score_bpb.py build`** (2026-09-25).
+  The topic and translation files lagged a rebuild, so 51 articles had no context row in the
+  review queue. — done this time; todo: one `refresh` script that runs build → annotate →
+  score build → check in order.
+
+- **Reference headings come in many spellings; match them by pattern** (2026-09-24). After the
+  first cleanup, about 200 sections still had "see also" and external-link headings spelled
+  differently: "ବାହାର ଲିଙ୍କ୍" (64), "ଏହା ମଧ୍ୟ ଦେଖନ୍ତୁ" (62), "ବାହ୍ୟ ଆଧାର" (20), "… ଦେଖିବେ". —
+  Re-scan the remaining headings for reference words after each change. — done:
+  `DROP_SECTION_PATTERNS`.
+- **A whole-block rule ran before the bracket stripping, so `[[ଶ୍ରେଣୀ:]]` survived**
+  (2026-09-24). — Whole-block tests must allow the markup that a later step removes. — done:
+  the category-block pattern accepts brackets.
+- **English template errors hide in plain red spans** (2026-09-24). "Error: {{Lang}}: text has
+  italic markup (help)" (59 in all) is printed in `<span style="color:#d33">` with no error
+  class, so the class filter missed it. — done: `drop_templates()` also drops span or strong
+  elements that start with "Error:" and are red or link to an error category; `check.py` scans
+  for them.
+- **A session restart wiped the scratch dir** (2026-09-24). It held the ad-hoc Markdown checker
+  and the pod's raw scores. The checker came back as `check.py`, a permanent tool. The lost raw
+  scores for since-removed texts mean restored blocks had to be re-scored. — Keep anything
+  needed later (tools, raw model scores) in the repo's data folder, not in scratch. — done:
+  `check.py`, `translate.py`. todo: keep pod score outputs under `raw/bpb/`.
 
 - **The Mac's disk filled up, and a build died writing its temp file** (2026-09-24). 127 MB of
   228 GB were free, mostly used outside this work. The atomic writes kept the corpus intact, but
