@@ -28,6 +28,26 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **The full corpus: 20,834 articles, 4.73M Odia words, 89 MB** (2026-09-24, dump
+  2026-09-01). That is about 18% more than the ~4M-word estimate for the 2023 HF snapshot in
+  `docs/landscape.md`, with no template holes. The median article has 143 Odia words. 3,424
+  articles are under 50 words, and 25 are over 5,000 (the longest: ଓଡ଼ିଶାରେ କୋଭିଡ-୧୯ ମହାମାରୀ,
+  15.6k). 400 articles (66k words) have `odia_ratio` under 0.6 because of English
+  bibliographies and numeric tables. Left out: 112 disambiguation pages, 141 pages under 5
+  words, 7 exact duplicates (disease "ସଂକ୍ଷିପ୍ତ" summary copies), and the main page. — done:
+  `README.md` and `orwiki-20260901-build.json`.
+- **The first chunks overstated the table share by 2×** (2026-09-24). The first 2,500 pages
+  gave 9.2% as much Odia in tables as in prose; the full corpus has 4.4% of its words in tables
+  (206k words in 1,748 articles). Chunks go in page-id order, so the oldest, biggest list
+  articles (districts, chief ministers) come first. — Don't extrapolate corpus statistics from
+  the first chunks of an id-ordered dump. Sample at random or wait for the full build. — done:
+  the build computes these numbers (`table_words`, `articles_with_tables`) and the README uses
+  them.
+- **Some pages contain raw Parsoid HTML as text** (2026-09-24). Content Translation pasted
+  `<span about="#mwt715" data-cx=… data-mw=…>` into the wikitext, which renders as literal
+  markup, e.g. in a FIFA-ranking table. Editors also type bare URLs into prose (57 in 45 pages).
+  — done: `HTML_RESIDUE` empties such blocks and cells, `LITERAL_TAG` strips stray tags, and
+  `URL` removes bare URLs.
 - **Data tables hold 9.2% as much Odia text as the prose** (2026-09-24). In the first 2,500
   articles: 336k Odia characters in `wikitable`s against 3.3M in the text. They are the list
   articles a school model needs: districts with area, population and literacy; chief
@@ -35,6 +55,11 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   — Don't drop tables wholesale for a small wiki. — done: `table_markdown()` keeps data
   tables as Markdown (rowspans repeat, colspans fill the first column, image-only columns
   removed), with a `tables` count per record.
+- **Keeping tables brings back residue that prose had lost** (2026-09-24). On 6,000 pages,
+  table cells carried image sizes as text (`70px`, `100px`). Flag templates with missing
+  country data showed "ଛାଞ୍ଚ:Country data ହଂକଂ" in a list of 36 territories. — Rerun the
+  noise scan after every change in what is kept, not only after changes in what is dropped. —
+  done: `PX_RESIDUE`, and red links to missing templates are dropped except the country name.
 - **Odia typists write the danda as `|` or as unassigned U+0B64** (2026-09-24). `|` appeared
   in 367 of the first 500 pages (mostly one year-page template sentence). U+0B64 (`୤`) appeared
   191 times in 48 of the first 2,000 pages. U+0B64/U+0B65 are reserved in Unicode, so any

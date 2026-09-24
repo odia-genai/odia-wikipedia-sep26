@@ -27,7 +27,7 @@ Usage (uv reads the dependencies from the header above; nothing is installed in 
     uv run prepare.py build
     uv run prepare.py all                 # the three in turn
 
-`render` takes about 1.5 h for 21k articles with 6 workers. It needs ODIA_WIKI_CONTACT (an email
+`render` takes about 2 h for 21k articles with 6 workers. It needs ODIA_WIKI_CONTACT (an email
 or URL for the user-agent): Wikimedia throttles bulk clients without contact details to about a
 request a minute.
 """
@@ -386,6 +386,18 @@ def drop_templates(body):
     for el in body.xpath("//*[@about]"):
         if el.get("about") in abouts and el.getparent() is not None:
             el.drop_tree()
+    # Red links to missing templates inside other templates: {{flag|ହଂକଂ}} without its
+    # country data shows "ଛାଞ୍ଚ:Country data ହଂକଂ". Keep the country name, drop the rest.
+    for a in body.xpath("//a"):
+        shown = a.text_content().strip()
+        if shown.startswith(("ଛାଞ୍ଚ:", "Template:")) and a.getparent() is not None:
+            name = re.sub(r"^(?:ଛାଞ୍ଚ|Template):\s*Country data\s+", "", shown)
+            if name == shown:
+                a.drop_tree()
+            else:
+                tail = a.tail
+                a.clear()
+                a.text, a.tail = name, tail
 
 
 def link_only_item(li):
@@ -564,6 +576,24 @@ def table_markdown(tbl, max_span=50):
     return "\n".join(lines)
 
 
+# "[2]", "[୪]" typed into the text as reference markers (not a[1] in code)
+MANUAL_CITE = re.compile(r"(?<![A-Za-z0-9_])\s*\[\s*[0-9୦-୯]{1,3}\s*\]")
+WIKI_RESIDUE = re.compile(r"\[\[|\]\]|\{\{|\}\}|'{2,}")  # broken wikitext shown as text
+FILE_RESIDUE = re.compile(
+    r"\.(?:jpe?g|png|svg|gif|tiff?|webp)\s*\||(?:^|\|)\s*(?:thumb|thumbnail|frameless|\d+px)\s*[|\]]", re.I | re.M)
+TABLE_RESIDUE = re.compile(r"\|\|[^|\n]*\|\||^\s*\{?\|[-+}]?", re.M)  # wikitable rows shown as text
+# Raw Parsoid HTML pasted into the wikitext (a Content Translation bug) shows up as text.
+HTML_RESIDUE = re.compile(r'data-(?:mw|cx)=|about="#mwt|typeof="mw:')
+# Wiki and HTML tags that leaked into the text as literal markup ("<poem>", "</right>", "<meta />").
+LITERAL_TAG = re.compile(
+    r"</?(?:span|div|br|small|big|center|font|p|ref|references|sup|sub|b|i|u|s|poem|right|left|meta|"
+    r"nowiki|gallery|onlyinclude|includeonly|noinclude|math|chem|ce|templatestyles|section|abbr|"
+    r"del|ins|mark|tt|strike|em|strong|blockquote)\b[^<>]*/?>", re.I)
+MAGIC_WORD = re.compile(r"__(?:LEAD_SECTION|NOTOC|TOC|FORCETOC|NOEDITSECTION|NEWSECTIONLINK|"
+                        r"NONEWSECTIONLINK|NOGALLERY|HIDDENCAT|INDEX|NOINDEX|DISAMBIG|STATICREDIRECT)__")
+THUMB_TOKEN = re.compile(r"\S*\|\s*(?:thumb|thumbnail|frameless|upright)\b\S*")  # "ଡାହାଣ|thumb"
+URL = re.compile(r"\s*\(\s*(?:https?://|www\.)[^\s)]+\s*\)|(?:https?://|www\.)\S+")  # bare URLs typed in prose
+PX_RESIDUE = re.compile(r"(?<![\w.])\d{1,4}px\b")  # image sizes left as text: "70px"
 # "|" typed for the danda "।" (and "||" for "॥") after Odia text (or a closing quote/bracket
 # after it), before a space or line end.
 PIPE_DANDA = re.compile(r"(?<=[\u0B00-\u0B7F)\]\"'”’])(\s?)(\|\|?)(?=\s|$)", re.M)
@@ -574,6 +604,13 @@ def clean_block(block, cell=False):
     kind, level, prefix, text = block
     if kind == "t":
         return block
+    # Broken [[File:...|thumb|...]] or table markup that rendered as text; punctuation alone.
+    if (FILE_RESIDUE.search(text) or TABLE_RESIDUE.search(text) or HTML_RESIDUE.search(text)
+            or not re.search(r"\w", text) or re.fullmatch(r"(?:ଛାଞ୍ଚ|Template):[^\n]*", text)):
+        return kind, level, prefix, ""
+    text = URL.sub("", THUMB_TOKEN.sub("", LITERAL_TAG.sub("", MAGIC_WORD.sub("", text))))
+    text = WIKI_RESIDUE.sub("", MANUAL_CITE.sub("", PX_RESIDUE.sub("", text)))
+    text = "\n".join(line for line in text.split("\n") if re.search(r"\w", line))  # no "।" lines
     text = PIPE_DANDA.sub(lambda m: m.group(1) + ("॥" if len(m.group(2)) == 2 else "।"), text)
     # Parentheses emptied by dropped pronunciation templates: "ବଙ୍ଗଳା ଭାଷା (), ..." "(; বাংলা)"
     text = re.sub(r" ?\([\s,;:]*\)", "", text)
@@ -722,6 +759,8 @@ def build(args):
         "table_words": sum(len(odia_words("\n".join(line for line in r["text"].split("\n")
                                                      if line.startswith("|")))) for r in records),
         "articles_with_tables": sum(r["tables"] > 0 for r in records),
+        "odia_ratio_below_0.6": sum(r["odia_ratio"] < 0.6 for r in records),
+        "odia_ratio_below_0.6_words": sum(r["words"] for r in records if r["odia_ratio"] < 0.6),
         "min_words": args.min_words,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
         "dropped_titles": excluded,
@@ -816,6 +855,10 @@ A short example record:
    - hatnotes, maintenance and stub banners, coordinates, pronunciation (IPA), sister-project
      boxes, archive notes ("Archived … at the Wayback Machine"), template error messages
    - list items that are only an external link or a book citation, under any heading
+   - hand-typed reference markers (`[2]`, `[୪]`) and broken wikitext that renders as text
+     (`[[`, `{{{{`, `''`, stray `File:…|thumb|` lines)
+   - bare URLs typed into the prose, and raw HTML pasted into the wikitext (a Content
+     Translation bug) that renders as text
    - empty sections, and parentheses emptied by the removed pronunciations
 4. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
    U+0B5F). A `|` typed for the danda after Odia text becomes `।` (and `||` becomes `॥`). Soft
@@ -834,6 +877,10 @@ A short example record:
 The median article has {q(0.5):,} Odia words (10th percentile {q(0.1):,}, 90th {q(0.9):,}).
 {len(bot):,} articles ({sum(r['words'] for r in bot):,} words) are bot-created and formulaic;
 {stats['stub']:,} are marked as stubs.
+{stats['odia_ratio_below_0.6']:,} articles
+({stats['odia_ratio_below_0.6_words']:,} Odia words) have `odia_ratio` under 0.6, mostly from English
+bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-trainer's
+`odia-build-cpt --min-odia-ratio`) skips them.
 
 | Odia words per article | Articles | Words |
 |---|---:|---:|
@@ -865,14 +912,14 @@ whose history lists the authors.
 
 ```bash
 uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD
-ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~1.5 h, resumable
+ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~2 h, resumable
 uv run prepare.py build      # about a minute
 ```
 
 `render` needs contact details in the user-agent (`ODIA_WIKI_CONTACT`). Wikimedia throttles
 anonymous bulk clients to about one request a minute per connection. With contact details and 6
-parallel requests it ran at about 4 pages/s, backing off on the occasional 429 as `Retry-After`
-asks. Rendered chunks are cached in `raw/html/<date>/`, so a rerun fetches only what is
+parallel requests it ran at about 3 pages/s (21,095 pages in about 2 hours), backing off on the
+occasional 429 as `Retry-After` asks. Rendered chunks are cached in `raw/html/<date>/`, so a rerun fetches only what is
 missing. The script writes only inside this directory. uv keeps its environment in its own cache.
 """
     (ROOT / "README.md").write_text(readme, encoding="utf-8")
