@@ -42,7 +42,7 @@ PANDOC_BAD = {"RawInline", "RawBlock", "CodeBlock", "Code", "Emph", "Strong", "L
               "BlockQuote", "HorizontalRule", "Strikeout"}
 HARD_CASES = ("ଆର୍ଯ୍ୟଭଟ୍ଟ", "ଡାଇନୋସର ଶ୍ରେଣୀବିଭାଗ", "ମ୍ୟାଟ୍‌ଲାବ୍‌", "କମ୍ପ୍ୟୁଟର", "ଓଡ଼ିଶାର ଜିଲ୍ଲାମାନଙ୍କର ତାଲିକା")
 RESIDUE = {  # name -> pattern that must not occur (math masked for the wikitext one)
-    "wikitext outside math": r"\{\{|\}\}|\[\[|\]\]",
+    "wikitext outside math": r"\{\{|\}\}|\[\[|\]\]|(?<![=<>!])={2,6}[^=\n|]{1,80}={2,6}(?!=)",
     "file/image options": r"\|\s*thumb|\.jpe?g\s*\||(?<![\w.])\d{1,4}px\b",
     "URL": r"https?://|www\.",
     "category link": r"(?m)Category:|ଶ୍ରେଣୀ:(?:\S|$)",

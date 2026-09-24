@@ -175,6 +175,8 @@ A block is dropped entirely when it contains:
 | lines with no letter or digit | | a `।` left on its own line |
 | parentheses emptied by removed pronunciations | | `ବଙ୍ଗଳା ଭାଷା (),` → `ବଙ୍ଗଳା ଭାଷା,`; `(; বাংলা)` → `(বাংলা)` |
 
+**Wikitext headings that rendered as text** (`split_wiki_headings()`, since 2026-09-25). MediaWiki makes `== … ==` a heading only at the start of a line, so a heading typed mid-line stays literal: `… ଯୁଗ୍ମ ସଂଖ୍ୟା । '== ଗାଣିତିକ ଧର୍ମ ==`, `==ଭୂଗୋଳ==1947 ମସିହାରେ …`. Before cleaning, such a mark at the start of a paragraph or after a sentence end becomes a real heading (level = number of `=`), splitting the paragraph around it. A reference heading made this way (`==ଆଧାର==`) is dropped. Mid-sentence (`କୋଟାୟମ, ==ଜମ୍ମୁ କାଶ୍ମୀର==, ଅମରାବତୀ`) only the marks go. Headings with the marks inside (`###### == ଆଧାର ==`) lose them, and `heading_key()` ignores them, so the reference-section drop sees them. 21 articles; `check.py` now flags any `==…==` outside math.
+
 ### Digits to ASCII
 
 **Rule.** Odia digits `୦–୯` become `0–9` in text, headings, tables and math (`ODIA_DIGITS` from `odia_text.py`, applied in `clean_block()`, `md_heading()` and `put_math_back()`), and since 2026-09-25 in every title field too: the corpus, `excluded.jsonl`, `removed-blocks.jsonl` and the annotations. Only `url` keeps the page's real name. 689,743 digits were converted in the text.
@@ -235,7 +237,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 
 | Reason | Pages | Rule | Examples |
 |---|---:|---|---|
-| year page | 1,864 | the title is a year (`1937`, `621`, `2`; `YEAR_TITLE`, which also accepts a BCE suffix) | 1,766 have no word outside template sentences |
+| year page | 1,864 | the title is a year (`1937`, `621`, `2`, `0 (ମସିହା)`; `YEAR_TITLE`, which also accepts a BCE suffix) | 1,766 have no word outside template sentences |
 | date page without events | 260 | the title is a day of the year (`11 ଅପ୍ରେଲ`; `DATE_TITLE`) and it has under 25 Odia words outside template sentences | 7 ଅକ୍ଟୋବର, 14 ଡିସେମ୍ବର: all 0 |
 | under 5 Odia words | 137 | fewer than 5 runs of Odia letters in the body after cleaning (`--min-words`) | one-line stubs: ଛତିଶଗଡ଼ ("ଛତିଶଗଡ଼, ଭାରତର ଏକ ରାଜ୍ୟ ।"), ତ୍ରିପୁରା, ଲାକ୍ଷାଦ୍ୱୀପ |
 | disambiguation | 112 | Parsoid's `mw:PageProp/disambiguation` | ଓଡ଼ିଆ, ବୌଦ୍ଧ, ସମାଜ, ସମୟ |
@@ -571,6 +573,7 @@ Newest first.
   - Sarvam-1 scores kept per text in `raw/bpb/scores.jsonl.gz`, so no text is ever scored twice; the migration needed no GPU.
   - `pipeline.py` runs build, annotations, scores and checks in one command.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
+  - Wikitext headings typed mid-line (21 articles) become headings; `0 (ମସିହା)` counts as a year page.
 
 - **2026-09-25: re-scoring run 3 and follow-ups.**
   - 2,445 new texts scored ($0.03); translations score like native Odia.

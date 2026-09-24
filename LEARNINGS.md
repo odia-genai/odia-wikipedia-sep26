@@ -76,6 +76,13 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   chemical elements, block and village one-liners and a national anthem's adoption date, all
   clean. — A length floor is a proxy for boilerplate; once the boilerplate is out by rule, the
   proxy only removes good data. — done: `--min-chars` defaults to 0 (off).
+- **Wikitext headings typed mid-line render as text** (2026-09-25). The residue scan missed
+  `== ଗାଣିତିକ ଧର୍ମ ==` in 21 articles. MediaWiki makes a heading only at the start of a line, so
+  "… ସଂଖ୍ୟା । '== ଗାଣିତିକ ଧର୍ମ ==" or "==ଭୂଗୋଳ==1947 …" stays literal. Headings written with
+  the marks inside (`###### == ଆଧାର ==`) also escaped the reference-section drop. — Check for
+  every markup family, not only the ones seen so far. — done: `split_wiki_headings()` makes
+  them headings at a sentence or block break and strips the marks mid-sentence; `heading_key()`
+  ignores the marks; `check.py` flags `==…==` outside math.
 - **A source error looks like a digit bug** (2026-09-25). The chlorine article says atomic
   number 7. It looked like digit conversion had lost a digit, but the rendered HTML says `୭`.
   — Check the source HTML before blaming a text transform. — idea: a facts check against

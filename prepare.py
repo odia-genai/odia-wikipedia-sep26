@@ -815,7 +815,9 @@ def clean_block(block, cell=False):
 
 
 def heading_key(text):
-    """Heading for matching: lowercased, nukta letters folded (ଡ଼/ଢ଼ come precomposed or not)."""
+    """Heading for matching: lowercased, nukta letters folded (ଡ଼/ଢ଼ come precomposed or not),
+    wikitext heading marks typed into the heading ("== ଆଧାର ==") ignored."""
+    text = text.strip().strip("='").strip()
     text = text.replace("\u0b5c", "\u0b21").replace("\u0b5d", "\u0b22").replace("\u0b3c", "")
     return SPACES.sub(" ", text).strip().rstrip(":").strip().lower()
 
@@ -843,6 +845,46 @@ def section_heading(sec):
     return SPACES.sub(" ", h.text_content()).strip() if h is not None else None
 
 
+# Wikitext headings typed where MediaWiki doesn't read them as headings (mid-line, or after a
+# stray quote), so they render as text: "… ଯୁଗ୍ମ ସଂଖ୍ୟା । '== ଗାଣିତିକ ଧର୍ମ ==", "==ଭୂଗୋଳ==1947 …".
+WIKI_HEADING = re.compile(r"'?(={2,6})\s*([^=\n|]{1,80}?)\s*\1(?!=)")
+SENTENCE_BREAK = re.compile(r"(?:^|[।.!?॥:]|\n)\s*$")
+
+
+def split_wiki_headings(blocks):
+    """A wikitext heading at the start of a paragraph or after a sentence becomes a heading block
+    (level = number of "="; a reference heading is dropped), splitting the paragraph around it.
+    Mid-sentence ("କୋଟାୟମ, ==ଜମ୍ମୁ କାଶ୍ମୀର==, …") only the marks go. A heading block whose text is
+    wrapped in marks loses them."""
+    def plain(t):
+        t, k = WIKI_HEADING.subn(lambda m: m.group(2), t)
+        FIX_COUNTS["wikitext heading marks"] += k
+        return t
+
+    out = []
+    for kind, level, prefix, text in blocks:
+        if kind == "h":
+            out.append((kind, level, prefix, plain(text)))
+            continue
+        if kind != "p" or "==" not in text:
+            out.append((kind, level, prefix, text))
+            continue
+        pos = 0
+        for m in WIKI_HEADING.finditer(text):
+            before = text[pos:m.start()]
+            if not SENTENCE_BREAK.search(before):
+                continue  # mid-sentence: plain() below keeps the words
+            if before.strip():
+                out.append(("p", 0, "", plain(before)))
+            if not reference_heading(m.group(2)):
+                out.append(("h", len(m.group(1)), "", m.group(2)))
+            FIX_COUNTS["wikitext heading"] += 1
+            pos = m.end()
+        if text[pos:].strip():
+            out.append(("p", 0, "", plain(text[pos:])))
+    return out
+
+
 LI_PREFIX = re.compile(r"^( *)((?:- |\d+\. )?)$")  # a list block's prefix: indent, then marker
 
 
@@ -863,7 +905,7 @@ def html_to_text(doc):
     w = Writer()
     w.walk(body)
     w.flush()
-    blocks = [clean_block(b) for b in w.blocks]
+    blocks = [clean_block(b) for b in split_wiki_headings(w.blocks)]
     # English-dominant blocks (see english_dominant): citations go; paragraphs and headings are
     # replaced by their Odia translation (TRANSLATIONS, keyed by the sha1 of the English block);
     # list items and tables (names, titles, data) stay as they are. A paragraph or heading with no
@@ -1036,7 +1078,7 @@ def drop_paragraphs(paras, shas, keep_first):
 # census figures, stay: their templated_share lets training down-weight them.)
 FRAME_ARTICLES, FREE_WORDS = 5, 25
 MONTHS = "(?:ଜାନୁଆରୀ|ଫେବୃଆରୀ|ମାର୍ଚ୍ଚ|ଅପ୍ରେଲ|ମଇ|ଜୁନ|ଜୁଲାଇ|ଅଗଷ୍ଟ|ସେପ୍ଟେମ୍ବର|ଅକ୍ଟୋବର|ନଭେମ୍ବର|ଡିସେମ୍ବର)"
-YEAR_TITLE = re.compile(r"[0-9]+(?:\s*(?:ଖ୍ରୀଷ୍ଟପୂର୍ବ|ଖ୍ରୀ\.?\s*ପୂ\.?))?")
+YEAR_TITLE = re.compile(r"[0-9]+(?:\s*(?:ଖ୍ରୀଷ୍ଟପୂର୍ବ|ଖ୍ରୀ\.?\s*ପୂ\.?))?(?:\s*\(ମସିହା\))?")  # "0 (ମସିହା)": year 0
 DATE_TITLE = re.compile(rf"[0-9]{{1,2}}\s*{MONTHS}|{MONTHS}\s*[0-9]{{1,2}}")
 FILM_YEAR_TITLE = re.compile(r"[0-9]{4}ର ଓଡ଼ିଆ (?:କଥାଚିତ୍ର|ଚଳଚ୍ଚିତ୍ର|ସିନେମା)")
 
@@ -1424,7 +1466,9 @@ A short example record:
    - conversion leftovers found by the review queue: Content Translation `<a href=… cx-link>` tags,
      raw `{{| … |}}` wikitable text, template parameters shown as text (`Quote box|width=…`), HTML
      attributes, `Category:` text, and the entities `&amp;` / `&#13;`
-     ({sum(v for k, v in stats['cleanup_fixes'].items() if not k.startswith(('typo', '_'))):,} fixes)
+     ({sum(v for k, v in stats['cleanup_fixes'].items() if not k.startswith(('typo', '_', 'wikitext'))):,} fixes)
+   - wikitext headings typed mid-line (`… । == ଇତିହାସ ==`) become real headings
+     ({stats['cleanup_fixes'].get('wikitext heading', 0):,})
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed ({stats['english']['removed_blocks'].get('citation', 0):,}), paragraphs and
      headings are replaced by their Odia translation ({stats['english'].get('translated', 0):,},
