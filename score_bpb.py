@@ -15,7 +15,8 @@ Steps:
   precision (pod, GPU)  bf16 paragraph bpb against an fp32 reference -> <work>/precision.json
   build     (laptop, no model, ~30 s)  the store -> annotations/bpb.jsonl, bpb.paragraphs.jsonl
                         (+ .json sidecars), quality/bpb.md, quality/review-first.md; joins
-                        annotations/translation.jsonl and topics.jsonl when they exist
+                        annotations/translation.jsonl and topics.jsonl when they exist;
+                        --allow-missing: build even if some paragraph texts have no score yet
 
 Files (JSON lines, JSON or Markdown only; the corpus and every output use ASCII digits):
 
@@ -24,12 +25,18 @@ Files (JSON lines, JSON or Markdown only; the corpus and every output use ASCII 
                               bytes, tokens, pieces, bits), kept for good, so a text that leaves the
                               corpus and comes back is never scored again
   annotations/bpb.json        sidecar of bpb.jsonl; "runs" holds every scoring run's record (pod,
-                              versions, checks), and a store row's score_run is a run's id
+                              versions, checks), and a store row's score_run is a run's id; "unscored"
+                              counts the paragraphs with no score and gives the pod command for them
 
 A paragraph's score depends only on its own text (it is scored from BOS), so `build` looks every
 paragraph of the current corpus up in the store by para_sha1. If any text has no score, it stops and
 prints how many texts, bytes and tokens need a pod run; removals alone never need one. (If the store is
-ever lost, the current texts' scores are also in annotations/bpb.paragraphs.jsonl.)
+ever lost, the current texts' scores are also in annotations/bpb.paragraphs.jsonl.) With
+--allow-missing (pipeline.py passes it) it builds anyway and warns on stderr. Those paragraphs get
+bpb null and no percentile or flag; article bpb is over the scored paragraphs (`unscored_paragraphs`
+counts the rest); they never enter the review queue; and bpb.json ("unscored") and quality/bpb.md say
+how many there are and give the pod command that scores them. A sidecar's "created" changes only when
+the build's output does, so building twice from the same inputs gives byte-identical files.
 
 New texts, on a pod (state the hourly price before creating it; terminate it when done):
 
@@ -788,6 +795,13 @@ def main():
         help="where annotations/ (whose bpb.json holds the run records) and quality/ are (default: this directory)",
     )
     s.add_argument("--partial", action="store_true", help="smoke test: scores cover only some articles")
+    s.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="build even if some paragraph texts have no score in the store (they get bpb null, no percentile or "
+        "flag, and stay out of the review queue; a warning on stderr and bpb.json's 'unscored' give the pod command); "
+        "without it, build stops",
+    )
     s.add_argument("--context-dir", default=str(ANN), help="where translation.jsonl / topics.jsonl are read from")
     args = ap.parse_args()
     {"score": cmd_score, "sanity": cmd_sanity, "precision": cmd_precision, "build": lambda a: cmd_build(a)}[args.step](
@@ -1017,6 +1031,7 @@ def before_stats(ann):
     if not ((ann / "bpb.paragraphs.jsonl").exists() and (ann / "bpb.jsonl").exists()):
         return {}
     op = pd.DataFrame(read_jsonl(ann / "bpb.paragraphs.jsonl"), columns=["id", "kind", "bytes", "bits"])
+    op = op[op.bits.notna()]  # a paragraph that build --allow-missing left unscored
     oa = pd.DataFrame(read_jsonl(ann / "bpb.jsonl"), columns=["id", "review_type"])
     ot = op[op.kind == "text"]
     return {
@@ -1102,21 +1117,47 @@ ODIA_BYTES_PER_TOKEN = 6.7  # all other paragraphs, headings (6.0) and lists inc
 A6000_TOKENS_PER_S = 16_000  # run 1: 16,487 tokens/s on an RTX A6000
 
 
-def unscored_message(miss, rows, store):
-    """What a pod run for the texts in `miss` (blocks) would take, estimated per script."""
+def piece_bytes(block):
+    """The UTF-8 bytes `score` divides a paragraph's bits by (its stripped split_text pieces)."""
+    return sum(len(c.encode("utf-8")) for c in split_text(block, MAX_CHARS))
+
+
+def gpu_time(tokens):
+    """'about 31 s' / 'under a second' of GPU time for a scoring run of `tokens` on an RTX A6000."""
+    s = tokens / A6000_TOKENS_PER_S
+    return f"about {s:,.0f} s" if s >= 1 else "under a second"
+
+
+def unscored_info(miss, rows, articles, store, corpus):
+    """What a pod run for the texts in `miss` (blocks) would take, estimated per script: (message, the
+    numbers and commands for bpb.json's "unscored")."""
     nbytes = latin = tokens = 0
     for b in miss:
-        n = sum(len(c.encode("utf-8")) for c in split_text(b, MAX_CHARS))
+        n = piece_bytes(b)
         is_latin = script_mix(b)[1] >= 0.5
         nbytes += n
         latin += is_latin
         tokens += n / (LATIN_BYTES_PER_TOKEN if is_latin else ODIA_BYTES_PER_TOKEN)
-    return (
-        f"{rows:,} paragraphs ({len(miss):,} distinct texts, {nbytes:,} B) have no score in {store}. They need a "
-        f"pod run of about {tokens:,.0f} tokens ({latin:,} Latin-script texts at {LATIN_BYTES_PER_TOKEN} B/token, "
-        f"the rest at {ODIA_BYTES_PER_TOKEN}; ~{tokens / A6000_TOKENS_PER_S:.0f} s of GPU time on an RTX A6000): "
-        "`score --only-missing`, then `build --add <dir>` (see the docstring of score_bpb.py)."
+    info = {
+        "paragraphs": rows,
+        "texts": len(miss),
+        "articles": articles,
+        "bytes": nbytes,
+        "latin_texts": latin,
+        "tokens_estimate": round(tokens),
+        "gpu_seconds_estimate_a6000": round(tokens / A6000_TOKENS_PER_S, 1),
+        # the steps are in the docstring of score_bpb.py ("New texts, on a pod")
+        "pod_command": f"cd /root && setsid nohup python score_bpb.py score --corpus {Path(corpus).name} --work "
+        "/root/bpb --only-missing scores.jsonl.gz < /dev/null > score.log 2>&1 &",
+        "add_command": "uv run --script score_bpb.py build --add raw/bpb/<date>",
+    }
+    msg = (
+        f"{rows:,} paragraphs ({len(miss):,} distinct texts, {nbytes:,} B, in {articles:,} articles) have no score "
+        f"in {store}. They need a pod run of about {tokens:,.0f} tokens ({latin:,} Latin-script texts at "
+        f"{LATIN_BYTES_PER_TOKEN} B/token, the rest at {ODIA_BYTES_PER_TOKEN}; {gpu_time(tokens)} of GPU time on an "
+        "RTX A6000): `score --only-missing` on a pod, then `build --add <dir>` (see the docstring of score_bpb.py)."
     )
+    return msg, info
 
 
 def cmd_build(args):
@@ -1169,6 +1210,8 @@ def cmd_build(args):
         "paragraphs_in_corpus": len(s),
         "paragraph_rows": int((~unscored).sum()),
         "missing_rows": int(unscored.sum()),
+        "missing_texts": int(s[unscored].para_sha1.nunique()),
+        "missing_articles": int(s[unscored].id.nunique()),
         "extra_rows": 0,
         "duplicate_rows": int(s.duplicated(["id", "para"]).sum()),
         "para_sha1_mismatches": 0,  # the score is looked up by the sha1 of the current text itself
@@ -1180,23 +1223,41 @@ def cmd_build(args):
         "articles_with_rows": int(s[~unscored].id.nunique()),
         "zero_byte_paragraphs": int((s.bytes == 0).sum()),
     }
-    if cov["missing_rows"] and not args.partial:
-        miss = s[unscored].drop_duplicates("para_sha1").block
-        raise SystemExit(unscored_message(miss, cov["missing_rows"], store_path))
+    miss_msg, miss_info = unscored_info(
+        s[unscored].drop_duplicates("para_sha1").block,
+        cov["missing_rows"],
+        cov["missing_articles"],
+        store_path,
+        args.corpus,
+    )
+    if cov["missing_rows"] and not (args.partial or args.allow_missing):
+        raise SystemExit(miss_msg)
     print(
         f"{cov['paragraph_rows']:,} of {cov['paragraphs_in_corpus']:,} paragraphs ({cov['distinct_texts']:,} texts) "
         f"have a score in {store_path.name} ({len(store):,} texts); "
-        + (f"{cov['missing_rows']:,} paragraphs have none (--partial)" if cov["missing_rows"] else "0 need a pod run")
+        + (
+            f"{cov['missing_rows']:,} paragraphs have none ({'--partial' if args.partial else '--allow-missing'})"
+            if cov["missing_rows"]
+            else "0 need a pod run"
+        )
     )
+    if cov["missing_rows"] and not args.partial:  # --allow-missing: say it loudly, where a pipeline shows it
+        print(
+            f"\nWARNING: NOT SCORED. {miss_msg}\nBuilt anyway (--allow-missing): they have bpb null in "
+            "annotations/bpb.paragraphs.jsonl, no percentile or flag, are left out of article bpb (unscored_paragraphs "
+            "in bpb.jsonl) and of the review queue; bpb.json's 'unscored' and quality/bpb.md give the pod command.\n",
+            file=sys.stderr,
+            flush=True,
+        )
     if args.partial:  # smoke tests: only what was scored
         s = s[~unscored]
         corpus = corpus[corpus.id.isin(set(s.id))].reset_index(drop=True)
     s = s.reset_index(drop=True)
     assert cov["duplicate_rows"] == 0, cov
 
-    # ---- paragraph features
+    # ---- paragraph features that need only the text: every paragraph, scored or not
     s["kind"] = s.block.map(para_kind)  # recomputed here: the rule may be newer than the pod run
-    mix = np.array([script_mix(b) for b in s.block])
+    mix = np.array([script_mix(b) for b in s.block]).reshape(-1, 3)
     s["odia_share"], s["latin_share"], s["other_share"] = mix[:, 0], mix[:, 1], mix[:, 2]
     s["markup"] = s.block.map(markup_hits)
     s["english"] = s.block.map(english_share)
@@ -1207,6 +1268,12 @@ def cmd_build(args):
     s["tkey"] = skeletons(s, titles)
     s["repeats"] = s.groupby("tkey").id.transform("nunique").fillna(1).astype("int32")  # no key: 1
     s["self_repeat"] = s.block.map(trigram_repeat)
+    # Unscored paragraphs (--allow-missing) keep these, and join the pool that near-copies are searched in
+    # (with the bytes `score` will count); everything from here on is computed over the scored ones only.
+    scored = s.bits.notna()
+    pool = s.assign(bytes=[nb if ok else piece_bytes(b) for nb, ok, b in zip(s.bytes, scored, s.block, strict=True)])
+    u = s[~scored].copy()
+    s = s[scored].copy()
     s["score_run"] = s.score_run.astype("int16")
     for c in ("bytes", "tokens", "pieces"):
         s[c] = s[c].astype("int64")
@@ -1232,18 +1299,24 @@ def cmd_build(args):
     s["flag"] = np.where(s.pct >= 1 - TAIL, "high", np.where(s.pct <= TAIL, "low", None))
     s.loc[~s.eligible, "flag"] = None
 
-    # ---- articles
+    # ---- articles (over their scored paragraphs; an article with none has bpb null)
     art = s.groupby("id").agg(
         paragraphs=("para", "size"), bytes=("bytes", "sum"), tokens=("tokens", "sum"), bits=("bits", "sum")
     )
+    ids = pd.Index(sorted(set(s.id) | set(u.id)), name="id")
+    art = art.reindex(ids)
+    for c in ("paragraphs", "bytes", "tokens"):
+        art[c] = art[c].fillna(0).astype("int64")
+    art["bits"] = art.bits.fillna(0.0)
+    art["unscored_paragraphs"] = u.groupby("id").size().reindex(art.index).fillna(0).astype("int32")
     txt = s[s.kind == "text"].groupby("id").agg(tb=("bytes", "sum"), tbits=("bits", "sum"))
     art = art.join(txt)
-    art["bpb"] = art.bits / art.bytes
+    art["bpb"] = (art.bits / art.bytes).where(art.bytes > 0)
     art["bpb_text"] = art.tbits / art.tb
     ext = s[s.flag.notna()]
     art["extreme_high"] = ext[ext.flag == "high"].groupby("id").size().reindex(art.index).fillna(0).astype("int32")
     art["extreme_low"] = ext[ext.flag == "low"].groupby("id").size().reindex(art.index).fillna(0).astype("int32")
-    art["extreme_share"] = ext.groupby("id").bytes.sum().reindex(art.index).fillna(0) / art.bytes
+    art["extreme_share"] = (ext.groupby("id").bytes.sum().reindex(art.index).fillna(0) / art.bytes).where(art.bytes > 0)
     big = art.bytes >= ART_MIN_BYTES
     lb = np.log(art.loc[big, "bpb"])
     art.loc[big, "bpb_pct"] = lb.rank(pct=True)
@@ -1268,7 +1341,7 @@ def cmd_build(args):
     eng = s[s.eligible & s.latin_english & s.kind.isin(["text", "list"])]
     eng_med, eng_p95 = float(eng.bpb.median()), float(eng.bpb.quantile(0.95))
     low_rows = list(s.index[(s.flag == "low") & s.kind.isin(["text", "list", "table"])])
-    copies = near_copies(s, low_rows)
+    copies = near_copies(pool, low_rows)  # searched among every paragraph, scored or not
     s["near_copies"] = pd.Series({r: v[0] for r, v in copies.items()}, dtype="float").reindex(s.index)
     s["near_best"] = pd.Series({r: v[1] for r, v in copies.items()}, dtype="float").reindex(s.index)
 
@@ -1417,7 +1490,9 @@ def cmd_build(args):
         "bytes": "UTF-8 bytes scored (the title heading, paragraph 0, is not scored)",
         "tokens": "Sarvam-1 tokens scored (without the BOS each piece starts with)",
         "bits": "total bits",
-        "paragraphs": "paragraphs scored (all but the title)",
+        "paragraphs": "paragraphs scored (all but the title, less unscored_paragraphs)",
+        "unscored_paragraphs": "paragraphs whose text has no score in the store yet (build --allow-missing; see "
+        "'unscored' in bpb.json): left out of bpb, bytes, tokens and bits; 0 normally",
         "extreme_high": f"paragraphs in the top {TAIL:.0%} of bpb for their kind and length (see bpb.paragraphs)",
         "extreme_low": f"paragraphs in the bottom {TAIL:.0%} of bpb for their kind and length",
         "extreme_share": "share of the article's scored bytes that are in extreme paragraphs",
@@ -1438,17 +1513,20 @@ def cmd_build(args):
         ),
         "kind": "heading / list / table / math / text, from the leading characters (edaapp's rule; its 'para' = text)",
         "bpb": "bits per UTF-8 byte; paragraphs over 1,000 characters are scored in whitespace-split pieces, as "
-        "the eval harness does",
+        "the eval harness does; null = the text has no score in the store yet (build --allow-missing; see "
+        "'unscored' in bpb.json)",
         "bytes": "UTF-8 bytes scored (pieces are stripped, so this can be a few bytes under the raw paragraph)",
         "tokens": "Sarvam-1 tokens scored (without BOS)",
         "bits": "-sum(log2 p) over the tokens",
         "pieces": "pieces the paragraph was split into (1 unless over 1,000 characters)",
         "bpb_group": (
             f"comparison group: kind x length band, pooled over the kind when under {MIN_GROUP} paragraphs; only "
-            "text/list/math >= 100 B and tables >= 200 B are compared (headings never)"
+            "text/list/math >= 100 B and tables >= 200 B are compared (headings never); null when not compared or "
+            "not scored"
         ),
-        "bpb_pct": "percentile of bpb within bpb_group (0-1); null when not compared",
-        "bpb_z": "robust z of log bpb within bpb_group ((x - median) / (1.4826 MAD)); null when not compared",
+        "bpb_pct": "percentile of bpb within bpb_group (0-1); null when not compared or not scored",
+        "bpb_z": "robust z of log bpb within bpb_group ((x - median) / (1.4826 MAD)); null when not compared or not "
+        "scored",
         "flag": f"'high' = top {TAIL:.0%}, 'low' = bottom {TAIL:.0%} of bpb_group; null otherwise",
         "latin_share": "share of the paragraph's letters and marks that are Latin script",
         "other_script_share": "share that is neither Odia nor Latin (Devanagari, Bengali, ...)",
@@ -1477,7 +1555,10 @@ def cmd_build(args):
         self_repeat=d.self_repeat.round(3),
         near_copies=d.near_copies.astype("Int32"),
     )
-    p = derived(s)
+    # unscored paragraphs (--allow-missing): the text-only columns, and null for bpb and everything derived from it
+    u = u.assign(bpb=np.nan, group=None, pct=np.nan, z=np.nan, flag=None, near_copies=np.nan)
+    p = derived(pd.concat([s, u[[c for c in u.columns if c in s.columns]]]).sort_index())
+    miss_rows = u.join(corpus.set_index("id").title, on="id")
 
     def sidecar(name, description, columns, **more):
         head = {"name": name, "description": description, "source": src, "created": now}
@@ -1492,6 +1573,13 @@ def cmd_build(args):
             "wrong-script text, untranslated English, boilerplate, odd tables, conversion leftovers) from "
             "paragraph and article bpb extremes.",
             art_cols,
+            # paragraphs whose text has no score yet (build --allow-missing), and the pod run that would score them
+            unscored={
+                "note": "paragraphs of the current corpus whose text has no score in the store: bpb null, not "
+                "in the review queue; pod_command runs `score --only-missing` on a GPU pod (steps in the "
+                "docstring of score_bpb.py), add_command merges its output",
+                **miss_info,
+            },
             runs=runs,  # every scoring run so far: what `build` needs to run again without the pods' files
         )
         + "\n",
@@ -1504,9 +1592,18 @@ def cmd_build(args):
         )
         + "\n",
         **write_reports(
-            s, art, runs, cov, ctx, by_type, ranked, primary, reasons, corpus_sha1, out_q
+            s, art, runs, cov, ctx, by_type, ranked, primary, reasons, corpus_sha1, out_q, miss_rows, miss_info
         ),
     }
+    # A sidecar's "created" is when its content last changed: rebuilt from the same inputs, every file is
+    # byte-identical (so the other outputs may be compared, or committed, without noise).
+    for name in ("bpb", "bpb.paragraphs"):
+        data, side = out_ann / f"{name}.jsonl", out_ann / f"{name}.json"
+        old = read_json(side, None)
+        if isinstance(old, dict) and "created" in old and data.exists():
+            new = {**json.loads(files[side]), "created": old["created"]}
+            if new == old and data.read_bytes() == files[data].encode("utf-8"):
+                files[side] = json.dumps(new, indent=2, ensure_ascii=False) + "\n"
     # The owner's rule: ASCII digits in every output (the corpus converts them; titles included).
     odia_digits = {f.name: n for f, text in files.items() if (n := len(ODIA_DIGIT.findall(text)))}
     if len(runs) > n_runs:
@@ -1540,8 +1637,9 @@ def cell(s, n=110):
     return excerpt(s, n).replace("\\|", "|").replace("|", "\\|")
 
 
-def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, corpus_sha1, out_q):
-    """The texts of quality/bpb.md and quality/review-first.md, by path."""
+def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, corpus_sha1, out_q, miss, miss_info):
+    """The texts of quality/bpb.md and quality/review-first.md, by path. `s` holds the scored paragraphs;
+    `miss` the paragraphs whose text has no score yet (build --allow-missing), with their titles."""
     run, sanity, pod = runs[0]["scoring"], runs[0].get("sanity", {}), runs[0].get("pod", {})
     import numpy as np
 
@@ -1554,15 +1652,30 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     el = s[s.eligible]
     L = []
     w = L.append
+    n_miss = len(miss)
+    miss_short = (
+        f"{n_miss:,} paragraph{'s' * (n_miss != 1)} ({miss_info['texts']:,} distinct text"
+        f"{'s' * (miss_info['texts'] != 1)}, {miss_info['bytes']:,} B, in {miss_info['articles']:,} article"
+        f"{'s' * (miss_info['articles'] != 1)})"
+    )
 
     w("# Sarvam-1 bits per byte on the Odia Wikipedia corpus\n")
     w(
         f"Every paragraph of `{cov['corpus']}` (sha1 `{corpus_sha1[:12]}`), except the title, scored with "
-        f"`{MODEL}` (revision `{run['revision'][:12]}`) by `score_bpb.py`. Written by `score_bpb.py build`; "
-        "the per-article and per-paragraph numbers are in `annotations/bpb.jsonl` and "
-        "`annotations/bpb.paragraphs.jsonl`, and the review queue is in `quality/review-first.md`.\n"
+        f"`{MODEL}` (revision `{run['revision'][:12]}`) by `score_bpb.py`"
+        + (f", except {miss_short} not scored yet (see [Not scored yet](#not-scored-yet))" if n_miss else "")
+        + ". Written by `score_bpb.py build`; the per-article and per-paragraph numbers are in "
+        "`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl`, and the review queue is in "
+        "`quality/review-first.md`.\n"
     )
     w("## Summary\n")
+    if n_miss:
+        w(
+            f"- **Not scored yet: {miss_short}.** Their text is new since the last scoring run, and this build was "
+            "made with `--allow-missing`: they have `bpb` null, are left out of every number below and of the review "
+            f"queue, and need a pod run of about {miss_info['tokens_estimate']:,} tokens (see [Not scored yet]"
+            "(#not-scored-yet))."
+        )
     w(
         f"- **Corpus bpb {corpus_bpb:.4f}** over {len(s):,} paragraphs, {s.bytes.sum() / 1e6:.1f} MB and "
         f"{s.tokens.sum() / 1e6:.2f}M Sarvam-1 tokens ({s.tokens.sum() / s.bytes.sum() * 1000:.1f} tokens per kB). "
@@ -1631,6 +1744,50 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
             )
         )
     w("")
+
+    # ---- paragraphs not scored yet (build --allow-missing)
+    if n_miss:
+        w("## Not scored yet\n")
+        w(
+            f"{miss_short[0].upper() + miss_short[1:]} of the current corpus have no score in "
+            "`raw/bpb/scores.jsonl.gz`: "
+            "their text is new since the last scoring run (the list is below). This build was made with "
+            "`--allow-missing`, so:\n"
+        )
+        w(
+            "- they have a row in `annotations/bpb.paragraphs.jsonl` with `bpb` null and no `bpb_group`, "
+            "`bpb_pct`, `bpb_z` or `flag` (the text-only columns, such as `latin_share` and `repeats`, are there);"
+        )
+        w(
+            "- their article's bpb, bytes, tokens and bits are over its scored paragraphs only, and "
+            "`unscored_paragraphs` in `annotations/bpb.jsonl` counts them;"
+        )
+        w("- they are not in the review queue, and every number in this report leaves them out;")
+        w("- `unscored` in `annotations/bpb.json` has these counts and the commands below.\n")
+        w(
+            f"Scoring them needs a GPU pod: about {miss_info['tokens_estimate']:,} tokens "
+            f"({miss_info['latin_texts']:,} Latin-script texts at {LATIN_BYTES_PER_TOKEN} B/token, the rest at "
+            f"{ODIA_BYTES_PER_TOKEN}), {gpu_time(miss_info['tokens_estimate'])} of GPU time on an RTX A6000, plus the "
+            "pod's start-up (minutes). Follow the steps in the docstring of `score_bpb.py` (state the hourly price "
+            "before creating the pod, terminate it when done). The pod command, after copying `score_bpb.py`, the "
+            "corpus and the store to `/root`:\n"
+        )
+        w(f"```\n{miss_info['pod_command']}\n```\n")
+        w("Then, on the laptop, with the run's files pulled into `raw/bpb/<date>/`:\n")
+        w(f"```\n{miss_info['add_command']}\n```\n")
+        rows = [
+            (
+                f"{r.title} ({r.id}/{r.para})",
+                r.kind,
+                f"{piece_bytes(r.block):,}",
+                cell(r.block, 90),
+            )
+            for r in miss.sort_values(["id", "para"]).head(50).itertuples()
+        ]
+        w(md_table(["article (id/para)", "kind", "B", "excerpt"], rows, ["---", "---", "---:", "---"]))
+        if n_miss > 50:
+            w(f"\n... and {n_miss - 50:,} more (`bpb` null in `annotations/bpb.paragraphs.jsonl`).")
+        w("")
 
     # ---- method
     w("## Method\n")
@@ -1791,11 +1948,14 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     )
     w(
         f"5. **Coverage.** {cov['paragraph_rows']:,} of {cov['paragraphs_in_corpus']:,} non-title paragraphs of the "
-        f"current corpus (sha1 `{cov['corpus_sha1'][:12]}`) have a score, {cov['missing_rows']} have none, "
-        f"{cov['duplicate_rows']} are duplicated; each score is looked up by the sha1 of the paragraph's current "
+        f"current corpus (sha1 `{cov['corpus_sha1'][:12]}`) have a score, {cov['missing_rows']} have none"
+        + (" (not scored yet, see above)" if cov["missing_rows"] else "")
+        + f", {cov['duplicate_rows']} are duplicated; each score is looked up by the sha1 of the paragraph's current "
         f"text ({cov['distinct_texts']:,} distinct texts; rows by scoring run: "
         + ", ".join(f"run {k}: {v:,}" for k, v in cov["rows_by_run"].items())
-        + f"). {cov['articles_with_rows']:,} of {cov['articles_in_corpus']:,} articles have rows, and `text_sha1` "
+        + (f", not scored: {cov['missing_rows']:,}" if cov["missing_rows"] else "")
+        + f"). {cov['articles_with_rows']:,} of {cov['articles_in_corpus']:,} articles have scored paragraphs, and "
+        "`text_sha1` "
         f"and `para_sha1` are computed from the current corpus file. The latest run (run {cov['latest_run']}) "
         + (
             "scored this same corpus file"
@@ -2145,7 +2305,8 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         "- Rerun: `uv run --script score_bpb.py build` (about 30 s, no GPU) rebuilds every "
         "output from the store and the run records; rerun it when the corpus or `annotations/topics.jsonl` or "
         "`translation.jsonl` change. It stops if a paragraph text has no score: run `score --only-missing` on a "
-        "pod and add it with `build --add <dir>` (see the script's docstring)."
+        "pod and add it with `build --add <dir>` (see the script's docstring), or build with `--allow-missing` "
+        "(as `pipeline.py` does), which leaves such paragraphs unscored and says so here."
     )
     bpb_md = "\n".join(L) + "\n"
 
@@ -2165,6 +2326,11 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         "`review_reasons`; null rank = not flagged). The web app (`edaapp`) shows it as "
         "a review queue. Every paragraph's score is in `annotations/bpb.paragraphs.jsonl`.\n"
     )
+    if n_miss:
+        w(
+            f"Not in this queue: {miss_short} whose text has no score yet (`bpb` null; see `quality/bpb.md`, "
+            "Not scored yet).\n"
+        )
     w("## Legend\n")
     counts = {t: sum(primary[p][0] == t for p in ranked) for t in TYPES}
     avail = {t: len(by_type[t]) for t in TYPES}

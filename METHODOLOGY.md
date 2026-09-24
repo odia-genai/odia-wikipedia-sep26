@@ -524,7 +524,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 
 ### Re-scoring
 
-**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. `build` stops while any paragraph has no score. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.json` keeps every run's record.
+**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. Plain `build` stops while any paragraph has no score. The pipeline runs `build --allow-missing` instead, which gives such paragraphs `bpb: null` (no percentile or flag, never in the review queue), counts them per article (`unscored_paragraphs`) and in `bpb.json` (`unscored`, with the pod command), and warns. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.json` keeps every run's record.
 
 **Effect.** After the cleanups, 143,357 of 144,751 paragraphs kept their scores.
 - 1,379 new texts (1,394 rows in 1,304 articles, 183,357 tokens) were scored on an RTX 4000 Ada, Secure, at $0.28/h: 25 s of GPU time and 5 minutes of pod time. The image was cached, so the pod was ready in 13 s.
@@ -550,6 +550,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 - **English lists and tables stay.** 5,754 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
 - **Topics.** The small topics have thin evidence (science and society 5/8 in the stratified check); `odisha` misses articles without categories; Wikidata was read live on 2026-09-24, not from a dump.
 - **Translation.** Untagged machine translation cannot be detected from the dumps.
+- **Some paragraph texts are not scored.** The wikitext-heading changes of 2026-09-25 made new texts, and re-scoring was deferred by the owner. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run fills them in.
 - **bpb.** Per-paragraph ranks carry bf16 noise; short paragraphs (under 100 B) are only flagged through their article.
 - **Digits.** This corpus uses ASCII digits, but Sangraha, FineWeb-2, the eval sets and Odisha's textbooks use Odia digits; the same conversion in `cpt.py` and the eval prompts needs the owner's go-ahead.
 - **Held-out overlap.** `cpt.py` holds out 300 documents from the 2023 Wikipedia snapshot; newer revisions of the same articles are in this corpus. Exclude them before training on it.
@@ -574,6 +575,7 @@ Newest first.
   - `pipeline.py` runs build, annotations, scores and checks in one command.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
   - Wikitext headings typed mid-line (21 articles) become headings; `0 (ମସିହା)` counts as a year page.
+  - Sarvam-1 scores for the new texts were put off (the owner stopped the run; its pod was terminated after about 6 minutes, about $0.03). `score_bpb.py build --allow-missing` marks them null instead of leaving the annotations stale.
 
 - **2026-09-25: re-scoring run 3 and follow-ups.**
   - 2,445 new texts scored ($0.03); translations score like native Odia.

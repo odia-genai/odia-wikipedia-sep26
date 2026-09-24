@@ -16,9 +16,11 @@ Steps (each is its own script, runnable alone):
                            English translations folded in and reviewer decisions applied),
                            excluded.jsonl, removed-blocks.jsonl, the build stats, README.md
   2. annotate.py topics, translation   -> annotations/topics.jsonl, translation.jsonl
-  3. score_bpb.py build    Sarvam-1 bits per byte per paragraph, carried over by text hash from
-                           raw/bpb/; stops if a paragraph text has never been scored (that needs a
-                           GPU pod: see score_bpb.py) -> annotations/bpb*.jsonl, quality/review-first.md
+  3. score_bpb.py build --allow-missing
+                           Sarvam-1 bits per byte per paragraph, carried over by text hash from
+                           raw/bpb/ -> annotations/bpb*.jsonl, quality/bpb.md, quality/review-first.md.
+                           A paragraph text never scored (that needs a GPU pod: see score_bpb.py) gets
+                           bpb null and a loud warning, not a failure; --skip-bpb skips the step
   4. check.py              Markdown structure, consistency with the dump index, residue scan
 
 Every output is JSON lines, JSON or Markdown. The script exits non-zero at the first failing step.
@@ -43,6 +45,21 @@ def run(name, *args):
     print(f"   {name} {args[0] if args else ''}: {'ok' if code == 0 else f'FAILED (exit {code})'} "
           f"in {time.time() - t:.0f} s", file=sys.stderr, flush=True)
     return code
+
+
+def warn_unscored():
+    """After the score step: a loud warning if paragraph texts have no score yet (bpb null)."""
+    try:
+        u = json.loads((ROOT / "annotations" / "bpb.json").read_text(encoding="utf-8")).get("unscored") or {}
+    except (OSError, ValueError):
+        u = {}
+    if u.get("paragraphs"):
+        bar = "!" * 100
+        print(f"\n{bar}\n!! NOT SCORED: {u['paragraphs']:,} paragraphs ({u['texts']:,} texts, {u['articles']:,} "
+              f"articles) have no Sarvam-1 score yet: bpb null, not in the review queue.\n!! Score them on a GPU "
+              f"pod (~{u['tokens_estimate']:,} tokens; steps in score_bpb.py's docstring, command in "
+              f"annotations/bpb.json 'unscored' and quality/bpb.md):\n!!   {u['pod_command']}\n!!   then "
+              f"{u['add_command']}\n{bar}", file=sys.stderr, flush=True)
 
 
 def summary():
@@ -71,14 +88,15 @@ def main():
                   ("annotate.py", "download"), ("annotate.py", "wikidata")]
     steps += [("prepare.py", "build", *build_args), ("annotate.py", "topics"), ("annotate.py", "translation")]
     if not args.skip_bpb:
-        steps.append(("score_bpb.py", "build"))
+        steps.append(("score_bpb.py", "build", "--allow-missing"))
     steps.append(("check.py",))
     for step in steps:
         if code := run(*step):
             if step[0] == "score_bpb.py":
-                print("   new paragraph texts need scores from a GPU pod (score_bpb.py `score "
-                      "--only-missing`), or re-run with --skip-bpb", file=sys.stderr)
+                print("   see score_bpb.py's message above, or re-run with --skip-bpb", file=sys.stderr)
             sys.exit(code)
+        if step[0] == "score_bpb.py":
+            warn_unscored()
     summary()
 
 

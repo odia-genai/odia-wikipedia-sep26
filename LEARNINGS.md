@@ -46,6 +46,10 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   bot-created pages were all year pages and are now excluded. The formulaic stubs that remain
   (village, town and film pages) carry `templated_share`: 1,007 articles are at 0.5 or more.
   Use it in `cpt.py` as a down-weight or a repeat cap. The change is in `src/`.
+- **Score the 319 unscored paragraph texts** (2026-09-25; put off by the owner). One
+  `score --only-missing` pod run, about 60k tokens. Until then they are `bpb: null`
+  (`build --allow-missing`, which the pipeline uses). A run 4 pod (RTX 4000 Ada, $0.28/h) was started and
+  terminated after about 6 minutes (about $0.03) with nothing scored.
 - **A per-source `--min-chars` in `cpt.py`** (2026-09-25). Its global `--min-chars 200` drops
   498 clean one-line fact articles from this corpus (chemical elements, blocks, capitals). A
   per-source threshold would keep them without admitting short web documents.
@@ -330,6 +334,13 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   kept (it is real content), link lists dropped.
 
 ## Tooling and automation
+
+- **A build that stops on a small gap blocks everything after it** (2026-09-25). The corpus
+  changed three times in one task (26, then 179 unscored texts). — Prefer a flagged partial
+  result. — done: `score_bpb.py build --allow-missing` (null `bpb`, `unscored_paragraphs`, a
+  report section), used by the pipeline.
+- **Timestamps in outputs broke byte-identical rebuilds** (2026-09-25). The sidecars' `created`
+  was the clock time. — Change a timestamp only when the content changes. — done.
 
 - **Scores lived only in annotations and scratch dirs** (2026-09-25). A text that left the corpus
   lost its score, and run 1's raw pod output was lost with a scratch dir. — Keep every score
