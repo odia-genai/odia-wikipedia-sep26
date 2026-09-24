@@ -8,20 +8,53 @@
 Steps:
 
   score     (pod, GPU)  paragraph texts -> <work>/scores.jsonl and run.json, checkpointed per shard;
-                        with --only-missing <file>: only the texts whose para_sha1 is not in <file>
-                        (plus --recheck N random ones that are), one row per text
+                        with --only-missing <store>: only the texts without a score in the store
+                        (plus --recheck N random ones that have one), one row per text
   sanity    (pod, GPU)  shuffle control, determinism, batch invariance, parity with
                         odia-llm-trainer's eval harness -> <work>/sanity.json
   precision (pod, GPU)  bf16 paragraph bpb against an fp32 reference -> <work>/precision.json
-  build     (laptop, no model, ~30 s)  scores -> annotations/bpb.jsonl, bpb.paragraphs.jsonl
+  build     (laptop, no model, ~30 s)  the store -> annotations/bpb.jsonl, bpb.paragraphs.jsonl
                         (+ .json sidecars), quality/bpb.md, quality/review-first.md; joins
                         annotations/translation.jsonl and topics.jsonl when they exist
 
-On a pod (torch and transformers installed there): `score`, and for a full run `sanity` and `precision`
-(--harness-src: a copy of odia-llm-trainer's src/). Pull <work> with a pod.json and add it with
-`build --add <dir>`. A paragraph's score depends only on its own text, so after a corpus rebuild `build`
-carries every score over by para_sha1 from annotations/bpb.paragraphs.jsonl, and only new texts need a
-pod run (`score --only-missing <a copy of that file>`); `build` stops while any paragraph has no score.
+Files (JSON lines, JSON or Markdown only; the corpus and every output use ASCII digits):
+
+  orwiki-20260901.jsonl       the corpus; paragraph i = text.split("\\n\\n")[i], 0 = the title (not scored)
+  raw/bpb/scores.jsonl.gz     the store: one row per paragraph text ever scored (para_sha1, score_run,
+                              bytes, tokens, pieces, bits), kept for good, so a text that leaves the
+                              corpus and comes back is never scored again
+  annotations/bpb.json        sidecar of bpb.jsonl; "runs" holds every scoring run's record (pod,
+                              versions, checks), and a store row's score_run is a run's id
+
+A paragraph's score depends only on its own text (it is scored from BOS), so `build` looks every
+paragraph of the current corpus up in the store by para_sha1. If any text has no score, it stops and
+prints how many texts, bytes and tokens need a pod run; removals alone never need one. (If the store is
+ever lost, the current texts' scores are also in annotations/bpb.paragraphs.jsonl.)
+
+New texts, on a pod (state the hourly price before creating it; terminate it when done):
+
+ 1. Estimate the job from `build`'s message, which counts tokens per script: Latin-script paragraphs
+    run at about 2.3 bytes per token, Odia prose at 7.1 (6.7 over all Odia paragraphs, 6.0 for
+    headings). A bytes-only estimate was 2.4x low for run 3 (206k tokens estimated, 497k scored), when
+    English lists and tables came back; per script, it comes within 7% of that run.
+ 2. On runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 (torch 2.9.1+cu128), whose system Python needs
+    --break-system-packages and has no numpy:
+        pip install --break-system-packages transformers==5.17.0 numpy
+ 3. scp score_bpb.py, orwiki-20260901.jsonl and raw/bpb/scores.jsonl.gz to /root, and start the job
+    detached. Without `< /dev/null`, ssh stays open until the job ends (nohup alone is not enough):
+        cd /root && setsid nohup python score_bpb.py score --corpus orwiki-20260901.jsonl \\
+            --work /root/bpb --only-missing scores.jsonl.gz < /dev/null > score.log 2>&1 &
+ 4. Pull /root/bpb/scores.jsonl and run.json into raw/bpb/<date>/, never a scratch dir. Add pod.json
+    (pod_id, gpu, cloud, datacenter, price_per_hr, image, created, ssh_ready, terminated, hours, cost)
+    and, if you like, note.txt (a line for the report). Terminate the pod.
+ 5. uv run --script score_bpb.py build --add raw/bpb/<date>
+    adds the run's new texts to the store and its record to annotations/bpb.json (a run already added
+    is skipped). Once that build has finished, everything in <date>/ is in those two files, so the
+    directory may be deleted.
+
+A full run from scratch (a new model revision: give it its own --store and --out) is the same with
+`score` (no --only-missing), then `sanity` and `precision` (--harness-src: a copy of odia-llm-trainer's src/),
+pulling sanity.json and precision.json as well.
 
 Method (matches odia-llm-trainer's src/odia_llm/evaluation/harness.py, so numbers are comparable with E03/E06):
 - paragraph i of an article = text.split("\\n\\n")[i]; i = 0 is the `# title` heading, not scored
@@ -46,6 +79,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # the repository root: every local output goes here
 CORPUS = ROOT / "orwiki-20260901.jsonl"
+STORE = ROOT / "raw" / "bpb" / "scores.jsonl.gz"
 STORE_FIELDS = ["para_sha1", "score_run", "bytes", "tokens", "pieces", "bits"]
 ANN = ROOT / "annotations"
 ODIA_DIGIT = re.compile("[\u0b66-\u0b6f]")  # the owner's rule: none in any output
@@ -149,8 +183,12 @@ def jsonl(rows):
 
 
 def write_jsonl(path, rows):
-    """Write rows atomically."""
-    write_atomic(path, jsonl(rows))
+    """Write rows atomically; a .gz name is gzipped with no name or time in the header, so the same rows
+    always give the same bytes."""
+    import gzip
+
+    data = jsonl(rows).encode("utf-8")
+    write_atomic(path, gzip.compress(data, compresslevel=9, mtime=0) if str(path).endswith(".gz") else data)
 
 
 def records(df, columns):
@@ -282,7 +320,7 @@ def gpu_info():
 
 def missing_texts(corpus, store, recheck=200):
     """[(para_sha1, purpose, text)]: every distinct paragraph text of `corpus` whose para_sha1 is not in
-    `store` (JSON lines with a para_sha1 field, e.g. a copy of annotations/bpb.paragraphs.jsonl: "missing"), then
+    `store` (JSON lines with a para_sha1 field, e.g. raw/bpb/scores.jsonl.gz: "missing"), then
     `recheck` random texts that are ("recheck").
 
     A paragraph's bpb depends only on its own text (it is scored from BOS), so a score can be carried
@@ -716,10 +754,10 @@ def main():
     s.add_argument("--limit", type=int, default=None, help="first N paragraphs only (smoke test)")
     s.add_argument(
         "--only-missing",
-        metavar="SCORED",
+        metavar="STORE",
         default=None,
         help="score only the paragraph texts whose para_sha1 is not in this JSON lines file (a copy of "
-        "annotations/bpb.paragraphs.jsonl); output is one row per text",
+        "raw/bpb/scores.jsonl.gz); output is one row per text",
     )
     s.add_argument("--recheck", type=int, default=200, help="with --only-missing: also re-score N scored texts")
     s = sub.add_parser("sanity")
@@ -734,14 +772,15 @@ def main():
     s.add_argument("--harness-src", required=True, help="a copy of odia-llm-trainer's src/")
     s = sub.add_parser("build")
     s.add_argument("--corpus", default=str(CORPUS))
+    s.add_argument("--store", default=str(STORE), help="the scores of every text ever scored (default: %(default)s)")
     s.add_argument(
         "--add",
         action="append",
         default=None,
         metavar="DIR",
-        help="add a `score` run from a pod: DIR holds its scores.jsonl and run.json, and optionally pod.json, "
-        "sanity.json, precision.json and note.txt (a line for the report). Repeatable; a run already added is "
-        "skipped",
+        help="add a `score` run from a pod to the store: DIR holds its scores.jsonl and run.json, and "
+        "optionally pod.json, sanity.json, precision.json and note.txt (a line for the report). Repeatable; "
+        "a run already added is skipped",
     )
     s.add_argument(
         "--out",
@@ -758,7 +797,7 @@ def main():
 
 # ----------------------------------------------------------------------------- build
 #
-# Everything below runs on the laptop from the pods' scores: no model, about 30 seconds.
+# Everything below runs on the laptop from the store of scores: no model, about 30 seconds.
 
 BANDS = [
     (0, 100, "<100 B"),
@@ -1001,7 +1040,13 @@ def add_run(add, runs, store, ann):
     if any(x["scoring"].get("finished") == r["finished"] for x in runs):
         print(f"{add}: already added, skipped")
         return runs, store
+    if runs and r["revision"] != runs[0]["scoring"]["revision"]:
+        raise SystemExit(
+            f"{add} was scored with {MODEL}@{r['revision'][:12]} and the store with "
+            f"@{runs[0]['scoring']['revision'][:12]}: a new revision needs its own --store and --out"
+        )
     rid = max((x["id"] for x in runs), default=0) + 1
+    store = store[store.score_run != rid]  # rows from an interrupted add of this run: added again below
     new = one_per_text(pd.DataFrame(read_jsonl(add / "scores.jsonl")))
     old = store.set_index("para_sha1").bits
     seen = new.para_sha1.isin(old.index)
@@ -1052,19 +1097,51 @@ def add_run(add, runs, store, ann):
     return [*runs, rec], store
 
 
+LATIN_BYTES_PER_TOKEN = 2.3  # Sarvam-1 on Latin-script paragraphs (latin_share >= 0.5), measured 2026-09-25
+ODIA_BYTES_PER_TOKEN = 6.7  # all other paragraphs, headings (6.0) and lists included; prose alone is 7.1
+A6000_TOKENS_PER_S = 16_000  # run 1: 16,487 tokens/s on an RTX A6000
+
+
+def unscored_message(miss, rows, store):
+    """What a pod run for the texts in `miss` (blocks) would take, estimated per script."""
+    nbytes = latin = tokens = 0
+    for b in miss:
+        n = sum(len(c.encode("utf-8")) for c in split_text(b, MAX_CHARS))
+        is_latin = script_mix(b)[1] >= 0.5
+        nbytes += n
+        latin += is_latin
+        tokens += n / (LATIN_BYTES_PER_TOKEN if is_latin else ODIA_BYTES_PER_TOKEN)
+    return (
+        f"{rows:,} paragraphs ({len(miss):,} distinct texts, {nbytes:,} B) have no score in {store}. They need a "
+        f"pod run of about {tokens:,.0f} tokens ({latin:,} Latin-script texts at {LATIN_BYTES_PER_TOKEN} B/token, "
+        f"the rest at {ODIA_BYTES_PER_TOKEN}; ~{tokens / A6000_TOKENS_PER_S:.0f} s of GPU time on an RTX A6000): "
+        "`score --only-missing`, then `build --add <dir>` (see the docstring of score_bpb.py)."
+    )
+
+
 def cmd_build(args):
     import numpy as np
     import pandas as pd
 
-    # ---- scores, one per paragraph *text* (para_sha1), from every scoring run so far
+    # ---- scores, one per paragraph *text* (para_sha1), from the store of every text ever scored
     # A paragraph's bpb depends only on its own text (scored from BOS), so scores carry over by para_sha1
     # when the corpus is rebuilt, and only new texts need the GPU (`score --only-missing`).
     out_ann = Path(args.out) / "annotations"
+    store_path = Path(args.store)
     runs = read_json(out_ann / "bpb.json", {}).get("runs", [])
-    prev = out_ann / "bpb.paragraphs.jsonl"  # every score so far, one row per paragraph
-    store = pd.DataFrame(read_jsonl(prev) if prev.exists() else [], columns=STORE_FIELDS).drop_duplicates("para_sha1")
+    if not store_path.exists() and not args.add:
+        raise SystemExit(f"{store_path} not found: it holds the score of every paragraph text (see the docstring)")
+    store = pd.DataFrame(read_jsonl(store_path) if store_path.exists() else [], columns=STORE_FIELDS)
+    n_runs = len(runs)
     for add in args.add or []:
         runs, store = add_run(add, runs, store, out_ann)
+    orphans = sorted(set(store.score_run.tolist()) - {x["id"] for x in runs})
+    if orphans:
+        raise SystemExit(
+            f"{store_path} holds texts from run(s) {orphans} that {out_ann / 'bpb.json'} does not record: an "
+            "interrupted `build --add`, or a lost bpb.json. Add the same run directories again with --add."
+        )
+    assert store.para_sha1.is_unique, "the store has two rows for one text"
     per = store.set_index("para_sha1")
     run = runs[0]["scoring"]
 
@@ -1104,10 +1181,13 @@ def cmd_build(args):
         "zero_byte_paragraphs": int((s.bytes == 0).sum()),
     }
     if cov["missing_rows"] and not args.partial:
-        raise SystemExit(
-            f"{cov['missing_rows']:,} paragraphs ({s[unscored].para_sha1.nunique():,} texts) have no score: run "
-            "`score --only-missing` with a copy of annotations/bpb.paragraphs.jsonl on a pod and add it with --add"
-        )
+        miss = s[unscored].drop_duplicates("para_sha1").block
+        raise SystemExit(unscored_message(miss, cov["missing_rows"], store_path))
+    print(
+        f"{cov['paragraph_rows']:,} of {cov['paragraphs_in_corpus']:,} paragraphs ({cov['distinct_texts']:,} texts) "
+        f"have a score in {store_path.name} ({len(store):,} texts); "
+        + (f"{cov['missing_rows']:,} paragraphs have none (--partial)" if cov["missing_rows"] else "0 need a pod run")
+    )
     if args.partial:  # smoke tests: only what was scored
         s = s[~unscored]
         corpus = corpus[corpus.id.isin(set(s.id))].reset_index(drop=True)
@@ -1318,12 +1398,12 @@ def cmd_build(args):
         art.at[pid, "review_para"] = c[3]
         art.at[pid, "review_reasons"] = reasons[pid]
 
-    # ---- the output files
+    # ---- the output files: the store first (a run's texts), then the annotations (its record), then reports
     art["text_sha1"] = [sha1(t) for t in corpus.set_index("id").loc[art.index, "text"]]
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     src = (
-        f"{MODEL}@{run['revision'][:12]}, {len(runs)} scoring runs on RunPod GPUs (records: 'runs' in bpb.json); "
-        "score_bpb.py; corpus "
+        f"{MODEL}@{run['revision'][:12]}, {len(runs)} scoring runs on RunPod GPUs (records: 'runs' in bpb.json), "
+        f"scores kept per text in raw/bpb/{store_path.name}; score_bpb.py; corpus "
         f"{Path(args.corpus).name} sha1 {corpus_sha1[:12]}"
     )
     art_cols = {
@@ -1429,6 +1509,9 @@ def cmd_build(args):
     }
     # The owner's rule: ASCII digits in every output (the corpus converts them; titles included).
     odia_digits = {f.name: n for f, text in files.items() if (n := len(ODIA_DIGIT.findall(text)))}
+    if len(runs) > n_runs:
+        write_jsonl(store_path, records(store.sort_values(["score_run", "para_sha1"]), STORE_FIELDS))
+        print(f"{store_path}: {len(store):,} texts")
     for f, text in files.items():
         write_atomic(f, text)
     print(
@@ -1574,8 +1657,9 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         "over its paragraphs, headings included."
     )
     w(
-        "- Scores are kept per paragraph *text*: when the corpus is rebuilt they are carried over by `para_sha1`, "
-        "and only new texts are scored (see the runs below). A text scored more than once gets the mean."
+        "- Scores are kept per paragraph *text*, for good, in `raw/bpb/scores.jsonl.gz`: when the corpus is "
+        "rebuilt they are carried over by `para_sha1`, and only texts never scored before go to a GPU (see the "
+        "runs below). A text found in several paragraphs of one run gets the mean of its scores."
     )
     w(
         "- bf16 weights, SDPA attention, `torch.inference_mode`. Batches are sorted by length and cut at "
@@ -1589,7 +1673,7 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
     w("## Runs\n")
     w(
         f"Model `{MODEL}` @ `{run['revision']}`, bf16, the same code path in every run. Each paragraph's score "
-        "comes from the run that first scored its text (`score_run`).\n"
+        "comes from the run that first scored its text (`score_run` in the store, `raw/bpb/scores.jsonl.gz`).\n"
     )
     rows = []
     for x in runs:
@@ -1862,6 +1946,8 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         ("neither", big[~big.bot_created & ~big.stub]),
         ("odia_ratio < 0.6", big[big.odia_ratio < 0.6]),
     ]:
+        if not len(d):  # e.g. bot-created pages, once the corpus left out the year pages
+            continue
         rows.append(
             (
                 name,
@@ -2052,10 +2138,14 @@ def write_reports(s, art, runs, cov, ctx, by_type, ranked, primary, reasons, cor
         "`bpb.paragraphs.json` describe every field, and `bpb.json` holds the record of every scoring run."
     )
     w(
-        "- Rerun: `uv run --script score_bpb.py build` (no GPU) rebuilds every output from the annotations and "
-        "the run records, carrying every score over by `para_sha1`; rerun it when the corpus or the topic and "
-        "translation annotations change. It stops if a paragraph text has no score: run `score --only-missing` "
-        "on a pod and add it with `build --add <dir>` (see the script's docstring)."
+        "- `raw/bpb/scores.jsonl.gz`: the store, one row per paragraph text ever scored (`para_sha1`, "
+        "`score_run`, `bytes`, `tokens`, `pieces`, `bits`), kept when a text leaves the corpus."
+    )
+    w(
+        "- Rerun: `uv run --script score_bpb.py build` (about 30 s, no GPU) rebuilds every "
+        "output from the store and the run records; rerun it when the corpus or `annotations/topics.jsonl` or "
+        "`translation.jsonl` change. It stops if a paragraph text has no score: run `score --only-missing` on a "
+        "pod and add it with `build --add <dir>` (see the script's docstring)."
     )
     bpb_md = "\n".join(L) + "\n"
 

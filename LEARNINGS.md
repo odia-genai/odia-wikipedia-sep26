@@ -324,6 +324,28 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **Scores lived only in annotations and scratch dirs** (2026-09-25). A text that left the corpus
+  lost its score, and run 1's raw pod output was lost with a scratch dir. — Keep every score
+  permanently, keyed by text. — done: `raw/bpb/scores.jsonl.gz` (116,318 texts, 4.9 MB, seeded
+  from the Parquet after checking that no text had two different scores); `build` reads only the
+  store, and `build --add` refuses a different model revision and skips a run already added.
+  2,378 texts that left with the year pages stay in the store. todo: `raw/` is gitignored and
+  `data/` untracked, so the store has no backup; decide whether to track it (4.9 MB).
+- **Token estimates by script** (2026-09-25), measured from the store: Latin-script paragraphs
+  run at 2.26 bytes per token, Odia prose at 7.12, all Odia paragraphs at 6.73, headings at
+  6.03. Estimating per script came within 7% of run 3's actual tokens, where a bytes-only
+  estimate was 2.4× low. — done: `build`'s stop message prints the per-script estimate.
+- **`bpb.paragraphs.jsonl` repeats the store** (2026-09-25): 64 MB, against 6.6 MB as Parquet.
+  About two-thirds is repeated key names, and its `bits`, `bytes`, `tokens`, `pieces` and
+  `score_run` duplicate `raw/bpb/scores.jsonl.gz`. — idea: drop those fields from the paragraph
+  file (edaapp would join the store), or gzip it. That changes the edaapp contract, so it's the
+  owner's call.
+- **The old re-check code could write `NaN` into `bpb.json`** (2026-09-25), which is not valid
+  JSON. — done: missing values are written as null, and every JSONL write refuses `NaN`.
+- **A migration ran while the corpus was being rebuilt** (2026-09-25). The score migration
+  compared JSONL with Parquet exactly only because the agent had saved a copy of the old corpus
+  first. — Snapshot an input before migrating it while others may rebuild it. — done.
+
 - **JSON lines cost 11–20× Parquet's disk** (2026-09-25): topics 7.5 MB against 0.66 MB,
   translation 8.7 MB against 0.43 MB, mostly repeated key names. — Readability has a disk price
   on a nearly full drive. — idea: accept it; gzip a file only if disk runs short.

@@ -337,7 +337,7 @@ Extra fields per article live in `annotations/`, one JSON-lines file each (one o
 
 ### Sarvam-1 bits per byte
 
-`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl`, built by `score_bpb.py`; report `quality/bpb.md`.
+`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl`, built by `score_bpb.py` from the score store `raw/bpb/scores.jsonl.gz`; report `quality/bpb.md`.
 
 **Method** (matches odia-llm-trainer's harness, `src/odia_llm/evaluation/harness.py`, so numbers compare with the experiments):
 
@@ -520,7 +520,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 
 ### Re-scoring
 
-**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build` stops while any paragraph has no score. `annotations/bpb.json` keeps every run's record.
+**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. `build` stops while any paragraph has no score. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.json` keeps every run's record.
 
 **Effect.** After the cleanups, 143,357 of 144,751 paragraphs kept their scores.
 - 1,379 new texts (1,394 rows in 1,304 articles, 183,357 tokens) were scored on an RTX 4000 Ada, Secure, at $0.28/h: 25 s of GPU time and 5 minutes of pod time. The image was cached, so the pod was ready in 13 s.
@@ -564,6 +564,7 @@ Newest first.
   - Removed blocks moved to `removed-blocks.jsonl`.
   - No Parquet: the corpus, annotations and removed blocks are JSON lines. `markdown/` is written only with `--markdown`.
   - Titles use ASCII digits everywhere; `url` keeps the real page name.
+  - Sarvam-1 scores kept per text in `raw/bpb/scores.jsonl.gz`, so no text is ever scored twice; the migration needed no GPU.
   - `pipeline.py` runs build, annotations, scores and checks in one command.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
 
