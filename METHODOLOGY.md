@@ -18,7 +18,7 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 | English inside articles | 899 paragraphs and headings translated into Odia (in 368 articles), 5,754 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
 
-The steps are scripts of their own, all in this folder:
+`pipeline.py` runs everything from the cached inputs in one command (`uv run pipeline.py`, a few minutes; `--fetch` starts from scratch): build, annotations, scores, checks, stopping at the first failure. The steps are scripts of their own, all in this folder:
 
 1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, translation insertion, filtering, outputs, `README.md`).
 2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, every page of the index must be in the corpus or `excluded.jsonl` exactly once, and no cleaned-away residue may be left.
@@ -556,7 +556,7 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
-- **2026-09-25: boilerplate pages out, every exclusion recorded, JSON-only outputs.**
+- **2026-09-25: boilerplate pages out, every exclusion recorded, JSON-only outputs, one pipeline.**
   - Dropped 1,864 year pages, 260 date pages without events and 19 empty film-year lists, judged by sentence frames repeated in 5+ articles. 18,693 articles remain, 4,513,948 Odia words (−22,615).
   - New field `templated_share` on every article.
   - Every left-out page is in `excluded.jsonl` (id, revid, title, reason, detail), 2,402 in all. `dropped_titles` is gone from the build JSON.
@@ -564,6 +564,7 @@ Newest first.
   - Removed blocks moved to `removed-blocks.jsonl`.
   - No Parquet: the corpus, annotations and removed blocks are JSON lines. `markdown/` is written only with `--markdown`.
   - Titles use ASCII digits everywhere; `url` keeps the real page name.
+  - `pipeline.py` runs build, annotations, scores and checks in one command.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
 
 - **2026-09-25: re-scoring run 3 and follow-ups.**

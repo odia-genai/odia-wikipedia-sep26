@@ -1331,7 +1331,8 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `{stem}-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |
 | `annotations/*.jsonl` | topics, translation flags, Sarvam-1 scores and the review queue, joined on `id` |
-| `prepare.py` | the script that made all of it (download, render, build) |
+| `pipeline.py` | **one command that rebuilds everything** from the cached inputs, in order, and checks it |
+| `prepare.py`, `check.py`, `translate.py`, `annotate.py`, `score_bpb.py` | the steps |
 | `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
 | `translations/english-to-odia.jsonl` | Odia translations of English paragraphs and headings, with source and checks |
@@ -1479,6 +1480,13 @@ keep that license and credit Wikipedia. Each record's `revid` names its exact so
 whose history lists the authors.
 
 ## Rebuild
+
+```bash
+uv run pipeline.py           # build, annotate, scores, checks, from raw/ (a few minutes)
+ODIA_WIKI_CONTACT=you@example.org uv run pipeline.py --fetch   # from scratch (~2 h)
+```
+
+The steps one by one:
 
 ```bash
 uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD

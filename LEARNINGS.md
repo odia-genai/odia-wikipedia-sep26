@@ -339,6 +339,10 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   the corpus's ASCII-digit titles. — Record every exclusion as data (`id`, `revid`, `title`,
   `reason`, `detail`), and check that corpus and exclusions partition the index. — done:
   `excluded.jsonl`, `check.py` consistency check (it catches a single missing page).
+- **Separate exports drifted; one command keeps them in step** (2026-09-25). Translations,
+  annotations and scores were each re-run by hand after a build. — One pipeline, stopping at
+  the first failing step. — done: `pipeline.py` (build, topics, translation, bpb carry-over,
+  check).
 
 - **Re-scoring after the translations: $0.03, and the translations read like native Odia**
   (2026-09-25).
