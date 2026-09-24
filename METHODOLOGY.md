@@ -14,19 +14,27 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 | Sarvam-1 tokens | 12.82M, without the BOS token of each scored paragraph (150.0 per kB of scored text) |
 | Paragraphs | 162,052, of which 143,357 are not the title |
 | Data tables | 2,962 in 1,727 articles, 168,947 Odia words |
-| Pages left out | 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 7 exact duplicates, the main page |
+| Pages left out | 2,400, each in `excluded.jsonl` with id, revision and reason: 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 7 exact duplicates, the main page |
 | English inside articles | 899 paragraphs and headings translated into Odia (in 368 articles), 5,754 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
 
 The steps are scripts of their own, all in this folder:
 
 1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, translation insertion, filtering, outputs, `README.md`).
-2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, and no cleaned-away residue may be left.
+2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, every page of the index must be in the corpus or `excluded.jsonl` exactly once, and no cleaned-away residue may be left.
 3. `translate.py`: translation rounds for the English prose left in articles. It makes work batches, checks and merges the translations, and marks junk.
 4. `annotate.py`: topics and translation flags from the dump's metadata tables.
 5. `score_bpb.py`: Sarvam-1 bits per byte on a GPU pod, and the review-first ranking.
 
-The outputs are `orwiki-20260901.jsonl` / `.parquet` (one record per article), `markdown/<title>.md`, `annotations/*.parquet`, and the reports in `quality/`. The fields are described in `README.md`, and what each step taught us is in `LEARNINGS.md`.
+The outputs are all JSON lines, JSON or Markdown, readable with any editor or `jq` (the owner's rule since 2026-09-25: no Parquet):
+
+- `orwiki-20260901.jsonl`: the corpus, one record per article. Build statistics: `orwiki-20260901-build.json`.
+- `excluded.jsonl`: every page left out, with `id`, `revid`, `title`, `reason` and `detail`
+- `removed-blocks.jsonl`: blocks cut out of kept articles (citations, junk, English prose awaiting translation)
+- `annotations/*.jsonl`, with a `.json` description each
+- the reports in `quality/`
+
+`build --markdown` also writes one `markdown/<title>.md` per article; that is off by default because it only repeats the corpus. The fields are described in `README.md`, and what each step taught us is in `LEARNINGS.md`.
 
 Reading this page: sections 2 to 6 are the build (the order in which text passes through `prepare.py`), section 7 the annotations, section 8 the human review loop, and the changelog at the end lists every change by date.
 
@@ -167,7 +175,7 @@ A block is dropped entirely when it contains:
 
 ### Digits to ASCII
 
-**Rule.** Odia digits `୦–୯` become `0–9` in text, headings, tables and math (`ODIA_DIGITS` from `odia_text.py`, applied in `clean_block()`, `md_heading()` and `put_math_back()`). The `title` field keeps the page name as it is on Wikipedia (`୨୦୦୬`), while the heading in `text` reads `# 2006`. 689,743 digits were converted in the text.
+**Rule.** Odia digits `୦–୯` become `0–9` in text, headings, tables and math (`ODIA_DIGITS` from `odia_text.py`, applied in `clean_block()`, `md_heading()` and `put_math_back()`), and since 2026-09-25 in every title field too: the corpus, `excluded.jsonl`, `removed-blocks.jsonl` and the annotations. Only `url` keeps the page's real name. 689,743 digits were converted in the text.
 
 **Why.** The owner's decision (2026-09-24): numbers should look the same everywhere in training. Wikipedia mixes both systems: 2,751 articles used ASCII and Odia digits side by side.
 
@@ -221,7 +229,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 
 ## Filtering
 
-`build()` leaves out:
+`build()` leaves out 2,400 of the 21,095 pages. Each one is a line of `excluded.jsonl`: `id`, `revid` (the dump revision, so `https://or.wikipedia.org/w/index.php?oldid=<revid>` shows it), `title` (ASCII digits), `reason` and `detail`. `check.py` confirms that every page of the article index is in exactly one of the corpus and `excluded.jsonl`. edaapp shows the file as its Excluded view.
 
 | Reason | Pages | Rule | Examples |
 |---|---:|---|---|
@@ -230,9 +238,10 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 | under 5 Odia words | 137 | fewer than 5 runs of Odia letters in the body after cleaning (`--min-words`) | one-line stubs: ଛତିଶଗଡ଼ ("ଛତିଶଗଡ଼, ଭାରତର ଏକ ରାଜ୍ୟ ।"), ତ୍ରିପୁରା, ଲାକ୍ଷାଦ୍ୱୀପ |
 | disambiguation | 112 | Parsoid's `mw:PageProp/disambiguation` | ଓଡ଼ିଆ, ବୌଦ୍ଧ, ସମାଜ, ସମୟ |
 | empty list page | 19 | a film-year list (`1951ର ଓଡ଼ିଆ କଥାଚିତ୍ର`; `FILM_YEAR_TITLE`) with under 25 Odia words outside template sentences | the 1949, 1951 and 1991 lists: headings with no films |
-| exact duplicate | 7 | the same body text as an earlier article (sha1) | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
+| exact duplicate | 7 | the same body text as an earlier article (sha1); `detail` names the kept one | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
 | mostly English | 2 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ, whose English is all citations |
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
+| reviewer: drop | 0 | an edaapp review decision | |
 
 Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (332, 56,627 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
 
@@ -263,11 +272,11 @@ The boilerplate the rule was meant to catch is already out by the rules above. N
 
 ## Annotations
 
-Extra fields per article live in `annotations/`, one Parquet file each, joined on `id`; `*.paragraphs.parquet` files have one row per paragraph (`id`, `para`), where paragraph `i` is `text.split("\n\n")[i]` and paragraph 0 is the title. Annotations that depend on the text carry `text_sha1` or `para_sha1`, so a rebuild that changes text makes them visibly stale. Each file has a JSON sidecar describing its columns.
+Extra fields per article live in `annotations/`, one JSON-lines file each (one object per article, in corpus order), joined on `id`; `*.paragraphs.jsonl` files have one row per paragraph (`id`, `para`), where paragraph `i` is `text.split("\n\n")[i]` and paragraph 0 is the title. Annotations that depend on the text carry `text_sha1` or `para_sha1`, so a rebuild that changes text makes them visibly stale. Each file has a JSON sidecar describing its columns.
 
 ### Topics
 
-`annotations/topics.parquet`, built by `annotate.py topics`; report `quality/topics.md`, hand labels `quality/topics-check.tsv`.
+`annotations/topics.jsonl`, built by `annotate.py topics`; report `quality/topics.md`, hand labels `quality/topics-check.tsv`.
 
 **Purpose.** Let the school training mix favour science, history, geography and Odisha over film and sports biographies (experiment E04 found random Odia Wikipedia paragraphs are mostly film-star and athlete bios).
 
@@ -303,7 +312,7 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 
 ### Machine-assisted translation
 
-`annotations/translation.parquet`, built by `annotate.py translation`; report `quality/translation.md`.
+`annotations/translation.jsonl`, built by `annotate.py translation`; report `quality/translation.md`.
 
 **Signals.**
 
@@ -328,7 +337,7 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 
 ### Sarvam-1 bits per byte
 
-`annotations/bpb.parquet` and `annotations/bpb.paragraphs.parquet`, built by `score_bpb.py`; report `quality/bpb.md`.
+`annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl`, built by `score_bpb.py`; report `quality/bpb.md`.
 
 **Method** (matches odia-llm-trainer's harness, `src/odia_llm/evaluation/harness.py`, so numbers compare with the experiments):
 
@@ -355,7 +364,7 @@ Extra fields per article live in `annotations/`, one Parquet file each, joined o
 
 ### Review-first queue
 
-`review_rank`, `review_type`, `review_para` and `review_reasons` in `annotations/bpb.parquet`; the readable list is `quality/review-first.md`, and edaapp shows it as its Review first page and Review queue.
+`review_rank`, `review_type`, `review_para` and `review_reasons` in `annotations/bpb.jsonl`; the readable list is `quality/review-first.md`, and edaapp shows it as its Review first page and Review queue.
 
 **Signals.** A paragraph is extreme when it is in the top or bottom 1% of its kind and length band (only text, list and math paragraphs of at least 100 B and tables of at least 200 B are compared: 96,838 paragraphs, 1,940 extreme). An article is extreme when its bpb is in the top or bottom 1% of articles of at least 500 B, or when most of its bytes are in extreme paragraphs. Script shares, common-English-word shares, markup leftovers, verse shape, near-copies and repeated table headers give each flag its type and its reasons.
 
@@ -394,7 +403,7 @@ edaapp, the web app of odia-llm-trainer for browsing and reviewing datasets, sho
 `prepare.py build` reads that file (`load_reviews()`, `apply_review()`):
 
 - **The latest event per article wins**, so every event carries the article's complete decision. edaapp carries earlier paragraph drops forward, or a later event would bring those paragraphs back.
-- An article marked *drop* is left out (reason "reviewer: drop" in the build JSON).
+- An article marked *drop* is left out (reason "reviewer: drop" in `excluded.jsonl`, with the reviewer's note as `detail`).
 - Dropped paragraphs are removed **by the sha1 of their text, not by position**, so a decision survives rebuilds that shift paragraphs. Paragraph 0 (the title) is never dropped. A decision whose paragraph is no longer in the text is counted, not applied.
 - *fix* verdicts are counted for follow-up; they change nothing by themselves.
 - A half-written last line is skipped. `--no-reviews` builds without any decisions.
@@ -461,7 +470,7 @@ In total the rules removed 8,046 characters of leftovers.
 | paragraph marked junk: vandalism, leaked template instructions, and reference lines the citation rule missed ("Source: …", numbered news references, a Gazette notification) | removed | 15 blocks (12 table entries) |
 | list item, table | kept as it is: names, titles, data | the rest of the 5,754 kept |
 
-A paragraph or heading with no translation yet is taken out and kept aside in `removed/` (reason "awaiting translation"), where `translate.py batches` finds it for the next translation round. None are waiting now. The citations (133) and junk blocks (15) that were cut out are listed there too, each with the article's `id` and `title`.
+A paragraph or heading with no translation yet is taken out and kept in `removed-blocks.jsonl` (reason "awaiting translation"), where `translate.py batches` finds it for the next translation round. None are waiting now. The citations (133) and junk blocks (15) that were cut out are listed there too, each with the article's `id` and `title`.
 
 **Citations** (`is_citation()`). Structural signals count for any block:
 - ISBN, ISSN, DOI or OCLC
@@ -547,9 +556,14 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
-- **2026-09-25: boilerplate pages out.**
+- **2026-09-25: boilerplate pages out, every exclusion recorded, JSON-only outputs.**
   - Dropped 1,864 year pages, 260 date pages without events and 19 empty film-year lists, judged by sentence frames repeated in 5+ articles. 18,693 articles remain, 4,513,948 Odia words (−22,615).
   - New field `templated_share` on every article.
+  - Every left-out page is in `excluded.jsonl` (id, revid, title, reason, detail), 2,402 in all. `dropped_titles` is gone from the build JSON.
+  - `check.py` verifies that the corpus and `excluded.jsonl` partition the index.
+  - Removed blocks moved to `removed-blocks.jsonl`.
+  - No Parquet: the corpus, annotations and removed blocks are JSON lines. `markdown/` is written only with `--markdown`.
+  - Titles use ASCII digits everywhere; `url` keeps the real page name.
   - `--min-chars` measured and left off: 200 would drop 498 clean fact stubs (0.17% of words).
 
 - **2026-09-25: re-scoring run 3 and follow-ups.**

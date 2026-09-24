@@ -16,7 +16,8 @@ Steps, each re-runnable from cached inputs, all output under this directory:
   topics       categories -> topics -> annotations/topics.jsonl (+ .json), quality/topics.md
 
 Outputs are JSON lines, one object per article of the corpus (orwiki-<date>.jsonl, read at run
-time), in corpus order. Never NFC.
+time), in corpus order. Odia digits become ASCII in every output field (titles, category names);
+the rules read the page names as they are. Never NFC.
 
 Usage (uv reads the dependencies from the header above; nothing is installed in the repo):
     ODIA_WIKI_CONTACT=you@example.org uv run annotate.py download
@@ -56,7 +57,7 @@ QUALITY = ROOT / "quality"
 # Importing must not leave __pycache__ here.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(ROOT))
-from odia_text import odia_words  # noqa: E402
+from odia_text import ODIA_DIGITS, odia_words  # noqa: E402
 
 WIKI = "orwiki"
 DATE = "20260901"
@@ -119,6 +120,21 @@ def write_jsonl_atomic(path, rows):
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
     replace_atomic(path, write)
+
+
+def ascii_digits(value):
+    """Odia digits (U+0B66-U+0B6F) as ASCII, in a string or in each string of a list; other
+    values unchanged. Nothing else is touched: no NFC."""
+    if isinstance(value, str):
+        return value.translate(ODIA_DIGITS)
+    if isinstance(value, list):
+        return [ascii_digits(v) for v in value]
+    return value
+
+
+def output_row(row):
+    """A row as written: Odia digits as ASCII in every string field."""
+    return {k: ascii_digits(v) for k, v in row.items()}
 
 
 # ---------------------------------------------------------------------------------- http
@@ -334,7 +350,8 @@ def sql_rows(path):
 # ------------------------------------------------------------------------------ articles
 
 def load_index():
-    """The stable article index: every main-namespace non-redirect page of the dump."""
+    """The stable article index: every main-namespace non-redirect page of the dump. Titles are the
+    page names as on the wiki (Odia digits kept)."""
     with open(INDEX, encoding="utf-8") as f:
         return [json.loads(line) for line in f]
 
@@ -930,9 +947,9 @@ TOPICS_SIDECAR = {
     "created": None,  # set when written
     "columns": {
         "id": "page id (integer)",
-        "title": "article title",
+        "title": "article title (Odia digits as ASCII)",
         "categories": "visible content categories, in page order: hidden (hiddencat) and maintenance or "
-                      "tracking categories removed (JSON array)",
+                      "tracking categories removed (JSON array; Odia digits as ASCII)",
         "topics": "topics with enough evidence, strongest first (JSON array; vocabulary in 'topics' below)",
         "primary_topic": "the strongest topic, or null when there is no evidence",
         "is_person": "a biography: Wikidata P31 = human (Q5), else a people category "
@@ -1102,20 +1119,20 @@ def topics(args):
 
 def write_annotation(name, rows, sidecar):
     """annotations/<name>.jsonl, one object per corpus article in corpus order (columns in the
-    sidecar's order), and its sidecar annotations/<name>.json."""
+    sidecar's order, Odia digits as ASCII), and its sidecar annotations/<name>.json."""
     cols = list(sidecar["columns"])
     ids = [r["id"] for r in rows]
     if ids != list(load_corpus()) or any(list(r) != cols for r in rows):
         raise SystemExit(f"{name}: rows are not one per corpus article with the columns {cols}")
-    write_jsonl_atomic(ANN / f"{name}.jsonl", rows)
+    write_jsonl_atomic(ANN / f"{name}.jsonl", (output_row(r) for r in rows))
     write_atomic(ANN / f"{name}.json", json.dumps(sidecar | {"created": now()}, indent=1, ensure_ascii=False)
                  + "\n")
     print(f"annotations/{name}.jsonl: {len(rows):,} articles; annotations/{name}.json", file=sys.stderr)
 
 
 def write_report(name, text):
-    """quality/<name>."""
-    write_atomic(QUALITY / name, text)
+    """quality/<name>, with Odia digits as ASCII (titles and category names come from the wiki)."""
+    write_atomic(QUALITY / name, ascii_digits(text))
     print(f"quality/{name}", file=sys.stderr)
 
 
@@ -1188,7 +1205,8 @@ def topics_report(rows, wd, n_fallback):
         "",
         f"Built by `annotate.py topics` on {now()[:10]} for the {n:,} articles of the corpus "
         f"(`{CORPUS.name}`, {total_words:,} Odia words). Output: `annotations/topics.jsonl`, one JSON object "
-        "per article in corpus order; the columns are described in `annotations/topics.json`.",
+        "per article in corpus order; the columns are described in `annotations/topics.json`. Titles and "
+        "category names are written with ASCII digits, here and in the annotation.",
         "",
         f"**Coverage: {pct(len(tagged), n)} of articles ({pct(sum(words[r['id']] for r in tagged), total_words)} of "
         f"words) have a topic.** Precision of `primary_topic`, checked by hand on a held-out random sample: see "
@@ -1241,7 +1259,7 @@ def topics_report(rows, wd, n_fallback):
         "(`Pages using …`, `CS1 …`, `Articles with …`) and Odia cleanup ones (ଆଧାରହୀନ \"unreferenced\", "
         "ସଜଡ଼ା ହେବାକୁ \"to be cleaned up\", bot and edit-a-thon bookkeeping). What is left is the `categories` "
         "column.",
-        "2. **Its title**: year and date pages (`୧୯୪୬`, `୧୯ ମାର୍ଚ୍ଚ`) are `calendar`, and a qualifier "
+        "2. **Its title**: year and date pages (`1946`, `19 ମାର୍ଚ୍ଚ`) are `calendar`, and a qualifier "
         "(`(ଓଡ଼ିଆ କଥାଚିତ୍ର)`, `(ରାଜନେତା)`) is read like a category.",
         f"3. **Its Wikidata item**, only when no rule matches a category's own name or the title ({n_fallback:,} "
         "dump articles): P31 (instance of), or P279 (subclass of) for a concept item that has no P31 (rice, "
@@ -1269,7 +1287,7 @@ def topics_report(rows, wd, n_fallback):
         "0.5. The walk does not continue through people categories or through general hubs. If the first level "
         "only says `geography`, the category is itself a place (ଜାପାନ in ଏସିଆର ଦେଶ \"Asian countries\"): its "
         "articles are things of that place (a dish, a myth, a census), so the walk gives nothing. A bare year "
-        "category (`୨୦୧୯`) gives nothing either.",
+        "category (`2019`) gives nothing either.",
         "",
         "**Scores.** Each category adds its weight (split across its topics), a title adds 3 (year or date) or "
         "1.5 (qualifier), and Wikidata adds 1.0 (P31, split) and 1.5 (P106, split). `primary_topic` is the "
@@ -1568,11 +1586,11 @@ TRANSLATION_SIDECAR = {
         "translated_at": "timestamp of the first CX or MDWiki revision, or null",
         "source_lang": "source wiki of the first CX or MDWiki revision (en, simple, hi, mdwiki, ...), from "
                        "its edit summary",
-        "source_title": "source page title from that summary (as written: may be a "
+        "source_title": "source page title from that summary (as written, Odia digits as ASCII: may be a "
                         "user-space draft, e.g. 'User:Mr. Ibrahem/...')",
         "source_revid": "source page revision id from that summary, or null",
         "source_section": "the translated section when only a section was translated ('opening section' "
-                          "for the lead), else null",
+                          "for the lead), else null (Odia digits as ASCII)",
         "created": "timestamp of the page's first revision",
         "creator_is_bot": "the first revision's account is, or was, in the bot group, or is a global bot "
                           "(name ends in 'bot')",
@@ -1665,7 +1683,8 @@ def translation_report(rows, n_index, template_pages, tag_defs, first_has_parent
         "",
         f"Built by `annotate.py translation` on {now()[:10]} from the `{WIKI}-{DATE}` dumps, for the "
         f"{n:,} articles of the corpus (`{CORPUS.name}`). Output: `annotations/translation.jsonl` "
-        "(one JSON object per article, in corpus order; columns in `annotations/translation.json`).",
+        "(one JSON object per article, in corpus order; columns in `annotations/translation.json`). Titles "
+        "are written with ASCII digits.",
         "",
         "## Method",
         "",

@@ -14,7 +14,11 @@
    first, as a math-aware renderer (GitHub, pandoc) would treat it.
 2. pandoc cross-check. A random sample, plus hard cases, is read with pandoc's GFM reader
    (`gfm+tex_math_dollars`); same expectations.
-3. Residue scan. Patterns the cleaning rules remove must be gone: wikitext outside math, file
+3. Consistency. Every page of the article index (raw/<wiki>-<date>-articles.jsonl) is in exactly
+   one of the corpus and excluded.jsonl, at the index's revision; no page twice; every block in
+   removed-blocks.jsonl belongs to a kept article, or to one excluded as mostly English; titles
+   use ASCII digits.
+4. Residue scan. Patterns the cleaning rules remove must be gone: wikitext outside math, file
    and image options, URLs, category links, Content Translation markup, HTML entities, Odia
    digits (the text uses ASCII digits), the unassigned danda U+0B64/65, ଯ + nukta (written ୟ),
    control characters.
@@ -117,6 +121,32 @@ def check_pandoc(recs, n):
     return len(sample), bad
 
 
+def check_consistency(recs, corpus):
+    """{problem: [example ids]} for the corpus, excluded.jsonl and removed-blocks.jsonl against the index."""
+    wiki, date = re.match(r"(\w+)-(\d{8})", corpus.name).groups()
+    index_file = ROOT / "raw" / f"{wiki}-{date}-articles.jsonl"
+    if not index_file.exists():
+        return {f"no article index {index_file.name} for {date}": [None]}
+    index = {a["id"]: a for a in map(json.loads, open(index_file, encoding="utf-8"))}
+    excluded = [json.loads(line) for line in open(ROOT / "excluded.jsonl", encoding="utf-8")]
+    blocks = [json.loads(line) for line in open(ROOT / "removed-blocks.jsonl", encoding="utf-8")]
+    bad = collections.defaultdict(list)
+    kept_ids = collections.Counter(r["id"] for r in recs)
+    out_ids = collections.Counter(e["id"] for e in excluded)
+    bad["page twice in the corpus"] = [i for i, n in kept_ids.items() if n > 1]
+    bad["page twice in excluded.jsonl"] = [i for i, n in out_ids.items() if n > 1]
+    bad["page in both corpus and excluded.jsonl"] = sorted(set(kept_ids) & set(out_ids))
+    bad["index page in neither"] = sorted(set(index) - set(kept_ids) - set(out_ids))
+    bad["page not in the index"] = sorted((set(kept_ids) | set(out_ids)) - set(index))
+    bad["revision differs from the index"] = [r["id"] for r in recs + excluded
+                                              if r["id"] in index and r["revid"] != index[r["id"]]["revid"]]
+    mostly_english = {e["id"] for e in excluded if e["reason"] == "mostly English"}
+    bad["removed block of an excluded page"] = sorted({b["id"] for b in blocks if b["id"] not in kept_ids
+                                                      and b["id"] not in mostly_english})
+    bad["Odia digit in a title"] = [r["id"] for r in recs + excluded + blocks if re.search("[୦-୯]", r["title"])]
+    return {k: v for k, v in bad.items() if v}
+
+
 def check_residue(recs):
     hits = collections.defaultdict(list)
     for r in recs:
@@ -152,6 +182,13 @@ def main():
         for k, v in pbad.items():
             failed = True
             print(f"  {k}: {len(v)} e.g. {v[:4]}")
+
+    cbad = check_consistency(recs, corpus)
+    print("consistency: " + ("every indexed page is in the corpus or excluded.jsonl, once" if not cbad
+                             else "PROBLEMS"))
+    for k, v in cbad.items():
+        failed = True
+        print(f"  {k}: {len(v)} e.g. ids {v[:6]}")
 
     hits = check_residue(recs)
     print("residue: " + ("none" if not hits else "FOUND"))

@@ -48,6 +48,7 @@ ROOT = Path(__file__).resolve().parent  # the repository root: every local outpu
 CORPUS = ROOT / "orwiki-20260901.jsonl"
 STORE_FIELDS = ["para_sha1", "score_run", "bytes", "tokens", "pieces", "bits"]
 ANN = ROOT / "annotations"
+ODIA_DIGIT = re.compile("[\u0b66-\u0b6f]")  # the owner's rule: none in any output
 QUALITY = ROOT / "quality"
 MODEL = "sarvamai/sarvam-1"
 REVISION = "e9607337286ddf496d4a2562b194e489dcf3feea"  # main on 2026-09-24; pinned so reruns match
@@ -1177,6 +1178,8 @@ def cmd_build(args):
         f = Path(args.context_dir) / f"{name}.jsonl"
         if f.exists():
             ctx[name] = pd.DataFrame(read_jsonl(f)).set_index("id")
+        elif f.with_suffix(".parquet").exists():
+            print(f"{f.with_suffix('.parquet')} is not read (JSON lines only): run `annotate.py {name}` for {f.name}")
 
     # ---- review candidates, one failure type each
     # Latin-dominant paragraphs: English (enough common English words) or not (transliteration, ...).
@@ -1424,10 +1427,13 @@ def cmd_build(args):
             s, art, runs, cov, ctx, by_type, ranked, primary, reasons, corpus_sha1, out_q
         ),
     }
+    # The owner's rule: ASCII digits in every output (the corpus converts them; titles included).
+    odia_digits = {f.name: n for f, text in files.items() if (n := len(ODIA_DIGIT.findall(text)))}
     for f, text in files.items():
         write_atomic(f, text)
     print(
         f"wrote {', '.join(str(f.relative_to(args.out)) for f in files)}; {len(ranked)} articles flagged"
+        + (f"; WARNING: Odia digits in {odia_digits}" if odia_digits else "")
     )
 
 

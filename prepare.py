@@ -13,8 +13,8 @@ Three steps, each resumable, all output under this directory:
   render    Wikipedia's own rendering (Parsoid HTML) of each article's dump revision
             -> raw/html/chunk-*.jsonl.gz, 500 articles per chunk
   build     HTML -> GitHub-flavoured Markdown -> orwiki-<date>.jsonl (the corpus,
-            one article per line), the build statistics and README.md; markdown/<title>.md
-            only with --markdown
+            one article per line), excluded.jsonl (every page left out, with the reason),
+            removed-blocks.jsonl, README.md; markdown/<title>.md only with --markdown
 
 Why render instead of stripping the wikitext: Odia articles build whole sentences out of
 templates ('''{{PAGENAME}}''' ଏକ ଭାରତୀୟ {{TownType|M}}, {{Birth date|...}}, {{convert|...}},
@@ -677,7 +677,7 @@ def fix_residue(text):
 
 # English-dominant blocks: more than twice as many Latin as Odia letters (digits are ASCII by
 # then, so only letters count): untranslated leftovers, English quotes, bibliographies, Latin-script
-# lists. Translated from translations/english-to-odia.jsonl, else taken out of the text.
+# lists. Translated from translations/english-to-odia.jsonl, else kept aside in removed-blocks.jsonl.
 # Judged per paragraph (>= 30 Latin letters),
 # per list item (>= 10; a whole list judged at once took mixed Odia lists with it), and per table
 # (>= 30, and under 200 Odia letters, so bilingual tables with an Odia column stay).
@@ -1103,7 +1103,9 @@ def atomic_write(path, write):
 
 
 def build(args):
-    """HTML -> the corpus (JSON lines), the build statistics and README.md."""
+    """HTML -> the corpus (JSON lines), excluded.jsonl, removed-blocks.jsonl, the
+    build statistics and README.md. Everything decided about a page is applied here: cleaning,
+    translations, review decisions, and every exclusion rule."""
     date = find_date(args.dump)
     arts = {a["id"]: a for a in load_index(date)}
     prov = json.loads(provenance_path(date).read_text(encoding="utf-8")) if provenance_path(date).exists() else {}
@@ -1119,10 +1121,11 @@ def build(args):
                                         paragraph_refs_not_found=0)
 
     def exclude(a, reason, detail=""):
-        excluded.append({"title": a["title"], "reason": reason, "detail": detail})
+        excluded.append({"id": a["id"], "revid": a["revid"], "title": a["title"].translate(ODIA_DIGITS),
+                         "reason": reason, "detail": detail})
 
     def blocks_of(a, info, kept):
-        return [{"id": a["id"], "title": a["title"], "kind": kind, "reason": reason,
+        return [{"id": a["id"], "title": a["title"].translate(ODIA_DIGITS), "kind": kind, "reason": reason,
                  "text": para, "article_kept": kept} for reason, kind, para in info["english_removed"]]
 
     print(f"converting {len(arts):,} pages", file=sys.stderr)
@@ -1141,7 +1144,7 @@ def build(args):
         english = info["english_removed"]
         if english and gutted(body, english):
             # Mostly English once citations and untranslated prose are out: an English page with an
-            # Odia title. Its blocks are kept aside for a later translation round.
+            # Odia title. Its blocks are kept in removed-blocks.jsonl for a later translation round.
             exclude(a, "mostly English", "what is left after removing English is under 25 Odia words")
             removed_blocks += blocks_of(a, info, False)
             continue
@@ -1151,7 +1154,7 @@ def build(args):
         key = hashlib.sha1(body.encode()).hexdigest()
         if key in seen:
             first = seen[key]
-            exclude(a, "duplicate text", f"same text as id {first['id']} ({first['title']})")
+            exclude(a, "duplicate text", f"same text as id {first['id']} ({first['title'].translate(ODIA_DIGITS)})")
             continue
         seen[key] = a
         title = a["title"].translate(ODIA_DIGITS)
@@ -1199,12 +1202,16 @@ def build(args):
     records = sorted(kept, key=lambda r: r["id"])
     kept_ids = {r["id"] for r in records}
     removed_blocks = [b for b in removed_blocks if b["id"] in kept_ids or not b["article_kept"]]
+    excluded.sort(key=lambda e: (e["reason"], e["id"]))
+    removed_blocks.sort(key=lambda b: (b["id"], b["reason"]))
 
     stem = corpus_stem(date)
     jl = ROOT / f"{stem}.jsonl"
     # Readers (edaapp, agents) never see a half-written file, and a failed write (a full disk)
     # leaves no partial file behind.
     atomic_write(jl, lambda tmp: write_jsonl(tmp, records))
+    atomic_write(ROOT / "excluded.jsonl", lambda tmp: write_jsonl(tmp, excluded))
+    atomic_write(ROOT / "removed-blocks.jsonl", lambda tmp: write_jsonl(tmp, removed_blocks))
     if args.markdown:
         write_markdown(records, prov.get("dump", stem))
 
@@ -1231,14 +1238,13 @@ def build(args):
         "reviews": {"file": shown_path(args.reviews) if reviews else None, "articles_reviewed": len(reviews),
                     **review_counts},
         "min_words": args.min_words, "min_chars": args.min_chars,
-        "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
-        "dropped_titles": excluded,
+        "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),  # titles: excluded.jsonl
     }
     (ROOT / f"{stem}-build.json").write_text(json.dumps(stats, indent=1, ensure_ascii=False) + "\n",
                                              encoding="utf-8")
     write_readme(stats, records, stem)
     print(f"{len(records):,} articles, {stats['words']:,} Odia words -> {jl.name}; "
-          f"{len(excluded):,} dropped ({dict(dropped)})", file=sys.stderr)
+          f"{len(excluded):,} excluded ({dict(dropped)}) -> excluded.jsonl", file=sys.stderr)
 
 
 def write_jsonl(path, rows):
@@ -1321,7 +1327,10 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | File | What it is |
 |---|---|
 | `{stem}.jsonl` | the corpus, one JSON object per line (fields below) |
-| `{stem}-build.json` | build statistics and the title of every page left out, with the reason |
+| `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
+| `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
+| `{stem}-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |
+| `annotations/*.jsonl` | topics, translation flags, Sarvam-1 scores and the review queue, joined on `id` |
 | `prepare.py` | the script that made all of it (download, render, build) |
 | `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
@@ -1329,6 +1338,8 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | inputs kept for rebuilds: the dump, the article index, Wikipedia's rendered HTML of every article |
+
+All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`.
 
 ## Record format
 
@@ -1416,8 +1427,8 @@ A short example record:
    hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
-6. **Filter.** {sum(stats['dropped'].values()):,} pages were left out. Their titles are in
-   `{stem}-build.json`. Boilerplate pages (year pages, date pages without events,
+6. **Filter.** {sum(stats['dropped'].values()):,} pages were left out, each listed in `excluded.jsonl`
+   with its id, revision and reason. Boilerplate pages (year pages, date pages without events,
    empty film-year lists) say nothing beyond their title. Fact-bearing stubs stay, with
    `templated_share` for down-weighting.
 
@@ -1447,6 +1458,10 @@ bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-t
 import json
 docs = [r["text"] for r in map(json.loads, open("{stem}.jsonl", encoding="utf-8"))
         if r["templated_share"] < 0.8]  # e.g. down-weight or skip formulaic stubs
+```
+
+```bash
+jq -r 'select(.reason == "year page") | .title' excluded.jsonl | head   # why a page is missing
 ```
 
 - In odia-llm-trainer, `odia-build-cpt --local {stem}.jsonl --local-upsample 1` adds all of it

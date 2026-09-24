@@ -76,6 +76,10 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   chemical elements, block and village one-liners and a national anthem's adoption date, all
   clean. — A length floor is a proxy for boilerplate; once the boilerplate is out by rule, the
   proxy only removes good data. — done: `--min-chars` defaults to 0 (off).
+- **A source error looks like a digit bug** (2026-09-25). The chlorine article says atomic
+  number 7. It looked like digit conversion had lost a digit, but the rendered HTML says `୭`.
+  — Check the source HTML before blaming a text transform. — idea: a facts check against
+  Wikidata for element numbers, capitals and dates.
 
 - **Removing all English left skeletons; the fix was translate prose, keep data, drop
   citations** (2026-09-24, owner's decision).
@@ -320,12 +324,21 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **JSON lines cost 11–20× Parquet's disk** (2026-09-25): topics 7.5 MB against 0.66 MB,
+  translation 8.7 MB against 0.43 MB, mostly repeated key names. — Readability has a disk price
+  on a nearly full drive. — idea: accept it; gzip a file only if disk runs short.
 - **The topic precision samples shrink with the corpus** (2026-09-25). Dropping year and date
   pages took the held-out check from 100 to 90 articles (86 of 87 tagged correct). — todo:
   decide whether to report precision on the full labelled set.
 - **`sys.dont_write_bytecode` doesn't stop importlib's loader** (2026-09-25), which caches
   bytecode before the module runs. — Run verification scripts with `PYTHONDONTWRITEBYTECODE=1`.
   — done.
+
+- **Exclusions recorded by title only couldn't be joined or shown** (2026-09-25). The build JSON
+  listed dropped titles, with no page id or revision, and titles with Odia digits don't match
+  the corpus's ASCII-digit titles. — Record every exclusion as data (`id`, `revid`, `title`,
+  `reason`, `detail`), and check that corpus and exclusions partition the index. — done:
+  `excluded.jsonl`, `check.py` consistency check (it catches a single missing page).
 
 - **Re-scoring after the translations: $0.03, and the translations read like native Odia**
   (2026-09-25).
@@ -501,6 +514,28 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   done: rewritten as escapes.
 
 ## Web app (edaapp)
+
+- **A side file looked like a second corpus** (2026-09-25). `removed-blocks.jsonl` has `id` and
+  `text`, so the rule "any id + text table is a corpus version" listed it as one. — Structural
+  discovery needs reserved names for side files. — done: `excluded.jsonl` and
+  `removed-blocks.jsonl` are reserved, with a test.
+- **JSON lines lose Parquet's schema** (2026-09-25). DuckDB's reader turned ISO strings in
+  `translation.jsonl` into timestamps (dropping `T`/`Z`) and UUID-like strings into UUIDs. —
+  Type JSONL explicitly. — done: types are inferred over every record, with dates and UUIDs kept
+  as strings. Inference is 0.61 s of the 0.77 s spent loading five JSONL files. idea: declare
+  column types in the sidecar `.json`.
+- **A leftover Parquet would have been served instead of a newer JSONL** (2026-09-25). — When
+  two copies exist, read the newer and say which. — done. Also `*.tmp` build writes are ignored,
+  so they no longer trigger reloads.
+- **Excluded view** (2026-09-25): counts per reason, a filter and search, and links to the dump
+  revision and the current page. Duplicates link to the kept article. A second tab shows the
+  removed blocks. Overview's "pages left out" reads `excluded.jsonl` and flags any disagreement
+  with the build's counts. 160 tests pass (132 before).
+- **Smaller fixes** (2026-09-25). The chart grid's 420 px minimum overflowed phone widths (fixed;
+  the Overview's build-statistics table is still 15 px too wide). A "²" search crashed
+  `int()` after `isdigit()` (fixed). idea: natural sort for titles with digits; hide constant
+  columns (`bot_created` is now all false) from Browse's defaults; compute Overview histograms
+  in DuckDB (the app uses 591 MB with everything loaded).
 
 - **Methodology and Review first pages, found by file name** (2026-09-24). `METHODOLOGY.md` at
   the dataset root → a Methodology page (contents, anchors, live reload). `quality/review-first.md`
