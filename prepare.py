@@ -1273,6 +1273,7 @@ whose history lists the authors.
 uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD
 ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~2 h, resumable
 uv run prepare.py build      # about a minute; --markdown
+uv run check.py              # exit 1 if any check fails
 ```
 
 `render` needs contact details in the user-agent (`ODIA_WIKI_CONTACT`). Wikimedia throttles

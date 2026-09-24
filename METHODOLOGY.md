@@ -20,8 +20,9 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 The steps are scripts of their own, all in this folder:
 
 1. `prepare.py`: `download` (the dump), `render` (Wikipedia's HTML of each article), `build` (HTML to Markdown, cleaning, filtering, outputs, `README.md`).
-2. `annotate.py`: topics and translation flags from the dump's metadata tables.
-3. `score_bpb.py`: Sarvam-1 bits per byte on a GPU pod, and the review-first ranking.
+2. `check.py`: checks the built corpus. Every article must parse as intended Markdown, pandoc must agree on a sample, and no cleaned-away residue may be left.
+3. `annotate.py`: topics and translation flags from the dump's metadata tables.
+4. `score_bpb.py`: Sarvam-1 bits per byte on a GPU pod, and the review-first ranking.
 
 The outputs are `orwiki-20260901.jsonl` / `.parquet` (one record per article), `markdown/<title>.md`, `annotations/*.parquet`, and the reports in `quality/`. The fields are described in `README.md`, and what each step taught us is in `LEARNINGS.md`.
 

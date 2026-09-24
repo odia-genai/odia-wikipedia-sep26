@@ -47,6 +47,25 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **Boilerplate after the cleanups: 6.3% of paragraphs but only 2.1% of Odia words, and some
+  of it wrong** (2026-09-24).
+  - 151 sentence frames repeat in 5 or more articles, once names and numbers are masked:
+    6,339 of 101,090 non-heading paragraphs. Only 1,422 of them are in bot-flagged pages.
+  - Top frames:
+    - the year-page sentence "N ଗ୍ରେଗୋରି ପାଞ୍ଜି ଅନୁସାରେ ଏକ ସାଧାରଣ ବର୍ଷ ଅଟେ ।" (1,774×), often the
+      page's only sentence
+    - a coordinates sentence (625×)
+    - the 2001-census sentence (about 870× across its variants)
+    - "ହିନ୍ଦୀ …ର ସରକାରୀ ଭାଷା ଅଟେ ।" (346×)
+    - an election-table footnote (136×)
+    - a village-school sentence (109×)
+  - The census frame writes a signed difference into "less than": "ଏହା ଜାତୀୟ ହାରଠାରୁ -20.28%
+    ପ୍ରତିଶତ କମ ଅଟେ" ("-20.28% less than the national rate", i.e. more). The data is also from
+    2001. A model trained on it sees the same wrong phrasing hundreds of times.
+  - — Repetition, not perplexity, is the signal (see bpb). — todo: cap each frame at a few
+    copies in the training mix, or drop the one-sentence year pages; fix or drop the "-X% କମ"
+    census sentences. The edaapp Patterns view lists these groups and can bulk-drop them.
+
 - **After the cleanups the queue's English type is mostly bilingual text** (2026-09-24). The
   English candidates fell from 707 to 66, and they are now mostly Odia with English quotes or
   glosses. The removal also left some list articles as skeletons: ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା is now

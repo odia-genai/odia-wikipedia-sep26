@@ -1,0 +1,166 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["markdown-it-py>=3"]
+# ///
+"""Check the built corpus: valid Markdown, and no leftovers the cleaning rules should have removed.
+
+  uv run check.py              # all checks; exit code 1 if any fails
+  uv run check.py --pandoc 0   # skip the pandoc cross-check
+
+1. Markdown structure. Every article is parsed as CommonMark + GFM tables (markdown-it). The
+   parse must give exactly the headings, list items and tables the text is meant to have, and no
+   accidental emphasis, links, code, HTML, block quotes, rules or setext headings. Math is masked
+   first, as a math-aware renderer (GitHub, pandoc) would treat it.
+2. pandoc cross-check. A random sample, plus hard cases, is read with pandoc's GFM reader
+   (`gfm+tex_math_dollars`); same expectations.
+3. Residue scan. Patterns the cleaning rules remove must be gone: wikitext outside math, file
+   and image options, URLs, category links, Content Translation markup, HTML entities, Odia
+   digits (the text uses ASCII digits), the unassigned danda U+0B64/65, ଯ + nukta (written ୟ),
+   control characters.
+"""
+
+import argparse
+import collections
+import json
+import random
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+MATH = re.compile(r"\$\$[^$]+\$\$|(?<!\\)\$[^$\n]+?(?<!\\)\$")
+UNEXPECTED = {"html_block", "html_inline", "code_block", "fence", "hr", "blockquote_open", "link_open",
+              "image", "em_open", "strong_open", "s_open", "code_inline"}
+PANDOC_BAD = {"RawInline", "RawBlock", "CodeBlock", "Code", "Emph", "Strong", "Link", "Image",
+              "BlockQuote", "HorizontalRule", "Strikeout"}
+HARD_CASES = ("ଆର୍ଯ୍ୟଭଟ୍ଟ", "ଡାଇନୋସର ଶ୍ରେଣୀବିଭାଗ", "ମ୍ୟାଟ୍‌ଲାବ୍‌", "କମ୍ପ୍ୟୁଟର", "ଓଡ଼ିଶାର ଜିଲ୍ଲାମାନଙ୍କର ତାଲିକା")
+RESIDUE = {  # name -> pattern that must not occur (math masked for the wikitext one)
+    "wikitext outside math": r"\{\{|\}\}|\[\[|\]\]",
+    "file/image options": r"\|\s*thumb|\.jpe?g\s*\||(?<![\w.])\d{1,4}px\b",
+    "URL": r"https?://|www\.",
+    "category link": r"(?m)Category:|ଶ୍ରେଣୀ:(?:\S|$)",
+    "Content Translation markup": r"cx-link|data-linkid|data-cx=|mw-redirect",
+    "HTML entity": r"&(?:amp|lt|gt|quot|nbsp|#1[03]);",
+    "Odia digit": "[୦-୯]",
+    "unassigned danda U+0B64/65": "[୤୥]",
+    "ଯ + nukta": "ଯ଼",
+    "control character": r"[\x00-\x08\x0b-\x1f\x7f-\x9f]",
+}
+
+
+def expected(text):
+    lines = text.split("\n")
+    return {
+        "headings": sum(bool(re.match(r"#{1,6} ", line)) for line in lines),
+        "tables": sum(bool(re.fullmatch(r"\|(?:---\|)+", line)) for line in lines),
+        "items": sum(bool(re.match(r"\s*(?:- |[0-9]+\. )", line)) for line in lines if not line.startswith("|")),
+    }
+
+
+def check_markdown(recs):
+    from markdown_it import MarkdownIt
+
+    md = MarkdownIt("commonmark", {"maxNesting": 100}).enable(["table", "strikethrough"])
+    bad = collections.defaultdict(list)
+    for r in recs:
+        text = MATH.sub("MATH", r["text"])
+        toks = md.parse(text)
+        kinds = collections.Counter(t.type for t in toks)
+        inline = collections.Counter(c.type for t in toks if t.type == "inline" for c in (t.children or []))
+        want = expected(text)
+        if kinds["heading_open"] != want["headings"]:
+            bad["heading count"].append(r["title"])
+        if kinds["table_open"] != want["tables"]:
+            bad["table count"].append(r["title"])
+        if kinds["list_item_open"] != want["items"]:
+            bad["list item count"].append(r["title"])
+        if any(t.type == "heading_open" and t.markup in ("=", "-") for t in toks):
+            bad["setext heading"].append(r["title"])
+        for k in UNEXPECTED:
+            if kinds[k] or inline[k]:
+                bad[k].append(r["title"])
+    return bad
+
+
+def check_pandoc(recs, n):
+    if not n or not shutil.which("pandoc"):
+        return None
+    random.seed(11)
+    sample = random.sample(recs, min(n, len(recs))) + [r for r in recs if r["title"] in HARD_CASES]
+    bad = collections.defaultdict(list)
+
+    def walk(x, c):
+        if isinstance(x, dict):
+            if "t" in x:
+                c[x["t"]] += 1
+            for v in x.values():
+                walk(v, c)
+        elif isinstance(x, list):
+            for v in x:
+                walk(v, c)
+
+    for r in sample:
+        out = subprocess.run(["pandoc", "-f", "gfm+tex_math_dollars", "-t", "json"], input=r["text"],
+                             capture_output=True, text=True, check=True).stdout
+        c = collections.Counter()
+        walk(json.loads(out)["blocks"], c)
+        for k in PANDOC_BAD & set(c):
+            bad[k].append(r["title"])
+        if c["Header"] != expected(r["text"])["headings"]:
+            bad["header count"].append(r["title"])
+        if c["Table"] != r["tables"]:
+            bad["table count"].append(r["title"])
+    return len(sample), bad
+
+
+def check_residue(recs):
+    hits = collections.defaultdict(list)
+    for r in recs:
+        masked = MATH.sub("MATH", r["text"])
+        for name, pattern in RESIDUE.items():
+            text = masked if name == "wikitext outside math" else r["text"]
+            for m in re.finditer(pattern, text):
+                hits[name].append((r["title"], text[max(0, m.start() - 50):m.end() + 40].replace("\n", "⏎")))
+    return hits
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("--corpus", type=Path, help="corpus JSONL (default: the newest *.jsonl here)")
+    ap.add_argument("--pandoc", type=int, default=400, help="articles for the pandoc cross-check (0: skip)")
+    args = ap.parse_args()
+    corpus = args.corpus or max(ROOT.glob("orwiki-*.jsonl"), key=lambda p: p.stat().st_mtime)
+    recs = [json.loads(line) for line in open(corpus, encoding="utf-8")]
+    failed = False
+
+    bad = check_markdown(recs)
+    print(f"markdown: {len(recs):,} articles parsed; " + ("all as intended" if not bad else "PROBLEMS"))
+    for k, v in bad.items():
+        failed = True
+        print(f"  {k}: {len(v)} e.g. {v[:4]}")
+
+    res = check_pandoc(recs, args.pandoc)
+    if res is None:
+        print("pandoc: skipped")
+    else:
+        n, pbad = res
+        print(f"pandoc: {n} articles; " + ("no problems" if not pbad else "PROBLEMS"))
+        for k, v in pbad.items():
+            failed = True
+            print(f"  {k}: {len(v)} e.g. {v[:4]}")
+
+    hits = check_residue(recs)
+    print("residue: " + ("none" if not hits else "FOUND"))
+    for name in RESIDUE:
+        if hits.get(name):
+            failed = True
+            print(f"  {name}: {len(hits[name])} in {len({t for t, _ in hits[name]})} articles, "
+                  f"e.g. {hits[name][0][0]}: …{hits[name][0][1]}…")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()
