@@ -388,6 +388,10 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   pod run, read bits and bytes from the paragraph file. — Search for readers as well as writers,
   and exercise rare paths with a fake run. — done: it reads the store.
 
+- **Put the big field last in JSON lines** (2026-09-25). The corpus had `words` and `chars` all
+  along, but after a 14 kB `text` field nobody saw them; the owner asked for length fields that
+  existed. — Order fields so `head` shows the metadata. — done: `text` is last; the file is
+  renamed `orwiki-20260901-trainingready.jsonl` (owner's request).
 - **Hand decisions as data, keyed by content** (2026-09-25). `curation/junk-paragraphs.jsonl`
   stores one line per dropped paragraph: page id, sha1 of the text, reason, and the text itself.
   The build drops matches, removes headings left empty, and reports entries that no longer match

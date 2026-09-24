@@ -160,10 +160,10 @@ def check_residue(recs):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--corpus", type=Path, help="corpus JSONL (default: the newest *.jsonl here)")
+    ap.add_argument("--corpus", type=Path, help="corpus JSONL (default: the newest *-trainingready.jsonl here)")
     ap.add_argument("--pandoc", type=int, default=400, help="articles for the pandoc cross-check (0: skip)")
     args = ap.parse_args()
-    corpus = args.corpus or max(ROOT.glob("orwiki-*.jsonl"), key=lambda p: p.stat().st_mtime)
+    corpus = args.corpus or max(ROOT.glob("*-trainingready.jsonl"), key=lambda p: p.stat().st_mtime)
     recs = [json.loads(line) for line in open(corpus, encoding="utf-8")]
     failed = False
 

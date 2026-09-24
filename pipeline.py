@@ -12,7 +12,7 @@
 Steps (each is its own script, runnable alone):
   0. with --fetch: prepare.py download + render (the dump's article index, then the HTML of every
      article at its dump revision), annotate.py download + wikidata (category, tag and history facts)
-  1. prepare.py build      HTML -> orwiki-<date>.jsonl (the corpus: cleaned Markdown with the
+  1. prepare.py build      HTML -> orwiki-<date>-trainingready.jsonl (cleaned Markdown with the
                            English translations folded in and reviewer decisions applied),
                            excluded.jsonl, removed-blocks.jsonl, the build stats, README.md
   2. annotate.py topics, translation   -> annotations/topics.jsonl, translation.jsonl
@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+GIT_LIMIT = 50_000_000  # files at least this big stay out of git (owner's rule)
 
 
 def run(name, *args):
@@ -72,6 +73,9 @@ def summary():
                  *sorted((ROOT / "annotations").glob("*.jsonl"))]:
         if path.exists():
             print(f"  {path.relative_to(ROOT)}  {path.stat().st_size / 1e6:.1f} MB")
+    big = [q for q in ROOT.rglob("*") if q.is_file() and q.stat().st_size >= GIT_LIMIT]
+    print(f"files over {GIT_LIMIT / 1e6:.0f} MB (kept out of git; .gitignore must list them): "
+          + (", ".join(f"{q.relative_to(ROOT)} ({q.stat().st_size / 1e6:.0f} MB)" for q in big) or "none"))
 
 
 def main():

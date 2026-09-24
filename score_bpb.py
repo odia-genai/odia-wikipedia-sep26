@@ -20,7 +20,8 @@ Steps:
 
 Files (JSON lines, JSON or Markdown only; the corpus and every output use ASCII digits):
 
-  orwiki-20260901.jsonl       the corpus; paragraph i = text.split("\\n\\n")[i], 0 = the title (not scored)
+  orwiki-20260901-trainingready.jsonl
+                              the corpus; paragraph i = text.split("\\n\\n")[i], 0 = the title (not scored)
   raw/bpb/scores.jsonl.gz     the store: one row per paragraph text ever scored (para_sha1, score_run,
                               bytes, tokens, pieces, bits), kept for good, so a text that leaves the
                               corpus and comes back is never scored again. It is the only copy of
@@ -70,9 +71,9 @@ New texts, on a pod (state the hourly price before creating it; terminate it whe
  2. On runpod/pytorch:1.0.3-cu1281-torch291-ubuntu2404 (torch 2.9.1+cu128), whose system Python needs
     --break-system-packages and has no numpy:
         pip install --break-system-packages transformers==5.17.0 numpy
- 3. scp score_bpb.py, orwiki-20260901.jsonl and raw/bpb/scores.jsonl.gz to /root, and start the job
+ 3. scp score_bpb.py, orwiki-20260901-trainingready.jsonl and raw/bpb/scores.jsonl.gz to /root, and start the job
     detached. Without `< /dev/null`, ssh stays open until the job ends (nohup alone is not enough):
-        cd /root && setsid nohup python score_bpb.py score --corpus orwiki-20260901.jsonl \\
+        cd /root && setsid nohup python score_bpb.py score --corpus orwiki-20260901-trainingready.jsonl \\
             --work /root/bpb --only-missing scores.jsonl.gz < /dev/null > score.log 2>&1 &
  4. Pull /root/bpb/scores.jsonl and run.json into raw/bpb/<date>/, never a scratch dir. Add pod.json
     (pod_id, gpu, cloud, datacenter, price_per_hr, image, created, ssh_ready, terminated, hours, cost)
@@ -108,7 +109,7 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent  # the repository root: every local output goes here
-CORPUS = ROOT / "orwiki-20260901.jsonl"
+CORPUS = ROOT / "orwiki-20260901-trainingready.jsonl"  # by name: `orwiki-*.jsonl` also matches files in raw/
 STORE = ROOT / "raw" / "bpb" / "scores.jsonl.gz"
 STORE_FIELDS = ["para_sha1", "score_run", "bytes", "tokens", "pieces", "bits"]
 # In bpb.paragraphs.jsonl these are not copied: its sidecar's "joins" points each row to its store row.

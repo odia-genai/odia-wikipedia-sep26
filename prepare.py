@@ -12,8 +12,8 @@ Three steps, each resumable, all output under this directory:
             every article) and raw/<wiki>-<date>-dump.json (provenance), then deleted
   render    Wikipedia's own rendering (Parsoid HTML) of each article's dump revision
             -> raw/html/chunk-*.jsonl.gz, 500 articles per chunk
-  build     HTML -> GitHub-flavoured Markdown -> orwiki-<date>.jsonl (the corpus,
-            one article per line), excluded.jsonl (every page left out, with the reason),
+  build     HTML -> GitHub-flavoured Markdown -> orwiki-<date>-trainingready.jsonl (the corpus,
+            one article per line; counts first, `text` last), excluded.jsonl (every page left out, with the reason),
             removed-blocks.jsonl, README.md; markdown/<title>.md only with --markdown
 
 Why render instead of stripping the wikitext: Odia articles build whole sentences out of
@@ -125,8 +125,8 @@ def dump_path(date):
 
 
 def corpus_stem(date):
-    """orwiki-<date>: the corpus is <stem>.jsonl, its build statistics <stem>-build.json."""
-    return f"{WIKI}-{date}"
+    """orwiki-<date>-trainingready: the corpus is <stem>.jsonl, its build statistics <stem>-build.json."""
+    return f"{WIKI}-{date}-trainingready"
 
 
 def provenance_path(date):
@@ -1239,7 +1239,7 @@ def atomic_write(path, write):
 
 
 def build(args):
-    """HTML -> the corpus (JSON lines), excluded.jsonl, removed-blocks.jsonl, the
+    """HTML -> the training-ready corpus (JSON lines), excluded.jsonl, removed-blocks.jsonl, the
     build statistics and README.md. Everything decided about a page is applied here: cleaning,
     translations, review decisions, and every exclusion rule."""
     date = find_date(args.dump)
@@ -1352,6 +1352,8 @@ def build(args):
 
     stem = corpus_stem(date)
     jl = ROOT / f"{stem}.jsonl"
+    # `text` goes last, so the counts and metadata lead each line (`head` shows them).
+    records = [{k: v for k, v in r.items() if k != "text"} | {"text": r["text"]} for r in records]
     # Readers (edaapp, agents) never see a half-written file, and a failed write (a full disk)
     # leaves no partial file behind.
     atomic_write(jl, lambda tmp: write_jsonl(tmp, records))
@@ -1479,7 +1481,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 
 | File | What it is |
 |---|---|
-| `{stem}.jsonl` | the corpus, one JSON object per line (fields below) |
+| **`{stem}.jsonl`** | **the training-ready corpus**, one JSON object per line (fields below) |
 | `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `{stem}-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |
@@ -1507,8 +1509,8 @@ All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. E
 | `revid` | revision in the dump; `https://or.wikipedia.org/w/index.php?oldid=<revid>` is exactly this text |
 | `timestamp` | when that revision was saved |
 | `text` | the article (format below) |
-| `words` | Odia words in `text` (runs of Odia-script characters) |
-| `chars` | characters in `text` |
+| `words` | Odia words in `text`: runs of Odia letters, title included; numbers and Latin words don't count |
+| `chars` | characters in `text` (Unicode code points), title line and Markdown included |
 | `odia_ratio` | share of non-space characters in the Odia block (`odia_text.odia_ratio`) |
 | `tables` | data tables in `text`, as Markdown tables |
 | `translated_paragraphs` | paragraphs and headings machine-translated from English (0 = all native Odia) |
@@ -1632,6 +1634,7 @@ docs = [r["text"] for r in map(json.loads, open("{stem}.jsonl", encoding="utf-8"
 
 ```bash
 jq -r 'select(.reason == "year page") | .title' excluded.jsonl | head   # why a page is missing
+jq -c 'select(.chars >= 500 and .chars < 600) | {{id, title, words, chars}}' {stem}.jsonl | head
 ```
 
 - In odia-llm-trainer, `odia-build-cpt --local {stem}.jsonl --local-upsample 1` adds all of it

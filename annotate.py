@@ -18,7 +18,7 @@ Steps, each re-runnable from cached inputs, all output under this directory:
                (+ .json), quality/translation.md
   topics       categories -> topics -> annotations/topics.jsonl (+ .json), quality/topics.md
 
-Outputs are JSON lines, one object per article of the corpus (orwiki-<date>.jsonl, read at run
+Outputs are JSON lines, one object per article of the corpus (orwiki-<date>-trainingready.jsonl, read at run
 time), in corpus order. Odia digits become ASCII in every output field (titles, category names);
 the rules read the page names as they are. Never NFC.
 
@@ -70,7 +70,7 @@ CONTACT = os.environ.get("ODIA_WIKI_CONTACT", "").strip()
 UA = ("odia-wikipedia-sep26/0.1 (research: annotating an Odia LLM training corpus from Wikipedia dumps"
       + (f"; {CONTACT}" if CONTACT else "") + ") python-urllib")
 
-CORPUS = ROOT / f"{WIKI}-{DATE}.jsonl"  # the built corpus (prepare.py build): which articles get rows
+CORPUS = ROOT / f"{WIKI}-{DATE}-trainingready.jsonl"  # the built corpus (prepare.py build): which articles get rows
 INDEX = RAW / f"{WIKI}-{DATE}-articles.jsonl"  # every dump article (prepare.py download): id, title, revid
 
 # Dump files kept in raw/ as they are: tiny, read at run time (job name in dumpstatus.json, suffix).

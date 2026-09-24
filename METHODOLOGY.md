@@ -28,7 +28,7 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 
 The outputs are all JSON lines, JSON or Markdown, readable with any editor or `jq` (the owner's rule since 2026-09-25: no Parquet):
 
-- `orwiki-20260901.jsonl`: the corpus, one record per article. Build statistics: `orwiki-20260901-build.json`.
+- `orwiki-20260901-trainingready.jsonl`: the training-ready corpus, one record per article. Each line starts with the metadata and counts, `words` (Odia words) and `chars` (characters), so articles can be picked by length, e.g. `jq -c 'select(.chars >= 500 and .chars < 600)'` (879 articles); `text` is last. Build statistics: `orwiki-20260901-trainingready-build.json`.
 - `excluded.jsonl`: every page left out, with `id`, `revid`, `title`, `reason` and `detail`
 - `removed-blocks.jsonl`: blocks cut out of kept articles (citations, junk, English prose awaiting translation)
 - `annotations/*.jsonl`, with a `.json` description each
@@ -616,6 +616,7 @@ Newest first.
   - Two translation-table entries were re-keyed to their new LaTeX source text.
   - `bpb.paragraphs.jsonl` no longer repeats the score store; its bits, bytes, tokens, pieces and run are read from `raw/bpb/scores.jsonl.gz`.
   - Every file under 50 MB in this folder is tracked in git (the corpus JSONL, 96 MB, is rebuilt by `pipeline.py`).
+  - The corpus is renamed `orwiki-20260901-trainingready.jsonl` (build statistics `…-trainingready-build.json`); each line now starts with its counts and metadata and ends with `text`.
 
 - **2026-09-25: boilerplate pages out, every exclusion recorded, JSON-only outputs, one pipeline.**
   - Dropped 1,864 year pages, 260 date pages without events and 19 empty film-year lists, judged by sentence frames repeated in 5+ articles. 18,693 articles remain, 4,513,948 Odia words (−22,615).
