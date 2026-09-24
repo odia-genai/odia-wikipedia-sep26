@@ -16,6 +16,9 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 - **Flag Content Translation articles from `change_tag` — done 2026-09-24, see Data** (2026-09-24). The dump's tag table is
   1.6 MB. Machine-assisted translations carry translationese and English leftovers (the
   `data-cx` leaks came from them). Compare the flag with the 1,302 English-dominant paragraphs.
+- **Score paragraphs with Sarvam-1 on the pod — done 2026-09-24, see Data** (kept for the record) (2026-09-24). This corpus is 13.3M Sarvam-1
+  tokens (153.6 per kB), about 14 minutes on the A6000. Very high bits-per-byte flags garbled or wrong-script text
+  that the pattern checks cannot see.
 - **Blind human review of ~50 random articles** (2026-09-24), with `odia-review`, for
   fluency, translationese and leftover noise. It is the only measure of what the automated
   checks miss.
@@ -40,6 +43,41 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   (year pages, town stubs) and formulaic. They are flagged (`bot_created`), not dropped.
 
 ## Data (Odia)
+
+- **Sarvam-1 bits per byte for every paragraph, and a review-first queue** (2026-09-24). An
+  RTX A6000 Secure pod at $0.53/h ran for 0.495 h, costing $0.26; the image pull took 7 of the
+  30 minutes. It scored 148,745 non-title paragraphs, 13.46M tokens at 16.5k tokens/s.
+  - Corpus bpb 0.556; prose 0.523; headings 1.14; lists and tables 0.69.
+  - Paragraph bpb looked worse than the held-out set's 0.4951 until matched for length. Prose
+    paragraphs of 1 kB and over score 0.4948, because a paragraph scored from BOS has no
+    context.
+  - Content Translation articles score like the rest (0.554 vs 0.556).
+  - Pages created after Sarvam-1's release score *lower* (median 0.519 vs 0.559), so there is no
+    sign of memorisation (correlational).
+  - Sanity checks: word-shuffled copies scored higher in 300 of 300 (0.518 → 0.883). The repo
+    harness agrees to 0.04%. bf16 is unbiased in total but moves single paragraphs by up to 3.4%
+    with batch shape, while fp32 is exact.
+
+  — Compare bpb within length bands. Treat close per-paragraph ranks as noise. — done:
+  `score_bpb.py`, `annotations/bpb*.parquet`, `quality/bpb.md`, `quality/review-first.md` (200
+  flagged articles, seven failure types interleaved). idea: document-level bpb alongside, and
+  fp32 when exact ranks matter.
+- **bpb cannot see boilerplate repeated across articles** (2026-09-24). Each paragraph is scored
+  alone, so sentence frames found in 5 or more articles sit at the 58th percentile of their
+  length band. The low tail is formulaic but correct writing: election sentences, year lists,
+  and an MLA career table whose header is in 220 articles. — Detect templates by repetition, not
+  by perplexity. — done: a `repeats` column in `bpb.paragraphs`. todo: a per-article templated
+  share and a repeat cap in the CPT mix (see above).
+- **The residue filters miss escaped HTML and raw wikitable text** (2026-09-24). The review
+  queue found 14 paragraphs in 13 articles: a leaked Content Translation link
+  (`\<a href=… class="mw-redirect cx-link"…>`), raw `{| … |}` wikitable text, `style=` and
+  `Category:` lines, and `&amp;amp;` in a table. — done 2026-09-24: `fix_residue()` in `prepare.py`
+  (anchors, entities, raw wikitable, template parameters, attributes, category text: 67 fixes).
+- **707 English-dominant and 375 other-script paragraphs sit inside Odia pages** (2026-09-24).
+  They include Param Vir Chakra citations, English bios, OCR'd radio listings, and Latin-script
+  filmographies. The page-level `--min-odia-ratio 0.6` misses them. — done 2026-09-24: removed per
+  paragraph, list item and table (6,622 blocks), kept in `removed/english-paragraphs.parquet`.
+  idea: translate them.
 
 - **Odia digits converted to ASCII, before escaping** (2026-09-24, user decision). 689,848
   digits were converted in text, headings, tables and math. Titles keep the page name. The
@@ -135,6 +173,15 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **Short pod jobs: stock flickers, image pulls dominate, and nothing auto-terminates**
+  (2026-09-24). A6000 Secure stock switched between Low and none, so the first create failed. A
+  bounded retry loop created exactly one pod. The image pull took 7 of 30 minutes. runpodctl
+  v2.14 `pod create` has no terminate-after option. — done: explicit termination, verified with
+  `pod list`. idea: a lighter cached image, and a watchdog that terminates on a deadline.
+- **pandas turns missing flags into NaN, which is truthy** (2026-09-24). That flagged all 2,782
+  tables for review instead of 57. — Test `isinstance(x, str)`, not truthiness, on columns with
+  nulls. — done in `score_bpb.py`.
+
 - **Review decisions flow from the web app back into the build** (2026-09-24). `build` reads
   `edaapp/state/reviews.jsonl`, taking the last event per page id. It drops articles marked
   *drop* and removes dropped paragraphs by **content sha1, not index**, so a decision survives
@@ -213,6 +260,33 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   `"[­​…]"` was saved with the literal invisible characters. It worked but was
   unreadable and fragile. — Check invisible-character regexes with `od -c` after writing. —
   done: rewritten as escapes.
+
+## Web app (edaapp)
+
+- **The review file needs full-state events** (2026-09-24). `build` applies only the latest
+  event per article and matches dropped paragraphs by sha1. So an event that leaves out an
+  earlier paragraph drop brings that paragraph back on the next build. — Each event must carry
+  the article's complete current decision. — done: edaapp carries earlier drops forward (with a
+  "forget them" button), keys drops by sha1, and never drops paragraph 0; the dataset README
+  states the rule.
+- **Verification writes polluted the real review log** (2026-09-24). The app agent's
+  end-to-end checks left 215 fake decisions in `edaapp/state/reviews.jsonl`, and the build would
+  have applied them. It archived them to scratch and deleted the file. — Test runs need their
+  own state dir. — idea: a `--state` option for edaapp.
+- **`node --check file.js` passes ES modules with syntax errors** (2026-09-24, Node 22.20). It
+  doesn't parse `.js` as a module without `"type": "module"`. — done: use
+  `node --input-type=module --check < file` (in edaapp's README).
+- **`sandbox-exec` with a deny-writes-outside-edaapp profile is a cheap, strong check that a
+  local app writes nowhere else** (2026-09-24). — done for edaapp; idea: reuse it for
+  `odia-review` and other local tools.
+- **Loading the corpus into in-memory DuckDB beat querying Parquet directly** (2026-09-24).
+  Regex search ran 3–10× faster (e.g. 0.16 → 0.03 s), and queries stay consistent while an agent
+  replaces a file atomically. The cost is ~230 MB of RAM. — done: `store.py` reloads on on-disk
+  changes only.
+- **Dropping a "paragraph" drops a whole list block** (2026-09-24). A list counts as one
+  paragraph, so an IMDb-link regex matched 589 list blocks where only 442 were one-line. —
+  idea: support dropping single list items, or split list items into their own paragraphs in
+  the contract.
 
 ## Process
 
