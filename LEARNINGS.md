@@ -13,6 +13,9 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   300 documents from the 2023 Wikipedia snapshot for bits-per-byte. The same articles, in newer
   revisions, are in this corpus, so training on it as-is would leak the eval. Exclude those
   titles, or rebuild the held-out set from this corpus. The change is in `src/`.
+- **Flag Content Translation articles from `change_tag` — done 2026-09-24, see Data** (2026-09-24). The dump's tag table is
+  1.6 MB. Machine-assisted translations carry translationese and English leftovers (the
+  `data-cx` leaks came from them). Compare the flag with the 1,302 English-dominant paragraphs.
 - **Blind human review of ~50 random articles** (2026-09-24), with `odia-review`, for
   fluency, translationese and leftover noise. It is the only measure of what the automated
   checks miss.

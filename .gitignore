@@ -4,6 +4,8 @@
 /markdown/
 # the dump `prepare.py download` fetches; its article index is tracked
 /raw/*.xml.bz2
+# the revision-history dump `annotate.py download` fetches
+/raw/*.xml.gz
 # temporary and partial files
 *.tmp
 *.part

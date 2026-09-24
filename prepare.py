@@ -948,9 +948,37 @@ def write_jsonl(path, rows):
 
 
 def annotations_section(stats):
-    """README section on the review decisions this build applied."""
+    """README section built from whatever annotations/*.json sidecars and quality/*.md exist."""
+    lines = []
+    for side in sorted((ROOT / "annotations").glob("*.json")):
+        try:
+            meta = json.loads(side.read_text(encoding="utf-8"))
+        except ValueError:
+            continue
+        table = next((t for t in (side.with_suffix(".jsonl"), side.with_suffix(".parquet")) if t.exists()),
+                     side.with_suffix(".jsonl"))
+        key = "para_sha1" if ".paragraphs." in table.name else "text_sha1"
+        stale = f" Depends on the text: rows carry `{key}`." if meta.get("depends_on_text") else ""
+        lines.append(f"- **`annotations/{table.name}`**: {meta.get('description', '').strip()}"
+                     f" Columns: {', '.join(f'`{c}`' for c in meta.get('columns', {}))}.{stale}")
+    reports = sorted((ROOT / "quality").glob("*.md"))
+    body = "\n".join(lines) or "- none yet"
+    reps = ", ".join(f"[`quality/{r.name}`](quality/{r.name})" for r in reports) or "none yet"
     rv = stats["reviews"]
-    return f"""## Review decisions
+    return f"""## Annotations
+
+Extra fields per article live next to the corpus, one JSON-lines file each (with a `.json`
+description), joined on `id`. A file named `*.paragraphs.jsonl` has one row per paragraph (`id`,
+`para`). Paragraph `i` of an article
+is `text.split("\\n\\n")[i]`, and paragraph 0 is the `# title` heading. Annotations that depend on
+the text carry `text_sha1` (sha1 of the scored `text`), so a rebuild that changes an article makes
+them visibly stale.
+
+{body}
+
+Reports: {reps}.
+
+## Review decisions
 
 Review decisions are kept in `reviews/reviews.jsonl`, one append-only JSON event per line: `ts`,
 `dataset` (`odia-wikipedia`), `id`, `title`, `verdict` (`keep`, `drop`, `fix` or null), `note`,
