@@ -89,7 +89,7 @@ Many of these are Lua modules, which only MediaWiki can run. So `prepare.py rend
   - references as ସହାୟକ ଗ୍ରନ୍ଥ, ସନ୍ଦର୍ଭ, ବାହ୍ୟ ସନ୍ଦର୍ଭ, ପୁସ୍ତକ ଆଧାର, ବହି ଆଧାର, ଅନ୍ୟ ଆଧାର, ଆଧାର ନୋଟ
   - misspelled external links: ଅନ୍ୟନ୍ୟ ଲିଂକ୍, ବହର ଲିଙ୍କ, ବାହାଡ ଲିଙ୍କ
 
-  Found by reviewing the paragraphs with no Odia letter. Before adding them, everything under these headings was measured: 276 articles, but only 246 Odia words; the rest was English page names and book references.
+  Found by reviewing the paragraphs with no Odia letter (below). Before adding them, everything under these headings was measured: 276 articles, but only 246 Odia words; the rest was English page names and book references.
 
 Content headings that share a word stay, e.g. ଉତ୍ସବ ("festival"), ଖାଦ୍ୟ ଉତ୍ସ ("food sources") and ଆର୍କିମିଡିସଙ୍କ ସୂତ୍ର ("Archimedes' principle"). Found on 2026-09-24 by scanning the remaining headings for reference words.
 
@@ -191,6 +191,38 @@ A block is dropped entirely when it contains:
 | parentheses emptied by removed pronunciations | | `ବଙ୍ଗଳା ଭାଷା (),` → `ବଙ୍ଗଳା ଭାଷା,`; `(; বাংলা)` → `(বাংলা)` |
 
 **Wikitext headings that rendered as text** (`split_wiki_headings()`, since 2026-09-25). MediaWiki makes `== … ==` a heading only at the start of a line, so a heading typed mid-line stays literal: `… ଯୁଗ୍ମ ସଂଖ୍ୟା । '== ଗାଣିତିକ ଧର୍ମ ==`, `==ଭୂଗୋଳ==1947 ମସିହାରେ …`. Before cleaning, such a mark at the start of a paragraph or after a sentence end becomes a real heading (level = number of `=`), splitting the paragraph around it. A reference heading made this way (`==ଆଧାର==`) is dropped. Mid-sentence (`କୋଟାୟମ, ==ଜମ୍ମୁ କାଶ୍ମୀର==, ଅମରାବତୀ`) only the marks go. Headings with the marks inside (`###### == ଆଧାର ==`) lose them, and `heading_key()` ignores them, so the reference-section drop sees them. 21 articles; `check.py` now flags any `==…==` outside math.
+
+### Curated junk paragraphs
+
+**Rule** (`curation/junk-paragraphs.jsonl`, `load_curated()`, `drop_paragraphs()`, since 2026-09-25). Paragraphs judged by hand not to be content are dropped. Each line of the file holds:
+- `id` and `title` of the page
+- `sha1` of the paragraph's text in the corpus
+- `reason`
+- the `text` itself
+
+The build matches by content, so a decision survives rebuilds that shift paragraphs. A heading left empty goes too. The dropped paragraphs are listed in `removed-blocks.jsonl` (reason `curated: …`). An entry whose text is no longer in its article is counted in the build JSON (`curated.entries_not_found`) and printed, not applied.
+
+**How the list was made.** Every paragraph with no Odia letter was read in context: 577 in 164 articles, the English, Devanagari and other text below the English filter's thresholds. Kept, as names, titles and data (the policy for English lists and tables):
+- filmographies ("Loafer 1973", 99 lines in one article), book and documentary lists
+- Sanskrit, Hindi, Punjabi and Marathi verses and sample texts; Japanese song lyrics with their translation
+- code examples; chemical equations and formulas
+- isotope data; quote attributions ("— Mandela, 1994."); table and list labels ("Women's doubles", "Nominated:")
+
+Dropped, 189 paragraphs in 72 articles:
+
+| Reason | Paragraphs | Examples |
+|---|---:|---|
+| leaked template: life timeline | 52 | ଏକକୋଷୀ ଜୀବ: "This box:", "- view - talk - edit", axis ticks "-4500 —" … "0 —", era labels in letters stacked one per line |
+| pasted search-result snippet | 42 | a cluster of 14 stubs about Odia writers and radio singers built from search results: "1 Jul 2021 — …", "2) 1984 · ", OCR'd radio listings "8.30 A.M. Askaran Sharma : Recital …" |
+| colour legend of a table | 27 | "Old version / Latest version / Future release", "BWF Grand Prix Gold tournament", "Win Draw Loss Fixture": the colours they explain are gone |
+| fragment | 22 | "Fi", "I", "k", "uma", "g.", "times.", "x x x", kundali grid numbers, a lone English name before the lead |
+| citation or source line | 12 | "(Singh 2005, p. 191)", "Source: FIH", Ohm's publication details "(PDF, 11.2 MB)" |
+| template or markup residue | 10 | "{Use British English\|date=November 2011", "Documentationcreatepurge", "= 2", "!! Indian rivers" |
+| test edit or vandalism | 8 | "odia language", "how", "machha basasthan", "kebe arambha hoi thila", "pablish by …", a keyboard mash |
+| hatnote or cross-reference | 6 | "For the film, see Sivakasi (film).", "Education in Chhattisgarh", "See earlier section" |
+| coordinates, captions, adverts, other | 10 | "20°15′22″N 85°50′29″E /", "Religions of India", a bookshop advert, a garbled algorithm |
+
+Snippet paragraphs that are complete prose (with an elision "…") stay. 448 paragraphs with no Odia letter remain, all of the kept kinds. The review also found the section headings, superscripts and typed powers of ten described above.
 
 ### Digits to ASCII
 
@@ -576,7 +608,8 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
-- **2026-09-25: more reference sections, LaTeX superscripts, everything under 50 MB in git.**
+- **2026-09-25: junk paragraphs, more reference sections, LaTeX superscripts, everything under 50 MB in git.**
+  - All 577 paragraphs with no Odia letter reviewed by hand. 189 junk paragraphs in 72 articles are now dropped, each with its reason in `curation/junk-paragraphs.jsonl`. The rest are kept as names, titles and data.
   - "See also", further-reading and reference headings the rules missed are now dropped, the main one being ପୁନଶ୍ଚ ଦେଖଣା (276 articles, 246 Odia words).
   - Numeric superscripts (283) are written as LaTeX; powers of ten typed flat, "6.1 x 108", are repaired (13).
   - 18,695 articles (+2: the two "mostly English" pages lost their English bibliographies), 4,512,644 Odia words.

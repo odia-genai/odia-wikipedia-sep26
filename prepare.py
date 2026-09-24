@@ -1105,17 +1105,55 @@ def apply_review(text, review, counts):
     return "\n\n".join(keep)
 
 
+HEADING_LINE = re.compile(r"(#{1,6}) ")
+
+
 def para_sha1(q):
     return hashlib.sha1(q.encode()).hexdigest()
 
 
 def drop_paragraphs(paras, shas, keep_first):
-    """(kept, dropped): paras without those whose sha1 is in shas. keep_first: the first paragraph
-    (the # title) always stays."""
+    """(kept, dropped): paras without those whose sha1 is in shas, and without the headings that
+    leaves with no content before the next heading of the same or a higher level. keep_first: the
+    first paragraph (the # title) always stays."""
     kept, gone = [], []
     for i, q in enumerate(paras):
         (gone if (i or not keep_first) and para_sha1(q) in shas else kept).append(q)
+    if gone:
+        head, rest, out = kept[:1] if keep_first else [], kept[1:] if keep_first else kept, []
+        for q in reversed(rest):
+            m = HEADING_LINE.match(q)
+            if m and (not out or ((n := HEADING_LINE.match(out[-1])) and len(n.group(1)) <= len(m.group(1)))):
+                continue
+            out.append(q)
+        kept = head + out[::-1]
     return kept, gone
+
+
+# Curated junk (curation/junk-paragraphs.jsonl): paragraphs judged by hand not to be content, such
+# as test edits, colour legends of tables whose colours are gone, a leaked timeline template, pasted
+# search-result snippets. One line per paragraph: page id, sha1 of its text in the corpus, the reason
+# and the text itself. Matched by content, so a decision survives rebuilds that shift paragraphs; an
+# entry whose text is no longer in its article is reported, not applied.
+CURATED = ROOT / "curation" / "junk-paragraphs.jsonl"
+
+
+def load_curated(path=CURATED):
+    out = collections.defaultdict(dict)
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                e = json.loads(line)
+                out[e["id"]][e["sha1"]] = e["reason"]
+    return out
+
+
+def block_kind(q):
+    if HEADING_LINE.match(q):
+        return "heading"
+    if q.startswith("|"):
+        return "table"
+    return "list item" if re.match(r"\s*(?:- |\d+\. )", q) else "paragraph"
 
 
 # Boilerplate pages: articles that say nothing beyond their title. A "frame" is a paragraph with
@@ -1215,6 +1253,7 @@ def build(args):
     removed_blocks = []  # blocks taken out of articles: citations, junk, prose awaiting translation
     english_totals = collections.Counter()
     reviews = {} if args.no_reviews else load_reviews(args.reviews, DATASET)
+    curated, curated_counts, curated_stale = load_curated(), collections.Counter(), []
     review_counts = collections.Counter(articles_dropped=0, paragraphs_dropped=0, fix_pending=0,
                                         paragraph_refs_not_found=0)
 
@@ -1239,6 +1278,14 @@ def build(args):
         if info["disambiguation"]:
             exclude(a, "disambiguation")
             continue
+        if shas := curated.get(a["id"]):
+            paras, gone = drop_paragraphs(body.split("\n\n"), shas, keep_first=False)
+            body = "\n\n".join(paras)
+            curated_counts["paragraphs_dropped"] += len(gone)
+            curated_stale += [(a["id"], h[:10]) for h in set(shas) - {para_sha1(q) for q in gone}]
+            removed_blocks += [{"id": a["id"], "title": a["title"].translate(ODIA_DIGITS), "kind": block_kind(q),
+                                "reason": f"curated: {shas[para_sha1(q)]}", "text": q, "article_kept": True}
+                               for q in gone]
         english = info["english_removed"]
         if english and gutted(body, english):
             # Mostly English once citations and untranslated prose are out: an English page with an
@@ -1335,12 +1382,18 @@ def build(args):
         "articles_with_escapes": sum(bool(MD_ESCAPE.search(r["text"])) for r in records),
         "reviews": {"file": shown_path(args.reviews) if reviews else None, "articles_reviewed": len(reviews),
                     **review_counts},
+        "curated": {"file": str(CURATED.relative_to(ROOT)), "entries": sum(map(len, curated.values())),
+                    "paragraphs_dropped": curated_counts["paragraphs_dropped"],
+                    "entries_not_found": len(curated_stale)},
         "min_words": args.min_words, "min_chars": args.min_chars,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),  # titles: excluded.jsonl
     }
     (ROOT / f"{stem}-build.json").write_text(json.dumps(stats, indent=1, ensure_ascii=False) + "\n",
                                              encoding="utf-8")
     write_readme(stats, records, stem)
+    if curated_stale:
+        print(f"{len(curated_stale)} curated entries match no paragraph any more (text changed?): "
+              f"{curated_stale[:8]}", file=sys.stderr)
     print(f"{len(records):,} articles, {stats['words']:,} Odia words -> {jl.name}; "
           f"{len(excluded):,} excluded ({dict(dropped)}) -> excluded.jsonl", file=sys.stderr)
 
@@ -1436,6 +1489,7 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
 | `translations/english-to-odia.jsonl` | Odia translations of English paragraphs and headings, with source and checks |
+| `curation/junk-paragraphs.jsonl` | paragraphs judged by hand not to be content, with the reason; `build` drops them |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
@@ -1526,6 +1580,9 @@ A short example record:
      ({stats['cleanup_fixes'].get('superscripts as LaTeX', 0):,}). Flattened, they would read 1026 and
      km2. Powers of ten typed without the superscript upstream, `6.1 x 108`, become
      `$6.1 \\times 10^{{8}}$` ({stats['cleanup_fixes'].get('typed powers of ten as LaTeX', 0):,}).
+   - paragraphs judged by hand not to be content: test edits, colour legends of tables whose colours
+     are gone, a leaked timeline template, pasted search-result snippets
+     ({stats['curated']['paragraphs_dropped']:,}; each with its reason in `curation/junk-paragraphs.jsonl`)
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed ({stats['english']['removed_blocks'].get('citation', 0):,}), paragraphs and
      headings are replaced by their Odia translation ({stats['english'].get('translated', 0):,},

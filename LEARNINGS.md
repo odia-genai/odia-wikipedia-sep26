@@ -50,6 +50,7 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   `score --only-missing` pod run, about 60k tokens. Until then they are `bpb: null`
   (`build --allow-missing`, which the pipeline uses). A run 4 pod (RTX 4000 Ada, $0.28/h) was started and
   terminated after about 6 minutes (about $0.03) with nothing scored.
+- **Review the 574 paragraphs with no Odia letter — done 2026-09-25, see Data.**
 - **A per-source `--min-chars` in `cpt.py`** (2026-09-25). Its global `--min-chars 200` drops
   498 clean one-line fact articles from this corpus (chemical elements, blocks, capitals). A
   per-source threshold would keep them without admitting short web documents.
@@ -62,6 +63,21 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **Reading 577 odd paragraphs in context found three rule gaps bigger than the paragraphs**
+  (2026-09-25, owner's request to decide on the paragraphs with no Odia letter).
+  - ପୁନଶ୍ଚ ଦେଖଣା ("see also") heads 227 articles and wasn't recognised. Neither were several
+    further-reading, reference and misspelled external-link headings: 276 articles in all, only
+    246 Odia words under them.
+  - Superscripts were flattened: `10<sup>26</sup>` read "1026" and "30<sup>0</sup> ସେ." read "300 ସେ.",
+    so the numbers changed.
+  - Some editors typed the flattened form themselves ("6.1 x 108 ppb"). A repair rule must spare
+    real products like the power-station table's "2 x 105" (two 105 MW units).
+  - One leaked template (a life timeline, 52 paragraphs) and one editor's 14 stubs built from
+    search-result snippets and OCR'd radio listings.
+  - 189 paragraphs are junk; 448 are names, titles, verses, code and data, and stay.
+  — A hand review of an odd sample, in context, finds the rules' blind spots; pattern scans
+  only find what you already suspect. — done: `curation/junk-paragraphs.jsonl`, new
+  `DROP_SECTION_PATTERNS`, `Writer.superscript()`, `TYPED_POWER`.
 - **Unicode superscripts were the wrong fix** (2026-09-25, owner's feedback). They are rare
   characters that the tokenizer splits into bytes, and the corpus already writes math as `$…$`.
   — Match the corpus's own convention for notation. — done: superscripts are LaTeX
@@ -371,6 +387,12 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 - **A rarely run path read the dropped columns** (2026-09-25). `before_stats`, used only after a
   pod run, read bits and bytes from the paragraph file. — Search for readers as well as writers,
   and exercise rare paths with a fake run. — done: it reads the store.
+
+- **Hand decisions as data, keyed by content** (2026-09-25). `curation/junk-paragraphs.jsonl`
+  stores one line per dropped paragraph: page id, sha1 of the text, reason, and the text itself.
+  The build drops matches, removes headings left empty, and reports entries that no longer match
+  (0 of 189 now). — Keep decisions reviewable and stale-proof. — done: `drop_paragraphs()`,
+  shared with the reviewer drops, which now also remove headings left empty.
 
 - **Scores lived only in annotations and scratch dirs** (2026-09-25). A text that left the corpus
   lost its score, and run 1's raw pod output was lost with a scratch dir. — Keep every score
