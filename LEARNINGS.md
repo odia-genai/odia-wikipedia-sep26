@@ -67,10 +67,19 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **A response cut off mid-body crashed the render after 12 of 43 chunks** (2026-09-24). The
+  server closed a chunked response early, and `r.read()` raised `http.client.IncompleteRead`.
+  That is an `HTTPException`, not a `URLError`, so the retry clause missed it and the thread
+  pool re-raised it. The finished chunks were safe because each one is written atomically.
+  — Retry on every transient network error, not just the ones seen so far. A long run must
+  outlive any single request. — done: `NETWORK_ERRORS` = `URLError`, `HTTPException`,
+  `OSError` in `http_get()` and `fetch_html()`. A page that still fails is saved with status
+  0, and the next `render` refetches it.
 - **Wikimedia throttles bulk REST clients without contact details** (2026-09-24). With a
   user-agent that had no email, every request got HTTP 429 with `Retry-After` ~52 s. With
   contact details and 6 workers, `/w/rest.php/v1/revision/<id>/html` ran at 3.1–4.1 pages/s
-  with an occasional 429 (`Retry-After` 5–26 s). All 21k articles take ~1.5–2 h. — Always
+  with an occasional 429 (`Retry-After` 5–29 s). All 21,095 pages rendered with no failures in
+  about 2 h of fetching, plus one restart. The build then takes 34 s at 602 MB peak RSS. — Always
   include contact details for bulk Wikimedia work. — done: `ODIA_WIKI_CONTACT` env var (never
   stored in a file), and `Retry-After` is honoured.
 - **The pre-rendered HTML dumps are gone** (2026-09-24). The Enterprise HTML dumps on
