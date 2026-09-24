@@ -460,6 +460,8 @@ def tex_of(el):
         src = (m.get("alttext") or "") if m is not None else ""
         src = re.sub(r"^\{\\(?:displaystyle|textstyle)\s*(.*)\}$", r"\1", src.strip(), flags=re.S)
     data = el.get("data-mw") or ""
+    if (el.get("typeof") or "") == "mw:Extension/chem":  # <chem> is mhchem: its source goes in \ce{…}
+        src = "\\ce{" + src + "}"
     _MATH.append(['"display":"block"' in data.replace(" ", ""), SPACES.sub(" ", src)])
     return f"\ue000{len(_MATH) - 1}\ue001"
 
@@ -470,6 +472,7 @@ def put_math_back(text):
 
 
 SUP_TEXT = re.compile(r"[+\-\u2212\u2013]?[0-9\u0B66-\u0B6F]{0,4}[+\-\u2212n]?")  # 26, -7, 2+, +, n
+SUB_TEXT = re.compile(r"[0-9\u0B66-\u0B6F]{1,3}[A-Za-z]?|[A-Za-z]{1,6}|[0-9]?[+\-\u2212]")  # 2, 12, 1a, n, sol, +
 SUP_BASE = re.compile(r"(?<![\w.,])(?:([0-9\u0B66-\u0B6F]+(?:\.[0-9\u0B66-\u0B6F]+)?)\s?[x×*]\s?(?:10|୧୦)|"
                       r"([0-9\u0B66-\u0B6F]+(?:\.[0-9\u0B66-\u0B6F]+)?))$")  # "6×10", "10", "30"
 
@@ -506,7 +509,13 @@ class Writer:
             return
         tag, cls = el.tag, el.get("class") or ""
         if "mwe-math-element" in cls or (el.get("typeof") or "").startswith("mw:Extension/math"):
-            self.inline.append(tex_of(el))
+            slot = tex_of(el)
+            n = int(MATH_SLOT.fullmatch(slot).group(1))
+            if self.inline and (m := MATH_SLOT.fullmatch(self.inline[-1])) and not _MATH[n][0] \
+                    and not _MATH[int(m.group(1))][0]:  # two formulas side by side: one $…$, not $…$$…$
+                _MATH[int(m.group(1))][1] += " " + _MATH[n][1]
+            else:
+                self.inline.append(slot)
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6"):
             self.flush()
             self.children(el, True)
@@ -518,6 +527,8 @@ class Writer:
             self.inline.append("\x00")
         elif tag == "sup" and (sup := el.text_content().strip()) and SUP_TEXT.fullmatch(sup):
             self.superscript(sup)
+        elif tag == "sub" and (sub := el.text_content().strip()) and SUB_TEXT.fullmatch(sub):
+            self.subscript(sub)
         elif tag in BLOCK:
             if in_item:
                 self.inline.append(" ")
@@ -550,9 +561,28 @@ class Writer:
                 if len(last) > n:
                     self.inline.append(last[:-n])
                 n = max(0, n - len(last))
-        _MATH.append([False, f"{base}^{exp}"])
-        self.inline.append(f"\ue000{len(_MATH) - 1}\ue001")
+        self.inline_math(f"{base}^{exp}")
         FIX_COUNTS["superscripts as LaTeX"] += 1
+
+    def subscript(self, sub):
+        """A short subscript as LaTeX math attached to the text before it: H<sub>2</sub>O → H$_2$O,
+        x<sub>n</sub> → x$_n$, L<sub>sol</sub> → L$_{\\mathrm{sol}}$ (a word index is upright)."""
+        sub = sub.replace("\u2212", "-")
+        if re.fullmatch(r"[A-Za-z]{2,}", sub):
+            sub = "{\\mathrm{" + sub + "}}"
+        elif len(sub) > 1:
+            sub = "{" + sub + "}"
+        self.inline_math(f"_{sub}")
+        FIX_COUNTS["subscripts as LaTeX"] += 1
+
+    def inline_math(self, tex):
+        """Add inline math; right after another inline formula it joins that one, so
+        NO<sub>3</sub><sup>-</sup> is NO$_3^-$, not NO$_3$$^-$ (a $$ would open display math)."""
+        if self.inline and (m := MATH_SLOT.fullmatch(self.inline[-1])) and not _MATH[int(m.group(1))][0]:
+            _MATH[int(m.group(1))][1] += tex
+            return
+        _MATH.append([False, tex])
+        self.inline.append(f"\ue000{len(_MATH) - 1}\ue001")
 
     def children(self, el, in_item):
         if el.text:
@@ -1581,7 +1611,9 @@ A short example record:
      becomes `$10^{{26}}$` and `km<sup>2</sup>` becomes `km$^{{2}}$`
      ({stats['cleanup_fixes'].get('superscripts as LaTeX', 0):,}). Flattened, they would read 1026 and
      km2. Powers of ten typed without the superscript upstream, `6.1 x 108`, become
-     `$6.1 \\times 10^{{8}}$` ({stats['cleanup_fixes'].get('typed powers of ten as LaTeX', 0):,}).
+     `$6.1 \\times 10^{{8}}$` ({stats['cleanup_fixes'].get('typed powers of ten as LaTeX', 0):,}). Short
+     subscripts too: `H<sub>2</sub>O` becomes `H$_2$O`
+     ({stats['cleanup_fixes'].get('subscripts as LaTeX', 0):,}); chemistry markup is `$\\ce{{…}}$`
    - paragraphs judged by hand not to be content: test edits, colour legends of tables whose colours
      are gone, a leaked timeline template, pasted search-result snippets
      ({stats['curated']['paragraphs_dropped']:,}; each with its reason in `curation/junk-paragraphs.jsonl`)

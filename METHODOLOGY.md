@@ -148,6 +148,10 @@ Content headings that share a word stay, e.g. ଉତ୍ସବ ("festival"), ଖ�
 
 **Powers of ten typed without the superscript** (`TYPED_POWER`). Some editors typed the flattened form themselves: "6.1 x 108 ppb", "6×1021 ଟନ", "5.15×10-5". These become `$6.1 \times 10^{8}$` etc. (13) when the mantissa has a decimal point, or is one digit with a two-digit exponent. That leaves real products alone: the power-station table's "2 x 105" (two 105 MW units) stays.
 
+**Subscripts** (`Writer.subscript()`, owner's call, 2026-09-25). A short subscript is LaTeX too, attached to the text before it: `H<sub>2</sub>O` → `H$_2$O`, `B<sub>6</sub>` → `B$_6$`, `x<sub>n</sub>` → `x$_n$`, and a word index is upright, `L<sub>sol</sub>` → `L$_{\mathrm{sol}}$`. 303 in the corpus (most of the 5,610 in the HTML are in infoboxes, which are dropped). Greek, Odia and long subscripts stay flat.
+
+**Formulas side by side are one formula** (`Writer.inline_math()`). Without this, `NO<sub>3</sub><sup>−</sup>` would give `NO$_3$$^-$`, and the `$$` opens display math. So the pieces join, `NO$_3^-$`, and so do two `<math>` elements with nothing between them. `check.py` flags any `$…$$…$` left ("adjacent inline math"). MediaWiki's `<chem>` markup is mhchem: its source goes in `\ce{…}`, e.g. `$\ce{6CO2 + 6H2O -> C6H12O6 + 6O2}$` (3 formulas in 2 articles).
+
 **Why.** Flattened, `10<sup>26</sup>` reads "1026" and "30⁰ ସେ." reads "300 ସେ.": the number changes. Unicode superscripts (¹²³) were considered and rejected (owner's call): they are rare characters that the tokenizer splits into bytes, and the corpus already writes math as `$…$`.
 
 ### Lists and nesting
@@ -571,7 +575,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 
 ### Re-scoring
 
-**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. Plain `build` stops while any paragraph has no score. The pipeline runs `build --allow-missing` instead, which gives such paragraphs `bpb: null` (no percentile or flag, never in the review queue), counts them per article (`unscored_paragraphs`) and in `bpb.json` (`unscored`, with the pod command), and warns. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.paragraphs.jsonl` keeps only what isn't in the store (`bpb` and the derived columns); its sidecar declares a `joins` entry, and edaapp reads `score_run`, `bits`, `bytes`, `tokens` and `pieces` from the store by `para_sha1` (63.9 MB → 46.7 MB, under git's 50 MB rule). `annotations/bpb.json` keeps every run's record.
+**Rule.** A paragraph's bits per byte depends only on its own text, since it is scored from BOS, so scores carry over by `para_sha1`. `score_bpb.py score --only-missing` scores only texts without a score, and `build --add` merges them. Plain `build` stops while any paragraph has no score. The pipeline runs `build --allow-missing` instead, which gives such paragraphs `bpb: null` (no percentile or flag, never in the review queue), counts them per article (`unscored_paragraphs`) and in `bpb.json` (`unscored`, with the pod command), and warns. Since 2026-09-25, 319 texts in 233 articles are unscored: re-scoring was deferred by the owner after the superscript, subscript, heading and section changes. Since 2026-09-25 every text ever scored is kept in `raw/bpb/scores.jsonl.gz` (one row per `para_sha1`: bits, bytes, tokens, pieces and the run that scored it; 116,318 texts when seeded), so a text that leaves the corpus and comes back is never scored again, and `build` reads scores only from there. `annotations/bpb.paragraphs.jsonl` keeps only what isn't in the store (`bpb` and the derived columns); its sidecar declares a `joins` entry, and edaapp reads `score_run`, `bits`, `bytes`, `tokens` and `pieces` from the store by `para_sha1` (63.9 MB → 46.7 MB, under git's 50 MB rule). `annotations/bpb.json` keeps every run's record.
 
 **Effect.** After the cleanups, 143,357 of 144,751 paragraphs kept their scores.
 - 1,379 new texts (1,394 rows in 1,304 articles, 183,357 tokens) were scored on an RTX 4000 Ada, Secure, at $0.28/h: 25 s of GPU time and 5 minutes of pod time. The image was cached, so the pod was ready in 13 s.
@@ -597,7 +601,7 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 - **English lists and tables stay.** 5,754 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
 - **Topics.** The small topics have thin evidence (science and society 5/8 in the stratified check); `odisha` misses articles without categories; Wikidata was read live on 2026-09-24, not from a dump.
 - **Translation.** Untagged machine translation cannot be detected from the dumps.
-- **Some paragraph texts are not scored.** The wikitext-heading changes of 2026-09-25 made new texts, and re-scoring was deferred by the owner. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run fills them in.
+- **319 paragraph texts are not scored** (233 articles). The wikitext-heading, superscript, subscript and section changes of 2026-09-25 made new texts, and re-scoring was deferred by the owner. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run (about 60k tokens, seconds of GPU time) fills them in.
 - **bpb.** Per-paragraph ranks carry bf16 noise; short paragraphs (under 100 B) are only flagged through their article.
 - **Digits.** This corpus uses ASCII digits, but Sangraha, FineWeb-2, the eval sets and Odisha's textbooks use Odia digits; the same conversion in `cpt.py` and the eval prompts needs the owner's go-ahead.
 - **Held-out overlap.** `cpt.py` holds out 300 documents from the 2023 Wikipedia snapshot; newer revisions of the same articles are in this corpus. Exclude them before training on it.
@@ -611,7 +615,7 @@ Newest first.
 - **2026-09-25: junk paragraphs, more reference sections, LaTeX superscripts, everything under 50 MB in git.**
   - All 577 paragraphs with no Odia letter reviewed by hand. 189 junk paragraphs in 72 articles are now dropped, each with its reason in `curation/junk-paragraphs.jsonl`. The rest are kept as names, titles and data.
   - "See also", further-reading and reference headings the rules missed are now dropped, the main one being ପୁନଶ୍ଚ ଦେଖଣା (276 articles, 246 Odia words).
-  - Numeric superscripts (283) are written as LaTeX; powers of ten typed flat, "6.1 x 108", are repaired (13).
+  - Numeric superscripts (283) and short subscripts (303, `H$_2$O`) are written as LaTeX; powers of ten typed flat, "6.1 x 108", are repaired (13); `<chem>` is `\ce{…}`; formulas side by side join into one.
   - 18,695 articles (+2: the two "mostly English" pages lost their English bibliographies), 4,512,644 Odia words.
   - Two translation-table entries were re-keyed to their new LaTeX source text.
   - `bpb.paragraphs.jsonl` no longer repeats the score store; its bits, bytes, tokens, pieces and run are read from `raw/bpb/scores.jsonl.gz`.

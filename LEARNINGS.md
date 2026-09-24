@@ -83,6 +83,12 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   — Match the corpus's own convention for notation. — done: superscripts are LaTeX
   (`$10^{26}$`, `km$^{2}$`). The base is found across spans and in Odia digits, but never inside
   a formula ("NO<sub>3</sub><sup>−</sup>" is NO3$^-$, not NO$3^-$).
+- **Two formulas side by side become display math** (2026-09-25). With subscripts as LaTeX too
+  (owner's call), `NO<sub>3</sub><sup>−</sup>` gave `NO$_3$$^-$`. A `<chem>` formula followed by a
+  `<math>` element gave `…16$$\text{P}_i$` even before that. `$$` opens display math, and neither
+  the Markdown check nor pandoc flagged it. — New notation needs its own residue check. — done:
+  `Writer.inline_math()` joins adjacent inline formulas; `<chem>` is `\ce{…}`; `check.py`
+  flags "adjacent inline math".
 - **Changing a source text orphans its translation** (2026-09-25). The superscript rule changed
   two English blocks, so their translations (keyed by the block's sha1) stopped matching. They
   showed up as "awaiting translation". — Check `removed-blocks.jsonl` for "awaiting translation"
