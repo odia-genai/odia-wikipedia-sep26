@@ -469,6 +469,11 @@ def put_math_back(text):
                          .format(_MATH[int(m.group(1))][1].translate(ODIA_DIGITS)), text)
 
 
+SUP_TEXT = re.compile(r"[+\-\u2212\u2013]?[0-9\u0B66-\u0B6F]{0,4}[+\-\u2212n]?")  # 26, -7, 2+, +, n
+SUP_BASE = re.compile(r"(?<![\w.,])(?:([0-9\u0B66-\u0B6F]+(?:\.[0-9\u0B66-\u0B6F]+)?)\s?[x×*]\s?(?:10|୧୦)|"
+                      r"([0-9\u0B66-\u0B6F]+(?:\.[0-9\u0B66-\u0B6F]+)?))$")  # "6×10", "10", "30"
+
+
 class Writer:
     """Walks the DOM and collects blocks (kind, level, prefix, text): kind is "h" (heading of
     that level), "p" (paragraph), "li" (list item; prefix is its indent and marker) or "t"
@@ -511,6 +516,8 @@ class Writer:
             self.walk_list(el, "")
         elif tag == "br":
             self.inline.append("\x00")
+        elif tag == "sup" and (sup := el.text_content().strip()) and SUP_TEXT.fullmatch(sup):
+            self.superscript(sup)
         elif tag in BLOCK:
             if in_item:
                 self.inline.append(" ")
@@ -524,6 +531,28 @@ class Writer:
             self.children(el, in_item)
         if el.tail:
             self.inline.append(el.tail)
+
+    def superscript(self, sup):
+        """A numeric superscript as LaTeX math, like the rest of the corpus's math. Flattened,
+        10<sup>26</sup>, 30<sup>0</sup> (degrees) and km<sup>2</sup> read 1026, 300 and km2 and change
+        the number. A number just before it becomes the base, $10^{26}$; otherwise the superscript
+        attaches to the text before it, km$^{2}$, β$^{+}$."""
+        exp = sup.replace("\u2212", "-").replace("\u2013", "-")
+        exp = exp if len(exp) == 1 else "{" + exp + "}"
+        base = ""
+        # the base is a whole number just before it, even across spans ("5.15", "×", "10"); in
+        # "NO<sub>3</sub><sup>-</sup>" the 3 belongs to NO, so the charge attaches to the text
+        if m := SUP_BASE.search("".join(self.inline[-6:])):
+            base = f"{m.group(1)} \\times 10" if m.group(1) else m.group(2)  # 6×10<sup>21</sup>
+            n = len(m.group(0))
+            while n:  # take the base's characters off the end of the text runs
+                last = self.inline.pop()
+                if len(last) > n:
+                    self.inline.append(last[:-n])
+                n = max(0, n - len(last))
+        _MATH.append([False, f"{base}^{exp}"])
+        self.inline.append(f"\ue000{len(_MATH) - 1}\ue001")
+        FIX_COUNTS["superscripts as LaTeX"] += 1
 
     def children(self, el, in_item):
         if el.text:
@@ -776,6 +805,21 @@ ODIA_DIGIT = re.compile("[\u0b66-\u0b6f]")
 DIGITS_CONVERTED = [0]  # Odia digits converted to ASCII in this build, for the statistics
 
 
+# Powers of ten typed without the superscript upstream: "6.1 x 108 ppb", "6×1021 ଟନ", "5.15×10-5".
+# Only a decimal mantissa, or one digit with a two-digit exponent, reads as a power of ten: the
+# power-station table's "2 x 105" (two 105 MW units) is a real product and stays.
+TYPED_POWER = re.compile(r"(?<![\d.,])(\d+(?:\.\d+)?)\s?[x×*]\s?10([-\u2212]?[1-9]\d?)(?!\d)(?![.,]\d)")
+
+
+def typed_power(m):
+    mantissa, exp = m.group(1), m.group(2).replace("\u2212", "-")
+    if "." not in mantissa and (len(mantissa) > 1 or len(exp.lstrip("-")) < 2):
+        return m.group(0)
+    _MATH.append([False, f"{mantissa} \\times 10^{{{exp}}}"])
+    FIX_COUNTS["typed powers of ten as LaTeX"] += 1
+    return f"\ue000{len(_MATH) - 1}\ue001"
+
+
 def clean_block(block, cell=False):
     """Clean one block's text (not its prefix) and escape it for Markdown; "" drops it."""
     kind, level, prefix, text = block
@@ -785,6 +829,7 @@ def clean_block(block, cell=False):
     # not a numbered list.
     DIGITS_CONVERTED[0] += len(ODIA_DIGIT.findall(text))
     text = fix_residue(text.translate(ODIA_DIGITS))
+    text = TYPED_POWER.sub(typed_power, text)
     if not text:
         return kind, level, prefix, ""
     # Broken [[File:...|thumb|...]] or table markup that rendered as text; punctuation alone.
@@ -1472,9 +1517,15 @@ A short example record:
    - conversion leftovers found by the review queue: Content Translation `<a href=… cx-link>` tags,
      raw `{{| … |}}` wikitable text, template parameters shown as text (`Quote box|width=…`), HTML
      attributes, `Category:` text, and the entities `&amp;` / `&#13;`
-     ({sum(v for k, v in stats['cleanup_fixes'].items() if not k.startswith(('typo', '_', 'wikitext'))):,} fixes)
+     ({sum(v for k, v in stats['cleanup_fixes'].items() if not k.startswith(('typo', '_', 'wikitext'))
+          and 'LaTeX' not in k):,} fixes)
    - wikitext headings typed mid-line (`… । == ଇତିହାସ ==`) become real headings
      ({stats['cleanup_fixes'].get('wikitext heading', 0):,})
+   - numeric superscripts are written as LaTeX math, like the rest of the math: `10<sup>26</sup>`
+     becomes `$10^{{26}}$` and `km<sup>2</sup>` becomes `km$^{{2}}$`
+     ({stats['cleanup_fixes'].get('superscripts as LaTeX', 0):,}). Flattened, they would read 1026 and
+     km2. Powers of ten typed without the superscript upstream, `6.1 x 108`, become
+     `$6.1 \\times 10^{{8}}$` ({stats['cleanup_fixes'].get('typed powers of ten as LaTeX', 0):,}).
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed ({stats['english']['removed_blocks'].get('citation', 0):,}), paragraphs and
      headings are replaced by their Odia translation ({stats['english'].get('translated', 0):,},

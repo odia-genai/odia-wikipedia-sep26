@@ -62,6 +62,16 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **Unicode superscripts were the wrong fix** (2026-09-25, owner's feedback). They are rare
+  characters that the tokenizer splits into bytes, and the corpus already writes math as `$…$`.
+  — Match the corpus's own convention for notation. — done: superscripts are LaTeX
+  (`$10^{26}$`, `km$^{2}$`). The base is found across spans and in Odia digits, but never inside
+  a formula ("NO<sub>3</sub><sup>−</sup>" is NO3$^-$, not NO$3^-$).
+- **Changing a source text orphans its translation** (2026-09-25). The superscript rule changed
+  two English blocks, so their translations (keyed by the block's sha1) stopped matching. They
+  showed up as "awaiting translation". — Check `removed-blocks.jsonl` for "awaiting translation"
+  after any cleaning change. — done: both entries re-keyed.
+
 - **Year pages were 9% of the articles and almost no content** (2026-09-25, owner's decision
   to drop them).
   - 1,864 year pages: 1,766 have no Odia word outside sentence frames repeated in 5 or more

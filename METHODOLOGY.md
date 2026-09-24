@@ -142,6 +142,14 @@ Content headings that share a word stay, e.g. ଉତ୍ସବ ("festival"), ଖ�
 
 **Why.** Every cleaning pass would otherwise run over TeX: `x^{{2}}` and `f''` would lose braces and primes to the wikitext-residue rule, and bracketed numbers to the citation rule. The dump has 414 formulas in 43 pages; the corpus has 108 math paragraphs.
 
+### Superscripts as LaTeX
+
+**Rule** (`Writer.superscript()`, since 2026-09-25). A numeric superscript (digits with an optional sign, `n`) is written as LaTeX math, like the rest of the corpus's math. A number just before it becomes the base, even across spans and in Odia digits: `10<sup>26</sup>` → `$10^{26}$`, `6×10<sup>21</sup>` → `$6 \times 10^{21}$`, `30<sup>0</sup>` (degrees) → `$30^0$`. Otherwise the superscript attaches to the text before it: `km<sup>2</sup>` → `km$^{2}$`, `NO<sub>3</sub><sup>−</sup>` → `NO3$^-$`. 283 superscripts.
+
+**Powers of ten typed without the superscript** (`TYPED_POWER`). Some editors typed the flattened form themselves: "6.1 x 108 ppb", "6×1021 ଟନ", "5.15×10-5". These become `$6.1 \times 10^{8}$` etc. (13) when the mantissa has a decimal point, or is one digit with a two-digit exponent. That leaves real products alone: the power-station table's "2 x 105" (two 105 MW units) stays.
+
+**Why.** Flattened, `10<sup>26</sup>` reads "1026" and "30⁰ ସେ." reads "300 ସେ.": the number changes. Unicode superscripts (¹²³) were considered and rejected (owner's call): they are rare characters that the tokenizer splits into bytes, and the corpus already writes math as `$…$`.
+
 ### Lists and nesting
 
 **Rule.** Items get `- ` or `1. `; a sublist is indented to its parent's content column (2 spaces under `- `, 3 under `1. `), and continuation lines line up with the item's text (`Writer.walk_list()`). An item that holds only a sublist is skipped as a level, so the indentation never jumps.
@@ -568,9 +576,11 @@ Details and the history of each issue are in `LEARNINGS.md`.
 
 Newest first.
 
-- **2026-09-25: more reference sections, everything under 50 MB in git.**
+- **2026-09-25: more reference sections, LaTeX superscripts, everything under 50 MB in git.**
   - "See also", further-reading and reference headings the rules missed are now dropped, the main one being ପୁନଶ୍ଚ ଦେଖଣା (276 articles, 246 Odia words).
+  - Numeric superscripts (283) are written as LaTeX; powers of ten typed flat, "6.1 x 108", are repaired (13).
   - 18,695 articles (+2: the two "mostly English" pages lost their English bibliographies), 4,512,644 Odia words.
+  - Two translation-table entries were re-keyed to their new LaTeX source text.
   - `bpb.paragraphs.jsonl` no longer repeats the score store; its bits, bytes, tokens, pieces and run are read from `raw/bpb/scores.jsonl.gz`.
   - Every file under 50 MB in this folder is tracked in git (the corpus JSONL, 96 MB, is rebuilt by `pipeline.py`).
 
