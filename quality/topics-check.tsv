@@ -1,0 +1,299 @@
+# Precision check of annotations/topics.parquet, labelled by reading each article's title and lead only,
+# independently of the classifier. topics = acceptable primary topics. set: dev = 120 random corpus articles
+# (random.Random(20260924).sample of the sorted ids) used while tuning the rules; test = 100 more
+# (random.Random(20260925), excluding dev) labelled after the rules were frozen.
+# stratified = 8 articles predicted as each of 9 small topics (random.Random(20260926), excluding dev and test),
+# labelled after the rules were frozen; it measures precision per topic, not overall.
+id	title	set	topics	is_person	odisha	note
+6910	୧୯୪୬	dev	calendar	0	0	year page
+92575	ସାରେସାଇକ୍ଲିନ	dev	health	0	0	antibiotic for acne
+100571	ନାରୀ ଶକ୍ତି ବନ୍ଦନ ଅଧିନିୟମ	dev	politics,society	0	0	women's reservation act
+34676	୧୨୬୫	dev	calendar	0	0	year page
+94226	ଆଦିକନ୍ଦ ସାହୁ	dev	literature	1	1	Odia poet and critic
+95046	ଗଙ୍ଗାଡ଼ି ବୋଲି	dev	literature	0	0	dialect of Garhwali
+16419	ଶ୍ରୀମଦ୍ଭଗବତ୍ଗୀତା	dev	religion,literature	0	0	Bhagavad Gita
+77460	ସଚ୍ଚିଦାନନ୍ଦ ଦେଓ	dev	politics	1	1	Odia politician, MLA
+57137	ମୁସ୍ତାକ ଅଲି	dev	sports	1	0	Indian cricketer
+68543	ଉଚ୍ଚତା ବେମାରୀ	dev	health	0	0	altitude sickness
+79318	ମଦ୍ୟପାନ ଜନିତ ଯକୃତ ରୋଗ	dev	health	0	0	alcoholic liver disease
+91942	ଲିକ୍ସିସେନାଟାଇଡ	dev	health	0	0	diabetes drug
+63295	ନାକ ଅସ୍ଥି ଭଗ୍ନ	dev	health	0	0	nasal fracture
+65242	ରାକ୍ଷୀ ଭିଜିଗଲା ଆଖି ଲୁହରେ	dev	film	0	1	1999 Odia film
+79131	ମୁକ୍ତା ଝୋଡ଼ିଆ	dev	society	1	1	Adivasi rights activist, Rayagada
+92088	ସିପୋନିମୋଡ	dev	health	0	0	multiple sclerosis drug
+53207	ଦକ୍ଷିଣକାଳୀ ମନ୍ଦିର	dev	religion	0	1	Kali temple, Puri
+16526	ଝୁଲଣ ଯାତ୍ରା	dev	religion,arts	0	1	festival at the Puri temple
+56356	ମାଶୋବ୍ରା	dev	geography	0	0	town, Himachal Pradesh
+47030	କଡ଼ି, ଗୁଜରାଟ	dev	geography	0	0	town, Gujarat
+56468	ସମନୁ	dev	arts	0	0	Iranian sweet
+11463	କଟକ (ଲୋକ ସଭା ନିର୍ବାଚନ ମଣ୍ଡଳୀ)	dev	politics	0	1	Lok Sabha constituency
+24692	ବନ୍ଧୁଗାଁ	dev	geography	0	1	gram panchayat and tehsil, Koraput
+97042	ଅଲିଶା ସିଂହ	dev	film,arts	1	0	actress and dancer
+69061	ଜରାୟୁ ସ୍ଖଳନ	dev	health	0	0	uterine prolapse
+81882	କୁରୁକ୍ଷେତ୍ର (ଟେଲି ଫିଲ୍ମ)	dev	film	0	1	Odia telefilm
+61871	ଏସିପି ସାଗରିକା	dev	film	0	1	2013 Odia film
+20350	ରବୀନ୍ଦ୍ରନାଥ ଠାକୁର	dev	literature	1	0	Rabindranath Tagore
+55423	ଜଗା ହାତରେ ପଘା (୨୦୧୫)	dev	film	0	1	2015 Odia film
+81282	ପି ସି ଆଇ ଏକ୍ସପ୍ରେସ	dev	technology	0	0	PCI Express
+48436	ପୁରଣପୁର	dev	geography	0	0	town, Uttar Pradesh
+85731	ଅନିରୁଦ୍ଧ ଅଗ୍ରୱାଲ	dev	film	1	0	Indian actor
+97609	କ୍ରାଫୋର୍ଡ ମାର୍କେଟ୍	dev	geography,economy,history	0	0	market building, Mumbai
+84684	ଅମଲା ଶଙ୍କର	dev	arts	1	0	dancer
+80941	ଫ୍ୟାଟ ଏମ୍ବୋଲିଜ୍ମ ସିଣ୍ଡ୍ରୋମ	dev	health	0	0	fat embolism syndrome
+80347	ତଥ୍ୟ ନିରାପତ୍ତା	dev	technology	0	0	information security
+78180	ଗଜାନନ ନାୟକ	dev	politics	1	1	Odia politician, MLA
+79647	ଭରତ ଚନ୍ଦ୍ର ହୋତା	dev	politics	1	1	Odia politician, MLA
+57091	ହରମିକ ସିଂହ	dev	sports	1	0	hockey player
+11848	ଚତୁର୍ଥୀ	dev	calendar,religion	0	0	lunar day (tithi)
+94190	ଲଲାଟେନ୍ଦୁ ରଥ	dev	literature,arts	1	1	Odia playwright, actor, painter
+35398	୧୯୮୬	dev	calendar	0	0	year page
+92879	ଗ୍ଲାସଡେଗିବ	dev	health	0	0	leukaemia drug
+71817	ଶାନ୍ତନୁ କୁମାର ଦାସ	dev	politics	1	1	Odia politician, minister
+98240	ନାରାୟଣ ଗୁରୁ	dev	religion,society	1	0	Narayana Guru, philosopher and reformer
+75221	ପାଇକ ବିଦ୍ରୋହ (କ୍ଷୁଦ୍ର ଚଳଚ୍ଚିତ୍ର)	dev	film	0	1	Odia short film
+32383	୧୯ ମାର୍ଚ୍ଚ	dev	calendar	0	0	date page
+85892	କଳ୍ପନା ଦତ୍ତ	dev	history	1	0	freedom fighter
+56945	ପେଟିଏମ	dev	economy,technology	0	0	Paytm
+40510	୨୫ ଅଗଷ୍ଟ	dev	calendar	0	0	date page
+80661	ବିଶ୍ଵ ସ୍ତନ୍ୟପାନ ସପ୍ତାହ	dev	health,calendar	0	0	World Breastfeeding Week
+87742	ନିମୋଡିପାଇନ	dev	health	0	0	drug
+95555	ପେଗୁନିଗାଲସିଡେଜ ଆଲଫା	dev	health	0	0	drug
+76358	ଜାତୀୟ ସଂସଦ (ଜାପାନ)	dev	politics	0	0	Japanese parliament
+86290	ଫଟା କପାଳ	dev	film	0	1	Odia telefilm
+52499	ମଥୁରା ପେଡ଼ା	dev	arts	0	0	Mathura peda, sweet
+32380	୧୬ ମାର୍ଚ୍ଚ	dev	calendar	0	0	date page
+8029	ଟୋପାଏ ସିନ୍ଦୂର ଦି ପଟ ଶଙ୍ଖା	dev	film	0	1	1989 Odia film
+83972	କାଳୀକା ମାତା ମନ୍ଦିର, ପଭଗଡ଼	dev	religion	0	0	temple, Pavagadh
+48552	ସାଦାବାଦ, ଉତ୍ତର ପ୍ରଦେଶ	dev	geography	0	0	town, Uttar Pradesh
+96888	ଜମ୍ମୁ ଓ କାଶ୍ମୀର ଉଚ୍ଚ ନ୍ୟାୟାଳୟ	dev	politics	0	0	high court
+58302	ଚିତ୍ତରଞ୍ଜନ ପାର୍କ କାଳୀ ମନ୍ଦିର	dev	religion	0	0	Kali temple, Delhi
+75620	ଅଭିନିବେଶ ଅର୍ଥନୀତି	dev	economy	0	0	attention economics
+28351	ଡୁଡୁକାଠେଙ୍ଗା	dev	geography	0	1	village, Kalahandi
+34069	୬୮୭	dev	calendar	0	0	year page
+79330	ଗଲୁ	dev	health	0	0	itch
+34444	୧୦୩୪	dev	calendar	0	0	year page
+8125	ଓଡ଼ିଶା ପ୍ରିମିଅର ଲିଗ	dev	sports	0	1	Odisha Premier League, cricket
+3179	ଲିଙ୍ଗରାଜ ମନ୍ଦିର	dev	religion,history	0	1	Lingaraj temple
+60228	ଦୀକ୍ଷା ସେଠ	dev	film	1	0	actress and model
+74059	ଶରତ ଚନ୍ଦ୍ର ପାଇକରାୟ	dev	politics	1	1	Odia politician, MLA
+45308	କୋଚିଲାଖାଇ	dev	biology	0	0	Indian grey hornbill
+70029	ଆଟୋମେକ୍ସେଟିନ	dev	health	0	0	ADHD drug
+93869	ସୋଡ଼ିଅମ ଫିନାଇଲଆସେଟେଟ/ସୋଡ଼ିଅମ ବେଞ୍ଜୋଏଟ	dev	health	0	0	drug
+100635	ମେମ୍‌ସାହାବ୍	dev	film	0	1	2026 Odia film
+98820	ନରୱେଜିଆନ ଉଇକିପିଡ଼ିଆ	dev	technology,literature	0	0	Norwegian Wikipedia
+65769	ନିର୍ବାଚନ (ଓଡ଼ିଆ କଥାଚିତ୍ର)	dev	film	0	1	1994 Odia film
+95678	ଅନୁପ ଦେବ	dev	politics	1	1	judge, also of the Odisha High Court
+83674	ଜିଙ୍କ ଅଭାବ	dev	health	0	0	zinc deficiency
+47630	ପ୍ରାକ୍ ଋତୁସ୍ରାବ ଲକ୍ଷଣପୁଞ୍ଜ	dev	health	0	0	premenstrual syndrome
+84398	ସୁଚିତ୍ରା ଭଟ୍ଟାଚାର୍ଯ୍ୟ	dev	literature	1	0	Bengali novelist
+48426	ପ୍ରୋଡ୍‌ଡୁ‌ଟୁରୁ	dev	geography	0	0	town, Andhra Pradesh
+69493	ବ୍ୟୁପ୍ରୋପିଅନ	dev	health	0	0	antidepressant
+16786	ଅଶୋକ (ଗଛ)	dev	biology	0	1	Ashoka tree, Odisha's state flower
+89624	ହେକ୍ସାକ୍ଲୋରୋଫିନ	dev	health	0	0	antiseptic
+59878	ଆଲିଆ ଭଟ୍ଟ	dev	film	1	0	Alia Bhatt
+69941	ଶାନ୍ତି ଦେବୀ (ଓଡ଼ିଆ ରାଜନୀତିଜ୍ଞ)	dev	politics	1	1	Odia politician, queen of Dharakot
+95471	ଓଲୁଟାସିଡେନିବ	dev	health	0	0	leukaemia drug
+7905	ଗୋପାଳ ଚନ୍ଦ୍ର ପ୍ରହରାଜ	dev	literature	1	1	Gopal Chandra Praharaj, lexicographer
+28927	ଋତୁସ୍ରାବ	dev	health,biology	0	0	menstruation
+98583	ରାଜେନ୍ଦ୍ର ମଲ ଲୋଧା	dev	politics	1	0	Chief Justice of India
+54379	ବିଷ	dev	health,biology,science	0	0	poison
+84026	ପର୍ଶୁରାମ କୁଣ୍ଡ	dev	religion,geography	0	0	pilgrimage site, Arunachal
+60710	ଦେବାଶିଷ ସାମନ୍ତରାୟ	dev	literature	1	1	Odia story writer and novelist
+72614	ମଲ୍ଲିକା ସରାଭାଇ	dev	arts,film,society	1	0	classical dancer, actress, activist
+69221	ଗୁରୁଚରଣ ନାଏକ	dev	politics	1	1	politician, Keonjhar MP
+86114	ସାତକୋଶିଆ ବାଘ ଅଭୟାରଣ୍ୟ	dev	biology,geography	0	1	Satkosia tiger reserve
+1929	ଜାପାନ	dev	geography	0	0	Japan
+34870	୧୪୪୯	dev	calendar	0	0	year page
+58717	ପଦ୍ମଜା ନାଇଡୁ	dev	politics,history	1	0	Padmaja Naidu, politician
+7996	ଯମେଶ୍ୱର ମିଶ୍ର	dev	literature	1	1	Odia novelist
+26453	ଘସିପୁରା (ବିଧାନ ସଭା ନିର୍ବାଚନ ମଣ୍ଡଳୀ)	dev	politics	0	1	assembly constituency, Keonjhar
+58221	ଖଣ୍ଡପଡ଼ା ଗଡ଼ଜାତ ରାଜ୍ୟ	dev	history,geography	0	1	Khandapada princely state
+98384	ବ୍ରହ୍ମାଣ୍ଡ ପୁରାଣ	dev	religion,literature	0	0	Brahmanda Purana
+47215	ମାର୍ହାଉରା	dev	geography	0	0	town, Bihar
+29305	ଜନଜାତି ସଂଗ୍ରହାଳୟ	dev	arts,society,education	0	1	Odisha State Tribal Museum
+87262	ଅଖିଳ ଭାରତୀୟ ମୁସଲିମ ଲିଗ	dev	politics,history	0	0	All-India Muslim League
+34263	୮୬୧	dev	calendar	0	0	year page
+16814	ଡାହୁକ ବୋଲି	dev	religion,arts	0	1	songs of the Rath Yatra
+98569	ସାମ୍‌ ପିରୋଜ୍ ଭରୁଚା	dev	politics	1	0	Chief Justice of India
+93220	ଇନୋଟର୍ସେନ	dev	health	0	0	drug
+100405	ଅଜୟ ପ୍ରଧାନ	dev	literature	1	1	Odia poet
+8475	ଗୌରୀ (୧୯୭୯ର ସିନେମା)	dev	film	0	1	1979 Odia film
+59440	ଅଶ୍ୱିନୀ ପୋନାପ୍ପା	dev	sports	1	0	badminton player
+65429	କୁଣ୍ଡାଖିଆ ଚଢ଼େଇ	dev	biology	0	0	jungle babbler
+19537	ଶ୍ରୀ ଅରବିନ୍ଦ	dev	religion,history,literature	1	0	Sri Aurobindo
+12684	ନିଷିଦ୍ଧ ସ୍ୱପ୍ନ	dev	film	0	1	1988 Odia film
+85543	ରାଣୀ ଅବନ୍ତୀବାଈ	dev	history	1	0	Rani Avantibai, 1857 rebel
+25301	ଟୁସର	dev	geography	0	1	village, Angul
+47480	ପେରାବୁରାନି	dev	geography	0	0	town, Tamil Nadu
+63009	ତୁ ମୋରି ପାଇଁ	test	film	0	1	2009 Odia film
+34194	୭୯୨	test	calendar	0	0	year page
+87081	ବାସୁ ଇନ୍ତୁରୀ	test	film	1	0	Telugu actor and writer
+32382	୧୮ ମାର୍ଚ୍ଚ	test	calendar	0	0	date page
+78331	ବୃକ୍‌କ କର୍କଟ	test	health	0	0	kidney cancer
+95112	ବିଦ୍ୟାଧର ମିଶ୍ର	test	economy,literature,education	1	1	Odia economist, educationist, essayist
+99326	ମିମି ଚକ୍ରବର୍ତ୍ତୀ	test	film,politics	1	0	Bengali actress, singer, politician
+51470	ରୁବେଲା ଟିକା	test	health	0	0	rubella vaccine
+95143	ସୂର୍ଯ୍ୟମଣି ସାମନ୍ତରାୟ	test	literature	1	1	Odia poet and story writer
+84211	ଟିର୍ଜେପାଟାଇଡ	test	health	0	0	diabetes drug
+72015	ଦୁଃଶାସନ ଜେନା	test	politics	1	1	Odia politician, MLA
+23543	କୈଳାଶ ଚନ୍ଦ୍ର ମେହେର	test	arts	1	1	painter on tussar silk
+88405	ହରିପୁରା	test	geography,history	0	0	village in Gujarat, 1938 Congress session
+56475	ଆରବ ସାଗର	test	geography	0	0	Arabian Sea
+2370	୨୬୫	test	calendar	0	0	year page
+58770	ସୁଚେତା କୃପାଲାନି	test	politics,history	1	0	Sucheta Kriplani
+2402	୨୯୭	test	calendar	0	0	year page
+65228	ଶିବା (୧୯୮୯ର ତେଲୁଗୁ ଚଳଚ୍ଚିତ୍ର)	test	film	0	0	1989 Telugu film
+52073	ଛେଣ୍ଡ କଲୋନୀ	test	geography	0	1	residential area, Rourkela
+99285	ଲରେଲ୍ ହେଷ୍ଟର	test	society,politics	1	0	police lieutenant, rights campaign
+97739	ପୌଲମି ଦାସ	test	film	1	0	TV actress and model
+48642	ସେଓନି	test	geography	0	0	town, Madhya Pradesh
+81022	ଭେଦ	test	literature	0	1	Odia novel
+96456	ସାମୁଏଲ୍‌ ଜନ୍‌ସନ୍‌	test	literature	1	0	Samuel Johnson
+2245	୧୪୦	test	calendar	0	0	year page
+29417	ରଜନୀ ଭିସେ	test	science,literature	1	0	Rajani Bhisey, scientist's memoir excerpt
+45496	ବାଧାପ୍ରାପ୍ତ ପ୍ରସବ	test	health	0	0	obstructed labour
+86003	ନାଲବୁଫାଇନ	test	health	0	0	opioid drug
+55508	ନରେନ୍ଦ୍ର ହିରବାନୀ	test	sports	1	0	cricketer
+95719	ଅଶୋକ କୁମାର ସାମନ୍ତରାୟ	test	politics	1	1	lawyer, Odisha High Court judge
+76300	ସଲମା ବେଗମ ସୁଜାତା	test	film	1	0	Bangladeshi actress
+62307	ଦୁର୍ଗା ସାଗର	test	geography	0	0	lake, Bangladesh
+46929	ଚିତ୍ତୋର-ଥାଥାମଙ୍ଗଳମ୍	test	geography	0	0	municipality, Kerala
+50794	ଗୋସାଣୀ ଯାତ୍ରା	test	religion,arts	0	1	Gosani Yatra festival, Puri
+50867	ତପନ ମିଶ୍ର	test	science,technology	1	1	ISRO scientist from Rayagada
+77669	ଫକୀର ଚରଣ ଦାସ	test	politics	1	1	Odia politician, MLA
+85322	ପୂଙ୍ଗାନି	test	arts	1	0	Tamil folk singer
+80064	ଇଏ ବି ଗୋଟେ ଲଭ୍ ଷ୍ଟୋରୀ	test	film	0	1	2021 Odia film
+9320	ନବକଳେବର	test	religion	0	1	Nabakalebara
+20609	ଷଡ଼ଭୁଜ ଗୌରାଙ୍ଗ ମନ୍ଦିର	test	religion	0	1	temple in the Puri temple complex
+25298	କୃତ୍ତିବାସପୁର	test	geography	0	1	village, Angul
+58030	ନେଭିରାପିନ	test	health	0	0	HIV drug
+81207	ଲୋସାର୍ଟାନ/ହାଇଡ୍ରୋକ୍ଲୋରୋଥିଆଜାଇଡ	test	health	0	0	blood-pressure drug
+35004	୧୫୮୩	test	calendar	0	0	year page
+57518	ଦିଲ୍ଲୀ ଫରିଦାବାଦ ଆକାଶପଥ	test	geography,technology	0	0	elevated road, Delhi
+44535	ଅଙ୍କୋସର୍ସିଆସିସ	test	health	0	0	river blindness
+81203	ଟେରାଜୋସିନ	test	health	0	0	drug
+77385	ବିକ୍ରମ କେଶରୀ ଆରୁଖ	test	politics	1	1	Odia politician, MLA
+67631	ସୁବର୍ଣ୍ଣା ମୁସ୍ତଫା	test	film	1	0	Bangladeshi actress
+34376	୯୭୪	test	calendar	0	0	year page
+78529	କ୍ଷଣସ୍ଥାୟୀ ଅଳ୍ପରକ୍ତ‌ତା ଆକ୍ରମଣ	test	health	0	0	transient ischemic attack
+73019	କାମଧେନୁ	test	religion	0	0	Kamadhenu
+93457	ସାରଦା ପ୍ରସାଦ ପ୍ରଧାନ	test	politics	1	1	Odia politician, MLA
+67882	ଶିଶୁ ଶ୍ରମିକ ନିରୋଧ ଦିବସ	test	calendar,society	0	0	World Day Against Child Labour
+84442	ଜାମିଦା ବିବି	test	society,religion	1	0	activist, Kerala
+91577	ମାଭାକାମ୍ଟେନ	test	health	0	0	heart drug
+92661	ଟିଭୋଜାନିବ	test	health	0	0	cancer drug
+15494	ଭୁବନେଶ୍ୱର (ଲୋକ ସଭା ନିର୍ବାଚନ ମଣ୍ଡଳୀ)	test	politics	0	1	Lok Sabha constituency
+11786	ରସାୟନ ବିଜ୍ଞାନ	test	science	0	0	chemistry
+87757	କର୍ତ୍ତବ୍ୟ	test	film	0	1	2023 Odia film
+98168	ବାଳକାଣ୍ଡ	test	religion,literature	0	0	Bala Kanda of the Ramayana
+88294	ନିସା ଗୋଦ୍ରେଜ	test	economy	1	0	businessperson
+33910	୫୨୮	test	calendar	0	0	year page
+94938	ପର୍ଫ୍ଲୋରୋହେକ୍ସିଲୋକ୍ଟେନ	test	health	0	0	eye drug
+39747	ବ୍ରତୋପନୟନ	test	religion,arts	0	0	Upanayana ceremony
+13364	କନ୍ନଡ଼ ଭାଷା	test	literature	0	0	Kannada language
+33452	ସଂଯୁକ୍ତ ପ୍ରଗତିଶୀଳ ଗଠବନ୍ଧନ	test	politics	0	0	United Progressive Alliance
+66483	ବୈଶାଳୀ ପରିଡ଼ା	test	film	1	1	Odia film actress
+60446	ରେଟିନୋଲ	test	health,science	0	0	retinol, vitamin A
+47393	ଓରାଇ	test	geography	0	0	town, Uttar Pradesh
+79215	ଶ୍ରଦ୍ଧା ପାଣିଗ୍ରାହୀ	test	film	1	1	Odia actress
+58077	ଚଣ୍ଡିକା ସ୍ଥାନ	test	religion	0	0	Shakti Peetha, Bihar
+86607	ପୋଡୋଫାଇଲୋଟକ୍ସିନ	test	health	0	0	drug
+23355	ଗଜପତି ମହାରାଜା	test	religion,history	0	1	Gajapati Maharaja's service to Jagannath
+58343	ଦି ଟେଷ୍ଟ ଅଫ ମାଇ ଲାଇଫ	test	literature,sports	0	0	Yuvraj Singh's autobiography
+20560	ସୁଲକ୍ଷଣା ଦେବୀ	test	literature	1	1	first woman poet of modern Odia literature
+79204	ବେନଜିର ଭୁଟ୍ଟୋ	test	politics	1	0	Benazir Bhutto
+51203	ମହେଞ୍ଜୋଦାରୋ	test	history	0	0	Mohenjo-daro
+82393	ଆଣ୍ଡେକ୍ସାନେଟ ଆଲଫା	test	health	0	0	antidote
+48464	ରାଇସିଂହନଗର	test	geography	0	0	town, Rajasthan
+100789	ଫାର୍ଷ୍ଟ ଲଭ୍	test	film	0	1	2025 Odia film
+84334	ମହେଶ୍ୱର ମହାନ୍ତି (ସାହିତ୍ୟିକ)	test	literature	1	1	Odia children's writer and translator
+70268	ପଦ୍ମ ଲୋଚନ ପଣ୍ଡା	test	politics	1	1	Odia politician
+61036	ସପନର ପଥେ ପଥେ	test	film	0	1	2017 Odia film
+79349	ଅର୍ଜୁନ ଦାସ (ରାଜନେତା)	test	politics	1	1	Odia politician, MLA
+94561	ରାଷ୍ଟ୍ରୀୟ ପ୍ରଦ୍ୟୋଗିକ ସଂସ୍ଥାନ (ଏନ.ଆଇ.ଟି)	test	education	0	0	National Institutes of Technology
+40766	୫ ନଭେମ୍ବର	test	calendar	0	0	date page
+89087	ଇ.ଏମ୍‍. ଇଭାନ୍‍ସ୍‍	test	politics	1	1	Odia politician, pre-independence MLA
+45983	ବାଙ୍କି ମୁହାଣ	test	geography,religion	0	1	river mouth, Puri
+58340	ପଶ୍ଚିମ ଓଡ଼ିଶା ବିକାଶ ପରିଷଦ	test	politics,economy	0	1	Western Odisha Development Council
+66269	ବାମାପଦ ତ୍ରିପାଠୀ	test	literature	1	1	Odia journalist and editor
+15501	ସାତସୁରେ ବନ୍ଧା ଏ ଜୀବନ	test	film	0	1	2009 Odia film
+34994	୧୫୭୩	test	calendar	0	0	year page
+68516	ବିଷ୍ଣୁ ଚରଣ ଦାସ	test	politics	1	1	Odia politician
+99989	ଫିରଦୌସୀ ବେଗମ	test	politics	1	0	West Bengal politician
+78506	ଭରତେନ୍ଦ୍ର ଶେଖର ଦେଓ	test	politics	1	1	Odia politician, MLA
+15853	ମାଧ୍ୟମିକ ଶିକ୍ଷା ପରିଷଦ ବିଦ୍ୟାଳୟ, କଟକ	test	education	0	1	high school, Cuttack
+33178	ବଣ୍ଡା ଜନଜାତି	test	society	0	1	Bonda tribe
+50815	ଓଡ଼ିଆ ଯୁବକ ପାଠାଗାର	test	education,literature	0	1	Odia library in Andhra Pradesh
+73234	ବିଜୟ ମହାପାତ୍ର	test	politics	1	1	Odia politician, minister
+47543	ଗୌତମ ଗମ୍ଭୀର	stratified	sports	1	0	cricketer
+25761	ନୋଭାକ୍ ଜାକୋଭିକ	stratified	sports	1	0	tennis player
+16431	ବିନିତା ଟୋପ	stratified	sports	1	1	hockey player from Odisha
+58893	ଜେ.ଜେ.ଶୋଭା	stratified	sports	1	0	athlete
+100070	ଶିଖା ପାଣ୍ଡେ	stratified	sports	1	0	cricketer, air force officer
+57179	ଅରବିନ୍ଦ ଆପତେ	stratified	sports	1	0	cricketer
+19687	ଭି. ଭି. ଏସ. ଲକ୍ଷ୍ମଣ	stratified	sports	1	0	cricketer
+55983	କର୍ସନ ଘାବ୍ରି	stratified	sports	1	0	cricketer
+87208	ଅପ୍ପାନ୍ନଗୌଡ଼ା ପାଟିଲ	stratified	history,society,economy	1	0	freedom fighter, cooperative leader
+97680	ଆଶାଲତା ସେନ	stratified	history,society,literature	1	0	freedom movement leader, poet
+66692	ମହାଦେବ ଦେଶାଇ	stratified	history,literature	1	0	Gandhi's secretary
+63481	ଚୀନର ବିଶାଳ ପ୍ରାଚୀର	stratified	history,geography	0	0	Great Wall of China
+55705	ତାତ୍ୟା ତୋପେ	stratified	history	1	0	1857 rebel leader
+88101	ନିର୍ମଳଜୀତ ସିଂହ ଶେଖୋଁ	stratified	history	1	0	air force officer, Param Vir Chakra
+22757	ଅନ୍ନପୂର୍ଣ୍ଣା ମହାରଣା	stratified	history	1	1	Odia freedom fighter
+80493	ଭର୍ସାଇ ଚୁକ୍ତି	stratified	history,politics	0	0	Treaty of Versailles
+84532	କେ.ଏସ୍. ଚନ୍ଦ୍ରିକା	stratified	literature	1	0	Malayalam writer (categories: Dalit activist, feminist)
+86510	ମଲ୍ଲୁ ସ୍ୱରାଜୟମ	stratified	politics,history	1	0	CPI(M) politician, freedom fighter
+52863	ଉତ୍କଳ ସମ୍ମିଳନୀ	stratified	society,history	0	1	Utkal Sammilani
+84591	ଖୁଜିସ୍ତା ଅଖତାର ବାନୁ	stratified	society,literature,education	1	0	writer, social reformer
+84604	କେ. ଅଜିତା	stratified	society,politics	1	0	former Naxalite
+77996	ଅଣଧର୍ମବାଦ	stratified	religion	0	0	irreligion
+98047	ଅଙ୍ଗାମୀ ଲୋକ	stratified	society	0	0	Angami tribe
+44311	ପାର୍ଥ ଚାଟାର୍ଜୀ	stratified	society,politics,history	1	0	political theorist, subaltern studies
+56782	କିମୋନୋ	stratified	arts	0	0	kimono
+47775	ଜାପାନୀ ୟେନ୍	stratified	economy	0	0	Japanese yen
+88184	ମନୀଷା ଗିରୋତ୍ରା	stratified	economy	1	0	business executive
+66651	ଶେୟାର ବଜାର	stratified	economy	0	0	stock market
+69036	ବ୍ୟକ୍ତିଗତ ଅର୍ଥବ୍ୟବସ୍ଥା	stratified	economy	0	0	personal finance
+59123	ସନ୍ଦୀପ ମାହେଶ୍ୱରୀ	stratified	economy,arts	1	0	entrepreneur, photographer
+58894	ଅରୁନ୍ଧତୀ ଭଟାଚ୍ଚାର୍ଯ୍ୟ	stratified	economy	1	0	banker
+67682	ସୁସ୍ମିତା ମହାନ୍ତି	stratified	economy,science,technology	1	1	space scientist and entrepreneur from Cuttack
+10662	ଓଲଟ କମଳ	stratified	biology	0	0	plant (Abroma augusta)
+71403	କୀଟ ନିୟନ୍ତ୍ରଣ	stratified	biology,economy	0	0	pest control
+63935	କାହ୍ନା ଜାତୀୟ ଉଦ୍ୟାନ	stratified	biology,geography	0	0	Kanha National Park
+95539	ଏନ୍.କେ. ସୁକୁମାରନ ନାୟାର	stratified	biology,society	1	0	environmentalist
+32264	ମାଛ	stratified	biology	0	0	fish
+16380	ଓସ୍ତ	stratified	biology,religion	0	1	sacred fig, Odisha's state tree
+18249	ପିଆଜ	stratified	biology	0	0	onion
+27886	ଆଲ୍‌ବିନିକସ	stratified	biology	0	0	dinosaur
+75285	ଇଣ୍ଟରନେଟ୍ ଅଫ୍ ଥିଙ୍ଗ୍ସ	stratified	technology	0	0	Internet of things
+56626	ହାୱଡା ମୁମ୍ବାଇ ମେଲ	stratified	technology	0	0	train service
+98811	ଚେକ୍ ଉଇକିପିଡ଼ିଆ	stratified	technology,literature	0	0	Czech Wikipedia
+66252	ଆର୍ଟିଫିସିଆଲ ଇଣ୍ଟେଲିଜେନ୍ସର ପ୍ରୟୋଗ	stratified	technology	0	0	applications of AI
+98949	ସ୍ୱିଡିଶ୍ ଉଇକିପିଡ଼ିଆ	stratified	technology,literature	0	0	Swedish Wikipedia
+99000	ଗୁଆରାନୀ ଉଇକିପିଡ଼ିଆ	stratified	technology,literature	0	0	Guarani Wikipedia
+41198	ହାଇଡ୍ରୋମିଟର୍	stratified	science,technology	0	0	hydrometer
+57534	କାଲକା ଶିମଳା ରେଳବାଇ	stratified	technology,geography,history	0	0	Kalka-Shimla railway
+92763	ଲେସିନୁରାଡ	stratified	health	0	0	gout drug
+21340	ବରାହମିହିର	stratified	science,mathematics,history	1	0	Varahamihira
+61495	ସୁଦିପ୍ତ କବିରାଜ	stratified	politics,history	1	0	political scientist (categorised as scientist)
+25280	ଫ୍ଲୋରିନ	stratified	science	0	0	fluorine
+46583	ରୋହିଣୀ (ନକ୍ଷତ୍ର)	stratified	religion	0	0	Rohini, nakshatra in Hindu astrology
+25475	କ୍ଲୋରିନ	stratified	science	0	0	chlorine
+25478	ଆର୍ଗନ	stratified	science	0	0	argon
+25677	ଆୟୋଡ଼ିନ	stratified	science	0	0	iodine
+42067	ଗୋବିନ୍ଦ ଚନ୍ଦ୍ର ଦେବ ହାଇସ୍କୁଲ	stratified	education	0	1	high school, Rayagada
+18345	ଉଚ୍ଚ ମାଧ୍ୟମିକ ଶିକ୍ଷା ପରିଷଦ, ଓଡ଼ିଶା	stratified	education	0	1	Council of Higher Secondary Education, Odisha
+56321	ସୈନିକ ସ୍କୁଲ, ଭୁବନେଶ୍ୱର	stratified	education	0	1	Sainik School, Bhubaneswar
+15942	ଓଡ଼ିଶା ପୋଲିସ ହାଇସ୍କୁଲ	stratified	education	0	1	high school, Cuttack
+89795	ଶ୍ରୀବିକ୍ରମ ସରକାରୀ ଚାରୁ ଓ କାରୁକଳା ବିଦ୍ୟାଳୟ	stratified	education,arts	0	1	art school, Jeypore
+16550	ଭୁବନାନନ୍ଦ ଓଡ଼ିଶା ସ୍କୁଲ ଅଫ ଇଞ୍ଜିନିୟରିଂ	stratified	education,technology	0	1	engineering school, Cuttack
+63979	ଅମିତା ଅଗ୍ରୱାଲ୍	stratified	health	1	0	clinical immunologist
+44765	ସରକାରୀ ବିଜୟାନନ୍ଦ ହାଇସ୍କୁଲ, ପଦ୍ମପୁର	stratified	education	0	1	high school, Padmapur
+33153	ପାଇ	stratified	mathematics	0	0	pi
+71894	ଗାଣିତିକ ଅର୍ଥଶାସ୍ତ୍ର	stratified	mathematics,economy	0	0	mathematical economics
+41341	ପଣିକିଆ	stratified	mathematics	0	1	Panikia, Odia multiplication tables
+46357	ସିଲ୍‌ଭିଷ୍ଟର୍‌ଙ୍କ କ୍ରାଇଟେରିଅନ୍	stratified	mathematics	0	0	Sylvester's criterion
+65716	ଗୁଣନ	stratified	mathematics	0	0	multiplication
+17747	ଗଣିତ	stratified	mathematics	0	0	mathematics
+65718	ହରଣ (ଗଣିତ)	stratified	mathematics	0	0	division
+19057	ପରିସଂଖ୍ୟାନ	stratified	mathematics	0	0	statistics

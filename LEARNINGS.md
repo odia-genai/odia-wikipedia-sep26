@@ -13,6 +13,9 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   300 documents from the 2023 Wikipedia snapshot for bits-per-byte. The same articles, in newer
   revisions, are in this corpus, so training on it as-is would leak the eval. Exclude those
   titles, or rebuild the held-out set from this corpus. The change is in `src/`.
+- **Tag articles by topic from `categorylinks` — done 2026-09-24, see Data** (2026-09-24). The dump's category table is 1.5
+  MB. Topic tags would let the school mix up-weight science, history and Odisha geography over
+  film and cricket bios, replacing the keyword `wiki-school` filter.
 - **Flag Content Translation articles from `change_tag` — done 2026-09-24, see Data** (2026-09-24). The dump's tag table is
   1.6 MB. Machine-assisted translations carry translationese and English leftovers (the
   `data-cx` leaks came from them). Compare the flag with the 1,302 English-dominant paragraphs.
@@ -43,6 +46,38 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   (year pages, town stubs) and formulaic. They are flagged (`bot_created`), not dropped.
 
 ## Data (Odia)
+
+- **Topics: 97.7% of articles tagged, precision ~95–99% on held-out samples, weaker on small
+  topics** (2026-09-24).
+  - Signals: categories from the rendered HTML (including template-added ones), shallow category
+    walks, rules on Odia category names, and Wikidata for the 2,767 articles with no direct
+    evidence.
+  - Share of words: health 15%, film 11.6%, politics 11.4%, literature 9.1%, religion 10.7%,
+    geography 7.7%. School-relevant: 51.4% of articles (57.6% of words); Odisha: 32.5%.
+  - Held-out random 100: 96/97 right. Stratified check of the small topics: 64/72 (science 5/8,
+    society 5/8).
+  - Category ancestry leaks: "geography" was reachable from 9,172 articles through "people of
+    Odisha" → Odisha. Keyword rules collide: ଲୋକ matched ଲୋକ ସଭା; ପର୍ବ matched inside ପର୍ବତ.
+  - The tuning sample read 100% where held-out gave 98% and small topics 89%.
+
+  — Match on the category's own name, walk shallowly, anchor Odia keywords at word boundaries,
+  always report held-out and stratified checks. — done: `annotate.py topics`,
+  `quality/topics.md`, hand labels in `quality/topics-check.tsv`.
+- **18.5% of articles are machine-assisted translations, and most health articles are**
+  (2026-09-24).
+  - 3,527 were created with Content Translation; 3,844 are `translated` if you add MDWiki's
+    dashboard, which uses CX but leaves no tag and is found from edit summaries ending
+    `#mdwikicx`. 1,936 of the 3,269 health articles are translations, 1,912 of them from MDWiki.
+  - Translated articles hold 4× the English-dominant paragraphs (3.1% vs 0.8%), mostly untranslated
+    table and list items, yet their `odia_ratio` is the same (0.900). Their bpb is the same too.
+  - People made fewer later edits to them (median 3 vs 7). The dumps can't show MT pasted in from
+    outside the tools, or how much machine output was kept.
+  - With the contract's paragraph definition there are 1,856 English-dominant paragraphs, not
+    the 1,302 counted earlier with a different split.
+
+  — Filter English-dominant paragraphs at paragraph level; page-level ratios hide them. — done:
+  `annotate.py translation`, `quality/translation.md`. idea: down-weight or review health by
+  the `translated` flag.
 
 - **Sarvam-1 bits per byte for every paragraph, and a review-first queue** (2026-09-24). An
   RTX A6000 Secure pod at $0.53/h ran for 0.495 h, costing $0.26; the image pull took 7 of the
@@ -172,6 +207,21 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
   kept (it is real content), link lists dropped.
 
 ## Tooling and automation
+
+- **Wikimedia services were slow or lagging, so use mirrors and plain reads** (2026-09-24).
+  - dumps.wikimedia.org served 2–3 kB/s. The official ACC Umeå mirror did ~400 kB/s, with SHA-1
+    still checked against Wikimedia's `dumpstatus.json`.
+  - The Wikidata query service was 5 hours behind. Because `maxlag` includes that lag, even
+    `wbgetentities` reads with `maxlag` were refused.
+  - Wikidata models concepts such as rice with only P279, and drugs look like chemicals.
+
+  — done in `annotate.py`: mirror first; serial `wbgetentities` without `maxlag`, only for items
+  that need it; P279 used when P31 is missing; P2175 marks drugs.
+- **`uv run --with …` inside the repo creates a root `.venv`** (2026-09-24). The tagging agent did
+  this once and deleted it at once. — Use `--script` or `--no-project`, and run from scratch. —
+  done.
+- **Lowercasing regex patterns while normalising them turned `\S` into `\s`** (2026-09-24). —
+  Normalise the text, not the patterns. — done in `annotate.py`.
 
 - **Short pod jobs: stock flickers, image pulls dominate, and nothing auto-terminates**
   (2026-09-24). A6000 Secure stock switched between Low and none, so the first create failed. A
