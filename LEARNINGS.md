@@ -92,6 +92,31 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Tooling and automation
 
+- **"Markdown-shaped" text was not all valid Markdown** (2026-09-24). Parsing all 20,834
+  articles with markdown-it (CommonMark + GFM tables) found about 100 articles that parsed
+  differently from what was meant:
+  - Page text read as markup: `*`, `_`, backticks used as minute marks (`୨୧°୩୦``),
+    `<alt>+<F4>`, a MATLAB `>>` prompt, `[…](…)`, and leftover `<poem>`/`</right>` tags.
+  - Taxonomy trees with text-less list levels jumped 6 spaces of indentation, which CommonMark
+    reads as an indented code block.
+  - Sublists under `1. ` need 3 spaces, not 2.
+
+  The same reading exposed a real bug: the text cleaners also ran over TeX, so `\sqrt[3]{x}`,
+  `x^{{2}}` and `f''` would have been mangled. — Validate generated Markdown with a real parser
+  and compare it with the intended structure. Checking that it looks right is not enough. Keep
+  math out of every text pass. — done: math waits behind placeholders until the end. Blocks
+  carry their list prefix apart from the text. `md_escape()` runs last (2,489 escapes in 534
+  articles, 71 per million characters). Empty list levels are skipped, and sublists are
+  indented to the parent's content column. After the fixes, every article parses as intended,
+  and pandoc's GFM reader agrees on 405 random articles. markdown-it's default `maxNesting` of
+  20 flagged one 10-level sauropod tree that is valid Markdown.
+- **Per-article Markdown files need names that are safe and unique on any file system**
+  (2026-09-24). Titles contain `/` and `:`. APFS and NTFS compare names case- and
+  normalisation-insensitively, so two titles that differ only in how ଡ଼ is encoded would
+  overwrite each other. — done: `md_filename()` replaces unsafe characters, caps names at 180
+  bytes, and checks collisions on an NFC-casefolded key (used only for the comparison; the text
+  is never normalised). Build time is 41 s with the 20,834 files.
+
 - **A response cut off mid-body crashed the render after 12 of 43 chunks** (2026-09-24). The
   server closed a chunked response early, and `r.read()` raised `http.client.IncompleteRead`.
   That is an `HTTPException`, not a `URLError`, so the retry clause missed it and the thread

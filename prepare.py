@@ -12,8 +12,9 @@ Three steps, each resumable, all output under this directory:
             stub flags of every article), with its provenance in raw/<wiki>-<date>-dump.json
   render    Wikipedia's own rendering (Parsoid HTML) of each article's dump revision
             -> raw/html/chunk-*.jsonl.gz, 500 articles per chunk
-  build     HTML -> Markdown-style text -> orwiki-<date>.jsonl (the corpus, one article per line),
-            the build statistics and README.md
+  build     HTML -> GitHub-flavoured Markdown -> orwiki-<date>.jsonl (the corpus,
+            one article per line), the build statistics and README.md; markdown/<title>.md
+            only with --markdown
 
 Why render instead of stripping the wikitext: Odia articles build whole sentences out of
 templates ('''{{PAGENAME}}''' ଏକ ଭାରତୀୟ {{TownType|M}}, {{Birth date|...}}, {{convert|...}},
@@ -45,6 +46,7 @@ import re
 import sys
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -423,8 +425,14 @@ def droppable(el):
     return "display:none" in style
 
 
+# Math is set aside while the text is cleaned and escaped: the text carries a placeholder
+# (\ue000<n>\ue001, private-use characters) and the TeX goes back in at the very end.
+_MATH = []  # (display, tex) of the page being converted
+MATH_SLOT = re.compile("\ue000(\\d+)\ue001")
+
+
 def tex_of(el):
-    """The math element as $TeX$, or $$TeX$$ for display math (Parsoid keeps its TeX in data-mw)."""
+    """A placeholder for the math element; its TeX source (Parsoid keeps it in data-mw) is saved."""
     try:
         src = json.loads(el.get("data-mw") or "{}")["body"]["extsrc"].strip()
     except (KeyError, ValueError, TypeError):
@@ -432,8 +440,13 @@ def tex_of(el):
         src = (m.get("alttext") or "") if m is not None else ""
         src = re.sub(r"^\{\\(?:displaystyle|textstyle)\s*(.*)\}$", r"\1", src.strip(), flags=re.S)
     data = el.get("data-mw") or ""
-    tex = SPACES.sub(" ", src)
-    return f"$${tex}$$" if '"display":"block"' in data.replace(" ", "") else f"${tex}$"
+    _MATH.append(['"display":"block"' in data.replace(" ", ""), SPACES.sub(" ", src)])
+    return f"\ue000{len(_MATH) - 1}\ue001"
+
+
+def put_math_back(text):
+    return MATH_SLOT.sub(lambda m: ("$${}$$" if _MATH[int(m.group(1))][0] else "${}$")
+                         .format(_MATH[int(m.group(1))][1]), text)
 
 
 class Writer:
@@ -499,19 +512,24 @@ class Writer:
             self.walk(c, in_item)
 
     def walk_list(self, lst, indent):
-        """Items get "- " or "1. "; a sublist is indented two spaces deeper than its item."""
+        """Items get "- " or "1. "; a sublist is indented to its parent's content column
+        (2 spaces under "- ", 3 under "1. "), as CommonMark requires."""
         items = [c for c in lst if isinstance(c.tag, str) and c.tag == "li"
                  and not droppable(c) and not link_only_item(c)]
         for i, li in enumerate(items):
             marker = f"{i + 1}. " if lst.tag == "ol" else "- "
-            prefix, inner = indent + marker, indent + "  "
+            prefix, inner = indent + marker, indent + " " * len(marker)
             if li.text:
                 self.inline.append(li.text)
             for c in li:
                 if isinstance(c.tag, str) and c.tag in ("ul", "ol") and not droppable(c):
+                    n = len(self.blocks)
                     self.flush("li", 0, prefix)
-                    prefix = inner  # text after a sublist continues the item
-                    self.walk_list(c, inner)
+                    if len(self.blocks) > n:  # the item has text: nest under it
+                        prefix = inner  # text after a sublist continues the item
+                        self.walk_list(c, inner)
+                    else:  # an item holding only a sublist: skip the empty level, or the
+                        self.walk_list(c, indent)  # indent jumps and reads as a code block
                     if c.tail:
                         self.inline.append(c.tail)
                 else:
@@ -531,7 +549,7 @@ def cell_text(cell):
     w.flush()
     text = " ".join(b[3] for b in w.blocks).replace("\n", ", ")
     text = clean_block(("p", 0, "", text), cell=True)[3] if re.search(r"\w", text) else ""
-    return text.replace("|", "\\|")
+    return put_math_back(text).replace("|", "\\|")  # GFM reads \| as a pipe even inside math
 
 
 def table_markdown(tbl, max_span=50):
@@ -598,9 +616,39 @@ PX_RESIDUE = re.compile(r"(?<![\w.])\d{1,4}px\b")  # image sizes left as text: "
 # after it), before a space or line end.
 PIPE_DANDA = re.compile(r"(?<=[\u0B00-\u0B7F)\]\"'”’])(\s?)(\|\|?)(?=\s|$)", re.M)
 
+# Markdown escaping, so that text from the page never turns into markup: emphasis, code,
+# HTML, links, math ($), and, at the start of a line, headings, quotes, lists, rules.
+WORDCHAR = "0-9A-Za-z\u0B00-\u0B7F"
+MD_INLINE = [
+    (re.compile(r"\\(?=[!-/:-@\[-`{-~])"), r"\\\\"),  # a backslash before ASCII punctuation
+    (re.compile(r"([*`$])"), r"\\\1"),
+    (re.compile(rf"(?<![{WORDCHAR}])_|_(?![{WORDCHAR}])"), r"\\_"),  # not intraword snake_case
+    (re.compile(r"<(?=[A-Za-z/!?])"), r"\\<"),  # "<alt>+<F4>", "<a> element"
+    (re.compile(r"\](?=[(\[])"), r"\\]"),  # "[text](...)"
+    (re.compile(r"~(?=~)"), r"\\~"),  # GFM strikethrough and ~~~ fences
+]
+MD_LINE_START = [
+    (re.compile(r"^(#{1,6})(?=\s|$)"), r"\\\1"),  # heading
+    (re.compile(r"^([>|])"), r"\\\1"),  # block quote (">> x = 17" in MATLAB), table row
+    (re.compile(r"^([-+])(?=\s|$)"), r"\\\1"),  # bullet
+    (re.compile(r"^(\d{1,9})([.)])(?=\s|$)"), r"\1\\\2"),  # "1. " numbered item
+    (re.compile(r"^([=-])(?=[=-]*\s*$)"), r"\\\1"),  # setext underline or thematic break
+]
+
+
+def md_escape(text, line_starts=True):
+    for pattern, repl in MD_INLINE:
+        text = pattern.sub(repl, text)
+    if line_starts:
+        lines = text.split("\n")
+        for pattern, repl in MD_LINE_START:
+            lines = [pattern.sub(repl, line) for line in lines]
+        text = "\n".join(lines)
+    return text
+
 
 def clean_block(block, cell=False):
-    """Clean one block's text (not its prefix); "" drops it."""
+    """Clean one block's text (not its prefix) and escape it for Markdown; "" drops it."""
     kind, level, prefix, text = block
     if kind == "t":
         return block
@@ -617,8 +665,14 @@ def clean_block(block, cell=False):
     text = re.sub(r"\((?:\s*[,;:])+\s*", "(", text)
     text = re.sub(r"\s*(?:[,;:]\s*)+\)", ")", text)
     text = re.sub(r"[ \t]{2,}", " ", text).strip()
-    if kind == "p" and not cell and re.fullmatch(r"\$[^$]+\$[.,]?", text):  # a formula on its own: display math
-        text = "$" + text.rstrip(".,") + "$"
+    if not re.search(r"\w", MATH_SLOT.sub("x", text)):
+        return kind, level, prefix, ""
+    if kind == "p" and not cell and (m := re.fullmatch("(\ue000(\\d+)\ue001)[.,]?", text)):
+        _MATH[int(m.group(2))][0] = True  # a formula on its own line: display math
+        return kind, level, prefix, m.group(1)
+    text = md_escape(text, line_starts=kind != "h" and not cell)
+    if kind == "h":
+        text = re.sub(r"(\s)(#+)$", r"\1\\\2", text)  # a trailing "#" would close the heading
     return kind, level, prefix, text
 
 
@@ -640,6 +694,7 @@ def html_to_text(doc):
     """(Markdown text without the title, info) for one Parsoid HTML page."""
     from lxml import html as lhtml
 
+    _MATH.clear()
     root = lhtml.document_fromstring(doc)
     info = {"disambiguation": bool(root.xpath('//meta[@property="mw:PageProp/disambiguation"]'))}
     body = root.find("body")
@@ -668,21 +723,60 @@ def html_to_text(doc):
         if kind == "h":
             text = "#" * level + " " + text
         elif kind == "li":
-            text = prefix + text
+            # continuation lines line up with the item's content
+            text = prefix + text.replace("\n", "\n" + " " * len(prefix))
         # Consecutive list items stay together; everything else is a paragraph of its own.
         sep = "\n" if kind == "li" and i and keep[i - 1][0] == "li" else "\n\n"
         out.append((sep if out else "") + text)
     text = CONTROL.sub("", INVISIBLE.sub("", "".join(out))).translate(RESERVED_DANDA)
-    return normalize_odia(text).strip(), info
+    return normalize_odia(put_math_back(text)).strip(), info
 
 
 # --------------------------------------------------------------------------------- build
 
 MAIN_PAGE = "ପ୍ରଧାନ ପୃଷ୍ଠା"  # orwiki's main page lives in the article namespace
+MD_DIR = ROOT / "markdown"  # one .md file per article; the build owns this directory
+MD_ESCAPE = re.compile(r"\\[!-/:-@\[-`{-~]")  # a Markdown backslash escape, for the statistics
 
 
 def md_heading(title):
-    return re.sub(r"(\s)(#+)$", r"\1\\\2", title)  # a trailing "#" would close the heading
+    return re.sub(r"(\s)(#+)$", r"\1\\\2", md_escape(title, line_starts=False))
+
+
+def md_filename(title, page_id, used):
+    """A file name for the article: its title, made safe on macOS/Windows/Linux, unique."""
+    name = re.sub(r'[/\\:*?"<>|\x00-\x1f]', "_", title).strip(" .") or "_"
+    while len(name.encode()) > 180:
+        name = name[:-1]
+    # File systems compare names case- and normalisation-insensitively (APFS, NTFS). NFC is used
+    # only for this comparison; the text itself is never normalised.
+    key = unicodedata.normalize("NFC", name).casefold()
+    if key in used:
+        name, key = f"{name} ({page_id})", f"{key} ({page_id})"
+    used.add(key)
+    return name + ".md"
+
+
+def write_markdown(records, dump):
+    """Optional (--markdown): markdown/<title>.md, YAML front matter (JSON-quoted values), then the
+    article. The same text as the corpus, for reading in an editor."""
+    MD_DIR.mkdir(exist_ok=True)
+    written, used = set(), set()
+    for r in records:
+        meta = {
+            "title": r["title"], "page_id": r["id"], "source": r["url"],
+            "revision": f"https://or.wikipedia.org/w/index.php?oldid={r['revid']}",
+            "revision_timestamp": r["timestamp"], "dump": dump, "words": r["words"],
+            "tables": r["tables"], "bot_created": r["bot_created"], "stub": r["stub"],
+            "license": "CC BY-SA 4.0 (text by Odia Wikipedia contributors)",
+        }
+        front = "\n".join(f"{k}: {json.dumps(v, ensure_ascii=False)}" for k, v in meta.items())
+        name = md_filename(r["title"], r["id"], used)
+        (MD_DIR / name).write_text(f"---\n{front}\n---\n\n{r['text']}\n", encoding="utf-8")
+        written.add(name)
+    for old in MD_DIR.glob("*.md"):  # articles gone since the last build
+        if old.name not in written:
+            old.unlink()
 
 
 def convert(row):
@@ -747,6 +841,8 @@ def build(args):
     tmp = jl.with_suffix(".tmp")  # readers never see a half-written file
     write_jsonl(tmp, records)
     tmp.replace(jl)
+    if args.markdown:
+        write_markdown(records, prov.get("dump", stem))
 
     dropped = collections.Counter(e["reason"] for e in excluded)
     stats = {
@@ -761,6 +857,8 @@ def build(args):
         "articles_with_tables": sum(r["tables"] > 0 for r in records),
         "odia_ratio_below_0.6": sum(r["odia_ratio"] < 0.6 for r in records),
         "odia_ratio_below_0.6_words": sum(r["words"] for r in records if r["odia_ratio"] < 0.6),
+        "markdown_escapes": sum(len(MD_ESCAPE.findall(r["text"])) for r in records),
+        "articles_with_escapes": sum(bool(MD_ESCAPE.search(r["text"])) for r in records),
         "min_words": args.min_words,
         "dropped": dict(sorted(dropped.items(), key=lambda kv: -kv[1])),
         "dropped_titles": excluded,
@@ -797,7 +895,7 @@ def write_readme(stats, records, stem):
 
 Every article on [Odia Wikipedia](https://or.wikipedia.org) in the **{pretty} dump**
 (`{stats['dump']}`, the latest complete dump when built on {stats['built']}), as clean
-Markdown-style text, one article per record: **{stats['articles']:,} articles, {stats['words']:,}
+GitHub-flavoured Markdown, one article per record: **{stats['articles']:,} articles, {stats['words']:,}
 Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 
 | File | What it is |
@@ -818,13 +916,26 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `url` | article URL |
 | `revid` | revision in the dump; `https://or.wikipedia.org/w/index.php?oldid=<revid>` is exactly this text |
 | `timestamp` | when that revision was saved |
-| `text` | the article: `# title`, then the lead, `##`/`###` section headings, paragraphs separated by a blank line, `- ` / `1. ` lists, data tables as Markdown tables, math as `$...$` |
+| `text` | the article (format below) |
 | `words` | Odia words in `text` (runs of Odia-script characters) |
 | `chars` | characters in `text` |
 | `odia_ratio` | share of non-space characters in the Odia block (`odia_text.odia_ratio`) |
 | `tables` | data tables in `text`, as Markdown tables |
 | `bot_created` | the page carries `{{{{ବଟ୍ ତିଆରି}}}}`: made by a bot (year pages, town stubs), formulaic text |
 | `stub` | the page carries a stub template (`{{{{ମୁଣ୍ଡିଆ}}}}`, `{{{{ଅଧାଗଢ଼ା}}}}`) |
+
+`text` is GitHub-flavoured Markdown: `# title`, the lead, `##`/`###` section headings,
+paragraphs separated by a blank line, `- ` / `1. ` lists (sublists indented to their parent's
+content column), data tables as GFM tables (`| a | b |`), and math as `$...$` (`$$...$$` on its
+own line). Links and emphasis are reduced to their text.
+
+It is checked as Markdown, not just shaped like it. Every article parses (markdown-it,
+CommonMark + GFM tables) into exactly the headings, list items and tables it is meant to have,
+with no accidental emphasis, links, code, HTML, block quotes or rules. pandoc's GFM reader agrees
+on a random sample of 405 articles. Text from the page that would read as markup is
+backslash-escaped: `\\*`, `\\_`, `\\$`, `\\<alt>`, `1\\.` or `\\-` at the start of a line.
+There are {stats['markdown_escapes']:,} escapes in {stats['articles_with_escapes']:,} articles, about
+{stats['markdown_escapes'] / stats['chars'] * 1e6:.0f} per million characters.
 
 A short example record:
 
@@ -913,7 +1024,7 @@ whose history lists the authors.
 ```bash
 uv run prepare.py download   # newest complete dump, or --dump YYYYMMDD
 ODIA_WIKI_CONTACT=you@example.org uv run prepare.py render  # ~2 h, resumable
-uv run prepare.py build      # about a minute
+uv run prepare.py build      # about a minute; --markdown
 ```
 
 `render` needs contact details in the user-agent (`ODIA_WIKI_CONTACT`). Wikimedia throttles
@@ -931,6 +1042,7 @@ def main():
     ap.add_argument("--dump", help="dump date YYYYMMDD (default: latest)")
     ap.add_argument("--workers", type=int, default=6, help="parallel HTTP requests (render)")
     ap.add_argument("--limit-chunks", type=int, help="render at most this many chunks")
+    ap.add_argument("--markdown", action="store_true", help="build: also write markdown/<title>.md files")
     ap.add_argument("--min-words", type=int, default=5,
                     help="drop articles with fewer Odia words than this after cleaning")
     ap.add_argument("--partial", action="store_true", help="build from the chunks rendered so far")

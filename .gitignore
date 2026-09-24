@@ -1,5 +1,7 @@
 # the corpus: `prepare.py build` makes it from what is tracked
 /orwiki-*.jsonl
+# optional per-article Markdown export (`build --markdown`): a second copy of the corpus
+/markdown/
 # the dump `prepare.py download` fetches; its article index is tracked
 /raw/*.xml.bz2
 # temporary and partial files
