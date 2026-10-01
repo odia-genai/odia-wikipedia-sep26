@@ -1,17 +1,17 @@
 # Sarvam-1 bits per byte on the Odia Wikipedia corpus
 
-Every paragraph of `orwiki-20260901-trainingready.jsonl` (sha1 `634b1411a0d1`), except the title, scored with `sarvamai/sarvam-1` (revision `e9607337286d`) by `score_bpb.py`, except 319 paragraphs (319 distinct texts, 366,751 B, in 233 articles) not scored yet (see [Not scored yet](#not-scored-yet)). Written by `score_bpb.py build`; the per-article and per-paragraph numbers are in `annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl` (each paragraph's bits, bytes, tokens, pieces and scoring run are in the score store `raw/bpb/scores.jsonl.gz`, joined on `para_sha1`), and the review queue is in `quality/review-first.md`.
+Every paragraph of `orwiki-20260901-trainingready.jsonl` (sha1 `68c6a19f1bf4`), except the title, scored with `sarvamai/sarvam-1` (revision `e9607337286d`) by `score_bpb.py`, except 319 paragraphs (319 distinct texts, 366,751 B, in 233 articles) not scored yet (see [Not scored yet](#not-scored-yet)). Written by `score_bpb.py build`; the per-article and per-paragraph numbers are in `annotations/bpb.jsonl` and `annotations/bpb.paragraphs.jsonl` (each paragraph's bits, bytes, tokens, pieces and scoring run are in the score store `raw/bpb/scores.jsonl.gz`, joined on `para_sha1`), and the review queue is in `quality/review-first.md`.
 
 ## Summary
 
 - **Not scored yet: 319 paragraphs (319 distinct texts, 366,751 B, in 233 articles).** Their text is new since the last scoring run, and this build was made with `--allow-missing`: they have `bpb` null, are left out of every number below and of the review queue, and need a pod run of about 57,961 tokens (see [Not scored yet](#not-scored-yet)).
-- **Corpus bpb 0.5528** over 143,038 paragraphs, 85.9 MB and 13.13M Sarvam-1 tokens (152.9 tokens per kB). Prose alone (kind `text`): **0.5206**. For comparison, base Sarvam-1 scores 0.4951 on the native-Odia held-out set of odia-llm-trainer (E03/E06).
-- The median article (>= 500 B, 18,095 articles) has bpb 0.550; the middle 98% run from 0.370 to 0.913.
-- Matched for length it is the held-out number: prose paragraphs of 1 kB and more score **0.4942**. Shorter paragraphs cost more because each is scored without the text before it.
+- **Corpus bpb 0.5520** over 142,724 paragraphs, 85.7 MB and 13.08M Sarvam-1 tokens (152.6 tokens per kB). Prose alone (kind `text`): **0.5204**. For comparison, base Sarvam-1 scores 0.4951 on the native-Odia held-out set of odia-llm-trainer (E03/E06).
+- The median article (>= 500 B, 18,083 articles) has bpb 0.549; the middle 98% run from 0.370 to 0.906.
+- Matched for length it is the held-out number: prose paragraphs of 1 kB and more score **0.4941**. Shorter paragraphs cost more because each is scored without the text before it.
 - Checks pass: word-shuffled paragraphs score higher in 300/300 cases; the repo harness gives the same pooled bpb to 0.04%; one paragraph's bpb is good to about 0.3% (median; bf16), 2% at p95; every paragraph has a row. Run 2's re-scores of 200 carried-over texts agree with them (median 0.0%, max 2.2%). Run 3's re-scores of 200 carried-over texts agree with them (median 0.0%, max 1.8%).
-- 1,874 paragraphs are extreme (top or bottom 1% of their kind and length band, among 93,634 comparable ones). 200 articles are queued for review (`quality/review-first.md`), 34 garbled, 34 english, 34 templated, 31 table, 0 markup, 34 script, 33 article, interleaved.
-- What bpb finds at the top: English inside Odia articles (295 comparable paragraphs), other scripts or non-English Latin text (290), and unusual Odia (verse, archaic text, name lists; genuinely garbled Odia is rare). At the bottom: formulaic biographies, year lists and a career table repeated in 220 articles. What it does not find: boilerplate repeated across articles (use `repeats`). Conversion leftovers: 0 paragraphs.
-- Machine-assisted translations score about the same as the rest (pooled 0.549 vs 0.553). Pages created after Sarvam-1's release score lower (median 0.518 vs 0.556), so there is no sign that it memorised Odia Wikipedia.
+- 1,870 paragraphs are extreme (top or bottom 1% of their kind and length band, among 93,572 comparable ones). 200 articles are queued for review (`quality/review-first.md`), 34 garbled, 34 english, 34 templated, 30 table, 0 markup, 34 script, 34 article, interleaved.
+- What bpb finds at the top: English inside Odia articles (286 comparable paragraphs), other scripts or non-English Latin text (273), and unusual Odia (verse, archaic text, name lists; genuinely garbled Odia is rare). At the bottom: formulaic biographies, year lists and a career table repeated in 220 articles. What it does not find: boilerplate repeated across articles (use `repeats`). Conversion leftovers: 0 paragraphs.
+- Machine-assisted translations score about the same as the rest (pooled 0.548 vs 0.553). Pages created after Sarvam-1's release score lower (median 0.518 vs 0.556), so there is no sign that it memorised Odia Wikipedia.
 
 ## Not scored yet
 
@@ -119,9 +119,9 @@ Checks 1-3 ran with run 1, on the whole corpus as it was then; 4 and 5 are recom
 1. **Shuffle control.** 300 random prose paragraphs (>= 100 B, >= 10 words, one piece) were scored as they are and with their words shuffled (the whitespace kept in place, so the bytes are identical). The shuffled copy scored higher for **300 of 300** (100.0%); pooled bpb 0.518 → 0.883, median ratio 1.69, smallest 1.08.
 2. **Determinism.** 100 random paragraphs re-scored: same batches twice, max |Δbpb| = 0.00e+00; one paragraph per batch (no padding), max |Δbpb| = 2.60e-02 (max relative Δbits 2.3e-02); against the main run (other batch neighbours), max |Δbpb| = 2.81e-02.
    **How precise is one paragraph's bpb?** The differences above are bf16 rounding, not a bug: on 150 random paragraphs, fp32 batched and fp32 one-at-a-time agree to 8e-06 (so batching and padding are exact), while bf16 differs from fp32 by a median 0.3% of the bits (p95 2.0%, max 3.4%, worst on a 18-byte paragraph) in the main run and 0.3% scored one at a time. Pooled bpb is unbiased: 0.5550 (bf16) vs 0.5551 (fp32). A 1% tail is far wider than this (see the robust spreads below), so the flags are stable; the exact rank of two paragraphs a few percent apart is not.
-3. **Parity with odia-llm-trainer's harness.** `odia_llm.evaluation.harness.Scorer` (its own `loglik`, batch 8) on 208 pieces from 200 random paragraphs: max |Δ log-likelihood| per piece 3.551 nats (relative 3.8e-02); pooled bpb 0.54221 (harness) vs 0.54241 (this script); `Scorer.bpb` on the same paragraphs: 0.54221. `split_text` differs from the harness's on 0 of 143,038 paragraphs.
-4. **Plausibility.** Corpus bpb 0.5528 and prose 0.5206, against 0.4951 for base Sarvam-1 on the held-out set. That set is scored as whole documents cut into ~1,000-character pieces; here every paragraph starts afresh from BOS, so short paragraphs lose context and cost more. Matched for length the numbers agree: prose paragraphs of 1 kB and more score 0.4942 (26,064 paragraphs), while those of 100-299 B score 0.710 and headings 1.129. Encyclopedic Odia is not easier for Sarvam-1 than the held-out mix (which already includes 300 Wikipedia documents from 2023).
-5. **Coverage.** 143,038 of 143,357 non-title paragraphs of the current corpus (sha1 `634b1411a0d1`) have a score, 319 have none (not scored yet, see above), 0 are duplicated; each score is looked up by the sha1 of the paragraph's current text (113,472 distinct texts; rows by scoring run: run 1: 139,849, run 2: 955, run 3: 2,234, not scored: 319). 18,689 of 18,695 articles have scored paragraphs, and `text_sha1` and `para_sha1` are computed from the current corpus file. The latest run (run 3) scored an earlier corpus file (sha1 `a80c57fd72f3`), whose scores carry over. 0 paragraphs have no bytes to score.
+3. **Parity with odia-llm-trainer's harness.** `odia_llm.evaluation.harness.Scorer` (its own `loglik`, batch 8) on 208 pieces from 200 random paragraphs: max |Δ log-likelihood| per piece 3.551 nats (relative 3.8e-02); pooled bpb 0.54221 (harness) vs 0.54241 (this script); `Scorer.bpb` on the same paragraphs: 0.54221. `split_text` differs from the harness's on 0 of 142,724 paragraphs.
+4. **Plausibility.** Corpus bpb 0.5520 and prose 0.5204, against 0.4951 for base Sarvam-1 on the held-out set. That set is scored as whole documents cut into ~1,000-character pieces; here every paragraph starts afresh from BOS, so short paragraphs lose context and cost more. Matched for length the numbers agree: prose paragraphs of 1 kB and more score 0.4941 (26,058 paragraphs), while those of 100-299 B score 0.709 and headings 1.129. Encyclopedic Odia is not easier for Sarvam-1 than the held-out mix (which already includes 300 Wikipedia documents from 2023).
+5. **Coverage.** 142,724 of 143,043 non-title paragraphs of the current corpus (sha1 `68c6a19f1bf4`) have a score, 319 have none (not scored yet, see above), 0 are duplicated; each score is looked up by the sha1 of the paragraph's current text (113,177 distinct texts; rows by scoring run: run 1: 139,640, run 2: 955, run 3: 2,129, not scored: 319). 18,677 of 18,683 articles have scored paragraphs, and `text_sha1` and `para_sha1` are computed from the current corpus file. The latest run (run 3) scored an earlier corpus file (sha1 `a80c57fd72f3`), whose scores carry over. 0 paragraphs have no bytes to score.
 
 ## Re-scoring after the 2026-09-24 cleanup
 
@@ -130,10 +130,10 @@ On 2026-09-24 the corpus was rebuilt with text cleanups: 917 ପରୁଷ→ପ�
 A paragraph's bpb depends only on its own text (it is scored from BOS, and paragraph *i* is still `text.split("\n\n")[i]`), so every score was carried over by `para_sha1` and only texts never scored before went to the GPU (`score --only-missing`), with the same model revision, chunking, bf16 and code as run 1.
 
 - **Before**: 20,834 articles, 148,745 paragraphs, corpus bpb 0.5564 (prose 0.5234).
-- **Now**: 18,689 articles, 143,038 paragraphs (113,153 distinct texts), corpus bpb 0.5528 (prose 0.5206). 142,083 rows carried over; 955 rows (1,379 new texts, 0.89 MB, 183,357 tokens) in 952 articles were scored in run 2: 939 text, 11 table, 5 list; their bpb is 0.5905.
+- **Now**: 18,677 articles, 142,724 paragraphs (112,858 distinct texts), corpus bpb 0.5520 (prose 0.5204). 141,769 rows carried over; 955 rows (1,379 new texts, 0.89 MB, 183,357 tokens) in 952 articles were scored in run 2: 939 text, 11 table, 5 list; their bpb is 0.5905.
 - **Pod**: `okby731xk0lcet`, NVIDIA RTX 4000 Ada Generation (20 GB), Secure cloud, EU-RO-1, $0.28/h, up 5 min ($0.02); scoring took 25 s of GPU time (8,357 tokens/s).
 - **Consistency**: 200 carried-over texts, scored again on the new pod, came out identical for 102; |Δ bits| / bits has median 0.00%, p95 1.04%, max 2.20% (paragraphs >= 100 B: median 0.00%, max 2.20%), mean signed +0.03%; pooled bpb 0.5360 new vs 0.5359 carried over. That is the size of run 1's own bf16 batch noise (see determinism above), so old and new scores are on the same scale and the flags are unaffected.
-- **Review queue** (types among the 200, before → now): garbled 32 → 34, english 32 → 34, templated 31 → 34, table 30 → 31, markup 13 → 0, script 31 → 34, article 31 → 33.
+- **Review queue** (types among the 200, before → now): garbled 32 → 34, english 32 → 34, templated 31 → 34, table 30 → 30, markup 13 → 0, script 31 → 34, article 31 → 34.
 
 ## Re-scoring after the 2026-09-24 cleanup
 
@@ -142,10 +142,10 @@ On 2026-09-24 the corpus was rebuilt again: 980 English prose paragraphs and hea
 A paragraph's bpb depends only on its own text (it is scored from BOS, and paragraph *i* is still `text.split("\n\n")[i]`), so every score was carried over by `para_sha1` and only texts never scored before went to the GPU (`score --only-missing`), with the same model revision, chunking, bf16 and code as run 1.
 
 - **Before**: 20,827 articles, 144,751 paragraphs, corpus bpb 0.5500 (prose 0.5219).
-- **Now**: 18,689 articles, 143,038 paragraphs (113,153 distinct texts), corpus bpb 0.5528 (prose 0.5206). 140,804 rows carried over; 2,234 rows (2,445 new texts, 1.37 MB, 497,209 tokens) in 877 articles were scored in run 3: 670 list, 534 heading, 518 table, 512 text; their bpb is 0.8615.
+- **Now**: 18,677 articles, 142,724 paragraphs (112,858 distinct texts), corpus bpb 0.5520 (prose 0.5204). 140,595 rows carried over; 2,129 rows (2,445 new texts, 1.37 MB, 497,209 tokens) in 865 articles were scored in run 3: 633 list, 506 table, 504 text, 486 heading; their bpb is 0.8615.
 - **Pod**: `t7qxsgbz59epm5`, NVIDIA RTX A6000 (48 GB), Secure cloud, EU-SE-1, $0.53/h, up 4 min ($0.03); scoring took 34 s of GPU time (15,231 tokens/s).
 - **Consistency**: 200 carried-over texts, scored again on the new pod, came out identical for 126; |Δ bits| / bits has median 0.00%, p95 0.91%, max 1.79% (paragraphs >= 100 B: median 0.00%, max 1.79%), mean signed +0.05%; pooled bpb 0.5234 new vs 0.5233 carried over. That is the size of run 1's own bf16 batch noise (see determinism above), so old and new scores are on the same scale and the flags are unaffected.
-- **Review queue** (types among the 200, before → now): garbled 35 → 34, english 35 → 34, templated 35 → 34, table 24 → 31, markup 2 → 0, script 35 → 34, article 34 → 33.
+- **Review queue** (types among the 200, before → now): garbled 35 → 34, english 35 → 34, templated 35 → 34, table 24 → 30, markup 2 → 0, script 35 → 34, article 34 → 34.
 
 ## Distributions
 
@@ -153,12 +153,12 @@ A paragraph's bpb depends only on its own text (it is scored from BOS, and parag
 
 | kind | paragraphs | MB | bytes | pooled bpb | median | p1 | p99 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| text | 86,688 | 73.68 | 85.8% | 0.521 | 0.537 | 0.324 | 2.009 |
-| heading | 43,816 | 1.73 | 2.0% | 1.129 | 1.161 | 0.624 | 2.656 |
-| list | 9,488 | 6.08 | 7.1% | 0.682 | 0.825 | 0.351 | 2.344 |
-| table | 2,940 | 4.35 | 5.1% | 0.686 | 0.759 | 0.253 | 1.717 |
+| text | 86,497 | 73.65 | 85.9% | 0.520 | 0.536 | 0.324 | 1.900 |
+| heading | 43,747 | 1.73 | 2.0% | 1.129 | 1.161 | 0.624 | 2.656 |
+| list | 9,448 | 6.07 | 7.1% | 0.681 | 0.823 | 0.351 | 2.317 |
+| table | 2,926 | 4.28 | 5.0% | 0.679 | 0.759 | 0.252 | 1.718 |
 | math | 106 | 0.01 | 0.0% | 1.278 | 1.567 | 0.528 | 4.255 |
-| all | 143,038 | 85.86 | 100% | 0.553 | 0.655 | 0.333 | 2.356 |
+| all | 142,724 | 85.75 | 100% | 0.552 | 0.654 | 0.333 | 2.305 |
 
 Pooled bpb = Σ bits / Σ bytes (what the harness reports); median and percentiles are over paragraphs.
 
@@ -166,23 +166,23 @@ Pooled bpb = Σ bits / Σ bytes (what the harness reports); median and percentil
 
 | bytes | all: paragraphs | pooled | median | text: paragraphs | pooled | median | p1 | p99 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| <100 B | 48,624 | 1.177 | 1.192 | 4,101 | 1.325 | 1.431 | 0.549 | 5.174 |
-| 100-299 B | 16,114 | 0.768 | 0.733 | 12,270 | 0.710 | 0.691 | 0.388 | 1.588 |
-| 300-999 B | 49,449 | 0.556 | 0.543 | 44,253 | 0.536 | 0.532 | 0.325 | 0.928 |
-| 1-3 kB | 27,070 | 0.505 | 0.495 | 24,750 | 0.492 | 0.490 | 0.311 | 0.738 |
-| >=3 kB | 1,781 | 0.541 | 0.509 | 1,314 | 0.507 | 0.499 | 0.351 | 0.699 |
+| <100 B | 48,374 | 1.173 | 1.188 | 3,935 | 1.303 | 1.399 | 0.542 | 4.862 |
+| 100-299 B | 16,092 | 0.767 | 0.733 | 12,264 | 0.709 | 0.691 | 0.388 | 1.588 |
+| 300-999 B | 49,425 | 0.556 | 0.543 | 44,240 | 0.536 | 0.532 | 0.325 | 0.927 |
+| 1-3 kB | 27,057 | 0.505 | 0.495 | 24,744 | 0.492 | 0.490 | 0.311 | 0.736 |
+| >=3 kB | 1,776 | 0.537 | 0.509 | 1,314 | 0.507 | 0.499 | 0.351 | 0.699 |
 
-Short pieces cost more bits per byte: the first tokens after BOS have no context. So paragraphs are only compared with paragraphs of the same kind and length band, and only text, list and math paragraphs of >= 100 B and tables of >= 200 B are compared at all (93,634 of 143,038). Headings are never flagged. Articles are ranked only from 500 B.
+Short pieces cost more bits per byte: the first tokens after BOS have no context. So paragraphs are only compared with paragraphs of the same kind and length band, and only text, list and math paragraphs of >= 100 B and tables of >= 200 B are compared at all (93,572 of 142,724). Headings are never flagged. Articles are ranked only from 500 B.
 
 ### Articles
 
 | articles | n | pooled bpb | median | p1 | p5 | p95 | p99 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| all articles | 18,695 | 0.553 | 0.551 | nan | nan | nan | nan |
-| >= 500 B | 18,095 | 0.553 | 0.550 | 0.370 | 0.409 | 0.770 | 0.913 |
+| all articles | 18,683 | 0.552 | 0.551 | nan | nan | nan | nan |
+| >= 500 B | 18,083 | 0.552 | 0.549 | 0.370 | 0.409 | 0.769 | 0.906 |
 | stubs | 1,738 | 0.525 | 0.514 | 0.347 | 0.401 | 0.698 | 0.825 |
-| neither | 16,357 | 0.556 | 0.555 | 0.374 | 0.410 | 0.777 | 0.921 |
-| odia_ratio < 0.6 | 325 | 0.756 | 0.736 | 0.428 | 0.550 | 1.141 | 1.488 |
+| neither | 16,345 | 0.555 | 0.555 | 0.373 | 0.410 | 0.775 | 0.913 |
+| odia_ratio < 0.6 | 312 | 0.737 | 0.725 | 0.430 | 0.551 | 1.062 | 1.243 |
 
 ### Did Sarvam-1 memorise Odia Wikipedia?
 
@@ -190,20 +190,20 @@ Sarvam-1 was released in October 2024. If it had memorised Odia Wikipedia, pages
 
 | page | made by | articles >= 500 B | pooled bpb | median | median prose bpb |
 | --- | --- | ---: | ---: | ---: | ---: |
-| created 2024-10 or later | written in Odia | 2,132 | 0.534 | 0.525 | 0.494 |
+| created 2024-10 or later | written in Odia | 2,131 | 0.534 | 0.525 | 0.494 |
 | created 2024-10 or later | machine-assisted translation | 345 | 0.477 | 0.479 | 0.478 |
-| created before 2024-10 | written in Odia | 12,147 | 0.557 | 0.563 | 0.530 |
-| created before 2024-10 | machine-assisted translation | 3,471 | 0.556 | 0.525 | 0.512 |
+| created before 2024-10 | written in Odia | 12,141 | 0.556 | 0.563 | 0.530 |
+| created before 2024-10 | machine-assisted translation | 3,466 | 0.555 | 0.525 | 0.512 |
 
 | page created | articles >= 500 B | median bpb | median prose bpb | translated |
 | --- | ---: | ---: | ---: | ---: |
 | 2011 | 1,124 | 0.624 | 0.558 | 0% |
-| 2012 | 864 | 0.563 | 0.541 | 0% |
+| 2012 | 863 | 0.563 | 0.541 | 0% |
 | 2013 | 835 | 0.563 | 0.535 | 0% |
 | 2014 | 523 | 0.574 | 0.547 | 0% |
-| 2015 | 1,688 | 0.628 | 0.588 | 1% |
-| 2016 | 1,667 | 0.608 | 0.583 | 50% |
-| 2017 | 1,415 | 0.573 | 0.547 | 19% |
+| 2015 | 1,686 | 0.628 | 0.588 | 1% |
+| 2016 | 1,661 | 0.607 | 0.582 | 50% |
+| 2017 | 1,413 | 0.573 | 0.547 | 19% |
 | 2018 | 1,241 | 0.560 | 0.526 | 5% |
 | 2019 | 884 | 0.515 | 0.477 | 11% |
 | 2020 | 913 | 0.491 | 0.465 | 12% |
@@ -211,7 +211,7 @@ Sarvam-1 was released in October 2024. If it had memorised Odia Wikipedia, pages
 | 2022 | 1,196 | 0.495 | 0.473 | 43% |
 | 2023 | 1,263 | 0.502 | 0.481 | 47% |
 | 2024 | 1,525 | 0.504 | 0.489 | 55% |
-| 2025 | 1,129 | 0.524 | 0.498 | 13% |
+| 2025 | 1,128 | 0.524 | 0.497 | 13% |
 | 2026 | 850 | 0.510 | 0.485 | 2% |
 | <=2010 | 82 | 0.546 | 0.513 | 2% |
 
@@ -221,11 +221,11 @@ Sarvam-1 was released in October 2024. If it had memorised Odia Wikipedia, pages
 
 | articles >= 500 B | n | pooled bpb | median | median prose bpb | in review queue |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `translated` = False | 14,279 | 0.553 | 0.557 | 0.522 | 157 |
-| `translated` = True | 3,816 | 0.549 | 0.518 | 0.507 | 42 |
-| `ct_created` = False | 14,596 | 0.552 | 0.555 | 0.521 | 157 |
-| `ct_created` = True | 3,499 | 0.556 | 0.525 | 0.512 | 42 |
-| `mdwiki_created` = False | 17,797 | 0.554 | 0.551 | 0.520 | 199 |
+| `translated` = False | 14,272 | 0.553 | 0.557 | 0.522 | 164 |
+| `translated` = True | 3,811 | 0.548 | 0.518 | 0.507 | 35 |
+| `ct_created` = False | 14,589 | 0.551 | 0.555 | 0.521 | 164 |
+| `ct_created` = True | 3,494 | 0.555 | 0.524 | 0.512 | 35 |
+| `mdwiki_created` = False | 17,785 | 0.553 | 0.551 | 0.520 | 199 |
 | `mdwiki_created` = True | 298 | 0.474 | 0.479 | 0.479 | 0 |
 
 ### By topic (`annotations/topics.jsonl`, `primary_topic`)
@@ -233,42 +233,42 @@ Sarvam-1 was released in October 2024. If it had memorised Odia Wikipedia, pages
 | topic | articles >= 500 B | pooled bpb | median | median prose bpb | in review queue |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | health | 3,266 | 0.525 | 0.515 | 0.514 | 1 |
-| film | 2,687 | 0.610 | 0.600 | 0.520 | 34 |
-| politics | 2,535 | 0.474 | 0.452 | 0.426 | 30 |
-| geography | 2,076 | 0.586 | 0.633 | 0.594 | 18 |
-| literature | 1,663 | 0.588 | 0.591 | 0.509 | 23 |
-| religion | 1,215 | 0.569 | 0.558 | 0.543 | 10 |
-| arts | 1,098 | 0.583 | 0.576 | 0.548 | 17 |
-| sports | 524 | 0.542 | 0.544 | 0.532 | 11 |
+| film | 2,684 | 0.609 | 0.600 | 0.520 | 35 |
+| politics | 2,535 | 0.474 | 0.452 | 0.426 | 33 |
+| geography | 2,074 | 0.585 | 0.633 | 0.594 | 15 |
+| literature | 1,663 | 0.588 | 0.591 | 0.509 | 29 |
+| religion | 1,214 | 0.569 | 0.558 | 0.543 | 11 |
+| arts | 1,095 | 0.577 | 0.576 | 0.548 | 14 |
 | history | 523 | 0.497 | 0.510 | 0.496 | 3 |
+| sports | 523 | 0.541 | 0.543 | 0.532 | 10 |
 | biology | 506 | 0.581 | 0.616 | 0.590 | 9 |
-| (none) | 467 | 0.580 | 0.556 | 0.537 | 14 |
-| technology | 396 | 0.548 | 0.545 | 0.528 | 10 |
-| science | 297 | 0.531 | 0.542 | 0.528 | 9 |
+| (none) | 465 | 0.581 | 0.556 | 0.536 | 12 |
+| technology | 396 | 0.548 | 0.545 | 0.528 | 9 |
+| science | 297 | 0.531 | 0.541 | 0.526 | 8 |
 | calendar | 263 | 0.524 | 0.563 | 0.543 | 2 |
 | society | 191 | 0.506 | 0.516 | 0.495 | 4 |
 | economy | 184 | 0.516 | 0.507 | 0.486 | 2 |
 | education | 150 | 0.492 | 0.476 | 0.460 | 2 |
 | mathematics | 54 | 0.592 | 0.596 | 0.591 | 0 |
-| `school_relevant` = False | 7,876 | 0.553 | 0.539 | 0.499 | 103 |
-| `school_relevant` = True | 10,219 | 0.552 | 0.557 | 0.533 | 96 |
-| `odisha` = False | 11,484 | 0.550 | 0.549 | 0.532 | 142 |
-| `odisha` = True | 6,611 | 0.559 | 0.550 | 0.496 | 57 |
-| `is_person` = False | 11,526 | 0.556 | 0.559 | 0.537 | 106 |
-| `is_person` = True | 6,569 | 0.546 | 0.527 | 0.484 | 93 |
+| `school_relevant` = False | 7,866 | 0.552 | 0.539 | 0.499 | 98 |
+| `school_relevant` = True | 10,217 | 0.552 | 0.557 | 0.533 | 101 |
+| `odisha` = False | 11,472 | 0.549 | 0.549 | 0.531 | 135 |
+| `odisha` = True | 6,611 | 0.559 | 0.550 | 0.496 | 64 |
+| `is_person` = False | 11,521 | 0.556 | 0.559 | 0.537 | 107 |
+| `is_person` = True | 6,562 | 0.545 | 0.527 | 0.484 | 92 |
 
 ## What the extremes look like
 
-Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 100-299 B 0.29, list 300-999 B 0.30, table 300-999 B 0.34, text 1-3 kB 0.18, text 100-299 B 0.27, text 300-999 B 0.22, text >=3 kB 0.14. So the top 1% of prose sits roughly 2.5 robust sd, or about 1.7x, above its group's median.
+Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 100-299 B 0.29, list 300-999 B 0.29, table 300-999 B 0.34, text 1-3 kB 0.18, text 100-299 B 0.27, text 300-999 B 0.22, text >=3 kB 0.14. So the top 1% of prose sits roughly 2.5 robust sd, or about 1.7x, above its group's median.
 
 **The high end.** Of the 828 prose paragraphs in the top 1%, 2% are mostly Latin script, 1% mostly another script and 97% Odia.
-- English: 295 comparable text and list paragraphs are mostly Latin script with common English words, median bpb 1.02 (Sarvam-1 reads English at about 0.8 bpb, E03); the largest are in ଗାଲିଲିଓ (18991), ମହିଳାଙ୍କ ସୁରକ୍ଷା ନିମନ୍ତେ ଭାରତରେ ଥିବା ଆଇନ ତାଲିକା (44352), କଳ୍ପନା ଚାୱଲା (18747).
-- Another script, or Latin letters that are not English (transliteration, IPA, romanised titles, code): 290 comparable paragraphs, most extreme in ପଞ୍ଜାବୀ ଭାଷା (13376), ମୁକ୍ରୀ (56147), ମ୍ୟାଟ୍‌ଲାବ୍‌ (34400), ମୋହନ ଚୋଟି (56180).
-- Odia: 801 paragraphs, 15% of them verse by line shape; the most extreme prose ones are in ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର (49282), ବିଷ୍ଣୁ ମାଝୀ (80916), ସରହପା (12785), ସାଲବେଗ (11367). Read on 2026-09-24, the Odia top 1% was mostly legitimate but unusual text: poems, folk songs and Sanskrit shlokas, archaic Odia, and runs of names (weapons, song and film titles transliterated into Odia). Genuinely garbled Odia was rare. That is why verse is ranked after prose in the `garbled` type.
+- English: 286 comparable text and list paragraphs are mostly Latin script with common English words, median bpb 1.02 (Sarvam-1 reads English at about 0.8 bpb, E03); the largest are in ଗାଲିଲିଓ (18991), ମହିଳାଙ୍କ ସୁରକ୍ଷା ନିମନ୍ତେ ଭାରତରେ ଥିବା ଆଇନ ତାଲିକା (44352), କଳ୍ପନା ଚାୱଲା (18747).
+- Another script, or Latin letters that are not English (transliteration, IPA, romanised titles, code): 273 comparable paragraphs, most extreme in ପଞ୍ଜାବୀ ଭାଷା (13376), ମୁକ୍ରୀ (56147), ମୋହନ ଚୋଟି (56180), ପେଣ୍ଟାଲ, ହାସ୍ୟ ଅଭିନେତା (55987).
+- Odia: 804 paragraphs, 15% of them verse by line shape; the most extreme prose ones are in ବିଷ୍ଣୁ ମାଝୀ (80916), ସରହପା (12785), ସାଲବେଗ (11367), ପାଇକ (17158). Read on 2026-09-24, the Odia top 1% was mostly legitimate but unusual text: poems, folk songs and Sanskrit shlokas, archaic Odia, and runs of names (weapons, song and film titles transliterated into Odia). Genuinely garbled Odia was rare. That is why verse is ranked after prose in the `garbled` type.
 
 **The low end is formulaic writing.** Of the 824 prose paragraphs in the bottom 1%, 266 (32%) have a near-copy in another article, a shared sentence frame or internal repetition (most extreme in ଚିନ୍ତାମଣି ଜେନା (ରାଜନୀତିଜ୍ଞ) (70599), ଲୋକନାଥ ମିଶ୍ର (ରାଜନେତା, 1967 ମୃତ୍ୟୁ) (83827), ପୂଜା ଭସ୍ତ୍ରାକର (100132)). The rest is plain, well-formed encyclopedic prose (most extreme in କିରଣ ବ୍ୟାସ (99029), ଲକ୍ଷ୍ମଣ ମଲ୍ଲିକ (72519), ଓଡ଼ିଶାର ମୁଖ୍ୟମନ୍ତ୍ରୀମାନଙ୍କର ତାଲିକା (10935)). The most repeated table header row, `| ଆରମ୍ଭ | ଶେଷ | ପଦବୀ | ନିର୍ବାଚନ ମଣ୍ଡଳୀ | ଦଳ |`, is in 220 articles.
 
-**bpb does not find boilerplate.** Each paragraph is scored on its own, so a sentence frame repeated across many articles is no more predictable to the model than any other sentence. The 4,162 comparable prose paragraphs whose frame (names and numbers masked) recurs in 5+ articles score 0.569 pooled against 0.517 for the rest. They are shorter (median 266 B against 764 B), and within their own kind and length band their median sits at the 49th percentile; only 12 of them reach the bottom 1%. Use the `repeats` column, not bpb, to find templates; 6,059 more templated paragraphs are under 100 B and are not compared at all.
+**bpb does not find boilerplate.** Each paragraph is scored on its own, so a sentence frame repeated across many articles is no more predictable to the model than any other sentence. The 4,162 comparable prose paragraphs whose frame (names and numbers masked) recurs in 5+ articles score 0.569 pooled against 0.517 for the rest. They are shorter (median 266 B against 764 B), and within their own kind and length band their median sits at the 49th percentile; only 12 of them reach the bottom 1%. Use the `repeats` column, not bpb, to find templates; 6,053 more templated paragraphs are under 100 B and are not compared at all.
 
 **Conversion leftovers**: 0 paragraphs in 0 articles match the markup patterns outside math.
 
@@ -276,7 +276,6 @@ Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 
 
 | bpb | B | article (id/para) | excerpt |
 | ---: | ---: | --- | --- |
-| 2.595 | 141 | ମ୍ୟାଟ୍‌ଲାବ୍‌ (34400/6) | \>> x = 17 x = 17 >> x = 'hat' x = hat >> y = x + 0 y = 104 97 116 >> x = [3\*4, pi/2] x = 12.0000 1.5708 >>… |
 | 2.355 | 417 | ପଞ୍ଜାବୀ ଭାଷା (13376/21) | ଟ୍ରାନ୍ସ ଲିଟେରେସନ୍: lahaur pākistānī panjāb dī rājdā̀ni ài. lok giṇtī de nāḷ karācī tõ bāad lahaur dūjā sáb tõ… |
 | 2.180 | 121 | ଅଡ଼ାଣା (ରାଗ) (65827/3) | ଆରୋହଣ S R M P n P M P n S' ପ୍ରାୟତଃ ଛୋଟ ⏎ S R g M P n P S' ⏎ ଅବରୋହଣ S' d n P g M R s |
 | 2.152 | 112 | ହନୁମାନ ଚାଳିଶା (55252/44) | ଆପନ ତେଜ ସମହ।ରୋ ଆପୈ । ⏎ ତୀନୈ ଲୋକ ହାଁକ ତେ କାପୈ ॥ |
@@ -288,6 +287,7 @@ Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 
 | 1.981 | 146 | ଶିବ ପଞ୍ଚାକ୍ଷର ସ୍ତୋତ୍ର (98362/42) | ଚନ୍ଦ୍ରାର୍କ ବୈଶ୍ୱାନର ଲୋଚନାୟ ତସ୍ମୈ "ବ" କାରାୟ ନମଃ ଶିବାୟ॥\*\*) |
 | 1.946 | 115 | ମୋତି ପ୍ରକାଶ (82232/10) | 4\* 'ଚିନିଙ୍ଗା ଭିଚ୍ ଛୋଲେ' (ମୋ କୋଳରେ ଝୁଲ), (କବିତା-1983) |
 | 1.927 | 161 | କାହ୍ନାପା (81962/6) | এক সো পদমা চউষট্‌ঠী পাখুড়ি । তহিঁ চড়ি নাচই ডোম্বি বাপুড়ি ॥ |
+| 1.901 | 119 | ଝୁମର (78036/60) | ଶ୍ରୀମୁଖ ସରୋଜ, ରଦ କରକଜ, ମାରନାରାଚ ଭ୍ରୁଲତାରେ । 3 । |
 
 **Lowest-bpb prose paragraphs (>= 100 B)**
 
@@ -367,14 +367,14 @@ Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 
 
 | bpb | B | article (id) | bot | odia_ratio |
 | ---: | ---: | --- | --- | ---: |
-| 2.007 | 3,211 | କେଷ୍ଟୋ ମୁଖାର୍ଜୀ (55695) |  | 0.29 |
-| 1.655 | 1,588 | ସାମରୋଜ ଆଜମି ଆଲଭୀ (98338) |  | 0.22 |
 | 1.597 | 1,073 | "ଖ ଚମ୍ପୂ" - ଖରାପ ତୁ ହେଲୁ ରେ (98320) |  | 0.95 |
-| 1.549 | 3,735 | ୟୁରୁ ୟୁରୁ ଦେ-ଓ (22752) |  | 0.54 |
-| 1.503 | 3,083 | ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା (56546) |  | 0.11 |
-| 1.439 | 1,200 | ହିମାଚଳ ପ୍ରଦେଶ ରେ ହ୍ରଦ ସମୂହ ର ସାରଣୀ (56549) |  | 0.34 |
 | 1.404 | 1,876 | "ଗ ଚମ୍ପୂ" - ଗଲାଣି ତ ଗଲା କଥାରେ ସଙ୍ଗାତ (98321) |  | 0.97 |
 | 1.383 | 1,366 | ଗଉଣି (13537) |  | 0.86 |
+| 1.373 | 1,812 | "କ ଚମ୍ପୂ" - କି ହେଲାରେ କହିତ ନୁହଇ ଭାରତୀରେ (98319) |  | 0.94 |
+| 1.367 | 869 | ଉରାଶିମାସକାତାସେନ (77537) |  | 0.45 |
+| 1.364 | 1,433 | ଚଢ଼େଇଆ ସଙ୍ଗୀତ (10901) |  | 0.96 |
+| 1.292 | 2,398 | ସାନଜିଦା ପ୍ରୀତି (98398) |  | 0.49 |
+| 1.266 | 4,328 | ପେଣ୍ଟାଲ, ହାସ୍ୟ ଅଭିନେତା (55987) |  | 0.07 |
 
 **Lowest-bpb articles (>= 500 B)**
 
@@ -389,7 +389,7 @@ Spread within groups (robust sd of log bpb, 1.4826 MAD): list 1-3 kB 0.27, list 
 | 0.305 | 2,418 | ବିଶ୍ଵ ଉପଭୋକ୍ତା ଅଧିକାର ଦିବସ (80646) |  | 0.98 |
 | 0.307 | 1,632 | ଆପଲ ଇନକର୍ପୋରେଟେଡ (7032) |  | 0.95 |
 
-**Templated text, all kinds and lengths.** 10,278 paragraphs (2.2% of bytes) share their sentence frame (digits, the article's title and rare words masked) with 5 or more articles; they score 0.640 pooled against 0.551 for the rest.
+**Templated text, all kinds and lengths.** 10,269 paragraphs (2.2% of bytes) share their sentence frame (digits, the article's title and rare words masked) with 5 or more articles; they score 0.639 pooled against 0.550 for the rest.
 
 ## Files
 

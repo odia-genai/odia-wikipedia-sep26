@@ -10,13 +10,13 @@ Not in this queue: 319 paragraphs (319 distinct texts, 366,751 B, in 233 article
 
 | type | meaning | in queue | candidates |
 | --- | --- | ---: | ---: |
-| `garbled` | Odia text the model finds very unlikely for its kind and length: garbled OCR or typing, broken sentences, odd mixtures. Verse, songs and Sanskrit also score high; they are ranked after prose within this type | 34 | 833 |
-| `english` | a paragraph that is mostly English: untranslated leftovers, quotes, citations, OCR'd English | 34 | 296 |
+| `garbled` | Odia text the model finds very unlikely for its kind and length: garbled OCR or typing, broken sentences, odd mixtures. Verse, songs and Sanskrit also score high; they are ranked after prose within this type | 34 | 839 |
+| `english` | a paragraph that is mostly English: untranslated leftovers, quotes, citations, OCR'd English | 34 | 287 |
 | `templated` | very predictable text for its kind and length (bottom 1%): formulaic sentences, lists and near-copies across articles; the reasons say when a copy was found | 34 | 898 |
-| `table` | a table in the top or bottom 1% of tables: English-only tables, IPA or name lists, repeated career tables | 31 | 57 |
+| `table` | a table in the top or bottom 1% of tables: English-only tables, IPA or name lists, repeated career tables | 30 | 53 |
 | `markup` | leftovers of the HTML/wikitext conversion ({{ }}, [[ ]], {\| \|}, tags, class=, namespace prefixes, px sizes, URLs), any bpb | 0 | 0 |
-| `script` | a paragraph mostly in another script (Shahmukhi, Brahmi, Telugu, ...) or in Latin letters that are not English (transliteration, IPA, other languages, romanised titles) | 34 | 315 |
-| `article` | the article as a whole: its bpb is in the top or bottom 1% of articles >= 500 B, or most of its bytes are in extreme paragraphs (catches pages made of many tiny paragraphs) | 33 | 448 |
+| `script` | a paragraph mostly in another script (Shahmukhi, Brahmi, Telugu, ...) or in Latin letters that are not English (transliteration, IPA, other languages, romanised titles) | 34 | 298 |
+| `article` | the article as a whole: its bpb is in the top or bottom 1% of articles >= 500 B, or most of its bytes are in extreme paragraphs (catches pages made of many tiny paragraphs) | 34 | 448 |
 
 Reason wording: *para 7 (text, 412 B): bpb 1.84, top 0.1% of text 300-999 B (median 0.45)* means paragraph 7 (`text.split("\n\n")[7]`) is a 412-byte prose paragraph whose bpb is in the top 0.1% of prose paragraphs of 300-999 bytes, whose median is 0.45. Extra notes: the share of Latin or other-script letters and of common English words among the Latin ones, conversion leftovers found (`markup`), verse, how many other articles hold a near-copy or the same sentence frame, repetition inside the paragraph, and a table header shared with other articles. *context:* lines come from the topic and Content Translation annotations when present.
 
@@ -24,17 +24,16 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
 
 ## Top 50
 
-1. **ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର** (id 49282, para 2, `garbled`)
-   - para 2 (text, 2,970 B): bpb 1.19, top 0.01% of text 1-3 kB (median 0.49)
-   - article: bpb 1.06, top 0.5% of articles >= 500 B (median 0.55); 100% of its bytes are in extreme paragraphs
-   - para 1 (text, 1,517 B): bpb 0.85, top 0.5% of text 1-3 kB (median 0.49)
-   - context: topic religion
-   > ଆମ୍ମା-ଭବାନୀ ଶକ୍ତିପୀଠ ପତି ଭକ୍ତଙ୍କର ଅପାର । । କଳାମୁଖୀ ବା କଲା ଜୀ ମା’ଙ୍କ । ଭାରତରେ ପବିତ୍ର ଓ ଧାର୍ମିକ ସୂଳ ରୂପେ ବାରଣାସୀର ବିଶେଷ ମହତ୍ୱ ରହିଛି । ിന്റെ \*\*-\* ମା’ଙ୍କର କୌଣସ ପତିମା ନାହିଁ; କେବଳ ଗୋଟିଏ । | ମନ୍ଦିର ହିମାଳୟର ନିମ୍ନଭାଗରେ କଶ୍ୱରେ…
+1. **ବିଷ୍ଣୁ ମାଝୀ** (id 80916, para 6, `garbled`)
+   - para 6 (text, 1,035 B): bpb 1.17, top 0.01% of text 1-3 kB (median 0.49)
+   - para 1 (text, 1,371 B): bpb 0.76, top 1% of text 1-3 kB (median 0.49)
+   - context: topic arts
+   > ହିସାବରୁ ଜଣାଯାଏ, ମାଝୀ 5000ରୁ ଅଧିକ ଗୀତ ଗାଇଥିଲେ, ଓ ତାଙ୍କ ମଧ୍ୟରୁ ଲୋକପ୍ରିୟ ଗୀତ ଗୁଡ଼ିକର ନାମ ଯଥାକ୍ରମେ "କସଲାଅଇ ସୋଧନେ ହୋଲା", "ସିତଲ ଦିନେ ପିପଲ ସମି ଚା", "ଡ୍ରାଇଭର ଦାଇ ମନ ପର୍ୟୋ ମଲାଇ", "ଲାଲୁପତେ ନୁଘ୍ୟୋ ଭୁଇନ୍ତର", "ମାଇ ଚୋରୀ ସଲାଲା", "ନା ଜ…
 
-2. **ଅଜୟଗଡ ରାଜ୍ୟ** (id 56693, para 7, `english`)
-   - para 7 (text, 1,282 B): bpb 1.16, top 0.01% of text 1-3 kB (median 0.49); 73% Latin letters, 12% common English words
-   - context: machine-assisted translation (Content Translation, from en)
-   > ମହାରାଜାଧିରାଜ ଛତ୍ରସାଲ : 1649-1731 (founder Ruler of many Kingdoms) \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_|\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ Hirdeshah ଜଗତରାଜ Bhartichandra (Panna…
+2. **ଗାଲିଲିଓ** (id 18991, para 19, `english`)
+   - para 19 (list, 7,621 B): bpb 0.72, 89th percentile of list >=100 B (median 0.51); 85% Latin letters, 31% common English words
+   - context: topic science
+   > - 1543 – ନିକୋଲସ କପରନିକସ (Nicolaus Copernicus), ଟଲେମୀଙ୍କ ଭୂ-କୈନ୍ଦ୍ରିକ ମଡେଲର ବିକଳ୍ପ ରୂପେ De revolutionibus orbium coelestium ପ୍ରକାଶ କଲେ, ଯାହାକି କପରନିକସଙ୍କ ମୃତ୍ୟୁ ପରବର୍ତ୍ତୀ କାଳରେ ଆରିଷ୍ଟୋଟଲୀୟ ଭୌତିକ-ଶାସ୍ତ୍ର (Aristotelian phy…
 
 3. **ସ୍ୱାମୀ ବିବେକାନନ୍ଦ** (id 18187, para 192, `templated`)
    - para 192 (list, 1,102 B): bpb 0.13, bottom 0.1% of list 1-3 kB (median 0.56); 79% of its word triples repeat within it
@@ -52,29 +51,31 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
 
 5. **ମୁକ୍ରୀ** (id 56147, para 11, `script`)
    - para 11 (list, 6,417 B): bpb 1.46, top 0.01% of list >=100 B (median 0.51); 100% Latin letters, 4% common English words
-   - article: bpb 1.21, top 0.5% of articles >= 500 B (median 0.55); 66% of its bytes are in extreme paragraphs; odia\_ratio 0.15
+   - article: bpb 1.21, top 0.1% of articles >= 500 B (median 0.55); 66% of its bytes are in extreme paragraphs; odia\_ratio 0.15
    - para 13 (list, 152 B): bpb 1.55, top 5% of list 100-299 B (median 0.97); 100% Latin letters, 7% common English words
    - context: machine-assisted translation (Content Translation, from en)
    - context: topic film
    > - Sharaabi (1984).... Natthulal ⏎ - Betaaj Badshah (1994) .... College Principal ⏎ - Baali Umar Ko Salaam (1994) (uncredited) .... Rahul ⏎ - Farishtay (1991) ⏎ - Trinetra (1991) .... Organizer Show Fight Wrestler in Wat…
 
-6. **ସାମରୋଜ ଆଜମି ଆଲଭୀ** (id 98338, whole article, `article`)
-   - article: bpb 1.65, top 0.01% of articles >= 500 B (median 0.55); 60% of its bytes are in extreme paragraphs; odia\_ratio 0.22
-   - para 3 (list, 791 B): bpb 2.32, top 0.01% of list 300-999 B (median 0.75); 100% Latin letters, 1% common English words
-   - para 5 (list, 158 B): bpb 2.39, top 0.5% of list 100-299 B (median 0.97); 100% Latin letters, 4% common English words
+6. **"ଖ ଚମ୍ପୂ" - ଖରାପ ତୁ ହେଲୁ ରେ** (id 98320, whole article, `article`)
+   - article: bpb 1.60, top 0.01% of articles >= 500 B (median 0.55)
+   - para 2 (text, 123 B): bpb 1.68, top 0.5% of text 100-299 B (median 0.69)
+   - para 7 (text, 171 B): bpb 1.64, top 1% of text 100-299 B (median 0.69)
+   > (para 2, bpb 1.68) ଖରାପ ତୁ ହେଲୁରେ ॥ ଖେଳଲୋଳଖଞ୍ଜନାଖି କି ସାହସ କଲୁ ରେ,
+
+7. **ପାଇକ** (id 17158, para 9, `garbled`)
+   - para 9 (text, 1,111 B): bpb 1.10, top 0.01% of text 1-3 kB (median 0.49)
+   - para 22 (text, 1,024 B): bpb 0.75, top 1% of text 1-3 kB (median 0.49)
+   - para 29 (text, 1,774 B): bpb 1.05, top 0.1% of text 1-3 kB (median 0.49); verse or song lines
+   - context: topic society, Odisha
+   > ପାଇକମାନେ ବ୍ୟବହାର କରୁ ଥିବା ଅସ୍ତ୍ର ଶସ୍ତ୍ରଗୁଡ଼ିକ ହେଉଛି କଣ୍ଟିଆ, ଅର୍ଦ୍ଧଚନ୍ଦ୍ର, ହବୁଡ଼ା, ଭୂଷଣ୍ଡୀ, କଟାରି, ଯୋଡ଼ାଗୁଆଳି, ଭିନ୍ଦିପାଳ, ଭାଲିମୁଖ, ପଞ୍ଚସୁର, ଜଜାଳ, କଉତୁଣ୍ଡି, ସପ୍ତସୁର, ଢାଲ, ଚକ୍ର, ଫରକଟ, ଶୂଳ, ବାଘନଖିଆ, ଗୋପୁଚ୍ଛ, ଭାଲ୍ଳା, କାଣ୍ଡଶର…
+
+8. **ସାଦିୟା ଆୟମାନ** (id 97980, para 5, `english`)
+   - para 5 (text, 1,285 B): bpb 1.03, top 0.1% of text 1-3 kB (median 0.49); 55% Latin letters, 44% common English words
+   - article: bpb 1.14, top 0.5% of articles >= 500 B (median 0.55); 60% of its bytes are in extreme paragraphs; odia\_ratio 0.25
+   - para 14 (table, 1,609 B): bpb 1.57, top 0.01% of table 1-3 kB (median 0.70); 100% Latin letters, 2% common English words
    - context: topic film
-   > (para 3, bpb 2.32) - Potro Mitali - ATN Bangla ⏎ - Tin Gada ⏎ - Sohojatri – Banglavision ⏎ - Badshah Sir er Biye – NTV ⏎ - Tui Ke Amar - Asian TV ⏎ - Tahader Joubonkal - ATN Bangla ⏎ - Madvhai ⏎ - Jamay Mela ⏎ - Gulsha…
-
-7. **ବିଷ୍ଣୁ ମାଝୀ** (id 80916, para 6, `garbled`)
-   - para 6 (text, 1,035 B): bpb 1.17, top 0.01% of text 1-3 kB (median 0.49)
-   - para 1 (text, 1,371 B): bpb 0.76, top 1% of text 1-3 kB (median 0.49)
-   - context: topic arts
-   > ହିସାବରୁ ଜଣାଯାଏ, ମାଝୀ 5000ରୁ ଅଧିକ ଗୀତ ଗାଇଥିଲେ, ଓ ତାଙ୍କ ମଧ୍ୟରୁ ଲୋକପ୍ରିୟ ଗୀତ ଗୁଡ଼ିକର ନାମ ଯଥାକ୍ରମେ "କସଲାଅଇ ସୋଧନେ ହୋଲା", "ସିତଲ ଦିନେ ପିପଲ ସମି ଚା", "ଡ୍ରାଇଭର ଦାଇ ମନ ପର୍ୟୋ ମଲାଇ", "ଲାଲୁପତେ ନୁଘ୍ୟୋ ଭୁଇନ୍ତର", "ମାଇ ଚୋରୀ ସଲାଲା", "ନା ଜ…
-
-8. **ଗାଲିଲିଓ** (id 18991, para 19, `english`)
-   - para 19 (list, 7,621 B): bpb 0.72, 89th percentile of list >=100 B (median 0.51); 85% Latin letters, 31% common English words
-   - context: topic science
-   > - 1543 – ନିକୋଲସ କପରନିକସ (Nicolaus Copernicus), ଟଲେମୀଙ୍କ ଭୂ-କୈନ୍ଦ୍ରିକ ମଡେଲର ବିକଳ୍ପ ରୂପେ De revolutionibus orbium coelestium ପ୍ରକାଶ କଲେ, ଯାହାକି କପରନିକସଙ୍କ ମୃତ୍ୟୁ ପରବର୍ତ୍ତୀ କାଳରେ ଆରିଷ୍ଟୋଟଲୀୟ ଭୌତିକ-ଶାସ୍ତ୍ର (Aristotelian phy…
+   > ଆୟମାନ 2019 ମସିହାରେ ଇମ୍ରାଉଲ ରାଫତଙ୍କ ନିର୍ଦ୍ଦେଶିତ ଟେଲିଭିଜନ ଡ୍ରାମା ଟୁ ବି ୱାଇଫ ଜରିଆରେ ଅଭିନୟ ଜଗତରେ କାମ କରିବା ଆରମ୍ଭ କରିଥିଲେ । ପରେ, ସେ ଆଜ ଆକାଶେ ଚାନ୍ଦ ନେଇ, ବ୍ରିଷ୍ଟିର ଓପେଖାଇ, ହାସି, ମେଡିସିନ୍ ମ୍ୟାନ୍, ନିରେର ପଖି, ତୁଇ ଚାରା ମୋନ ଭାଲୋ ନେ…
 
 9. **ଚିନ୍ତାମଣି ଜେନା (ରାଜନୀତିଜ୍ଞ)** (id 70599, para 11, `templated`)
    - para 11 (text, 1,313 B): bpb 0.20, bottom 0.01% of text 1-3 kB (median 0.49); near-copy (word-pair overlap 64%) in 1 other article
@@ -90,30 +91,29 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
 
 11. **ମୋହନ ଚୋଟି** (id 56180, para 6, `script`)
    - para 6 (list, 5,588 B): bpb 1.41, top 1% of list >=100 B (median 0.51); 100% Latin letters, 1% common English words
-   - article: bpb 1.16, top 0.5% of articles >= 500 B (median 0.55); 70% of its bytes are in extreme paragraphs; odia\_ratio 0.14
+   - article: bpb 1.16, top 0.1% of articles >= 500 B (median 0.55); 70% of its bytes are in extreme paragraphs; odia\_ratio 0.14
    - context: machine-assisted translation (Content Translation, from en)
    - context: topic film
    > - 1994 Do Fantoosh ⏎ - 1994 Mere Data Garib Nawaz ⏎ - 1993 Badi Bahen ⏎ - 1993 Kala Coat ⏎ - 1993 Shuruaat ⏎ - 1992 Sarphira ⏎ - 1992 Naseebwaala ⏎ - 1990 Shandaar ⏎ - 1990 Doodh Ka Karz ⏎ - 1990 Muqaddar Ka Badshaah ⏎…
 
-12. **କେଷ୍ଟୋ ମୁଖାର୍ଜୀ** (id 55695, whole article, `article`)
-   - article: bpb 2.01, top 0.01% of articles >= 500 B (median 0.55); odia\_ratio 0.29; 48% of its bytes are in paragraphs under 100 B
-   - context: machine-assisted translation (Content Translation, from en)
-   - context: topic film
-   > (para 1, bpb 0.61) କେଶଟୋ ମୁଖାର୍ଜୀ (Keshto Mikherji) ଜଣେ ଭାରତୀୟ ସିନେମା କଳାକାର ଯିଏ ହାସ୍ୟରସାତ୍ମକ ଭୂମିକା ପାଇଁ 50 ଦଶକରୁ 80 ଦଶକର ମଧ୍ୟ ଭାଗ ଯାଏ ଖୁବ ଜନପ୍ରିଯ ଥିଲେ । ସେ ମଦ୍ୟପ ଭୂମିକା ଏପରି ନିଖୁଣତାର ସହ ଅଭିନୟ କରୁଥିଲେ ଯେ ଦର୍ଶକମାନେ ହସି…
+12. **"କ ଚମ୍ପୂ" - କି ହେଲାରେ କହିତ ନୁହଇ ଭାରତୀରେ** (id 98319, whole article, `article`)
+   - article: bpb 1.37, top 0.1% of articles >= 500 B (median 0.55); 53% of its bytes are in extreme paragraphs
+   - para 6 (text, 315 B): bpb 1.38, top 0.1% of text 300-999 B (median 0.53)
+   - para 5 (text, 323 B): bpb 1.29, top 0.1% of text 300-999 B (median 0.53)
+   > (para 6, bpb 1.38) କି ନୀତି କି ଜାତିଶୀଳ, କି କୁଳବରତ ଫଳ, ଠଉର ପାରିଲା ମୋ ମତିରେ, କୋମଳତର ମୋହନ, କୁଞ୍ଜକୁକ୍ଷିରୁ ନିଃସ୍ୱନ, ଆସି ଚୁମ୍ବିଦେଲା ମୋ ଶ୍ରୁତିରେ ॥ 4 ॥
 
-13. **ପାଇକ** (id 17158, para 9, `garbled`)
-   - para 9 (text, 1,111 B): bpb 1.10, top 0.1% of text 1-3 kB (median 0.49)
-   - para 22 (text, 1,024 B): bpb 0.75, top 1% of text 1-3 kB (median 0.49)
-   - para 29 (text, 1,774 B): bpb 1.05, top 0.1% of text 1-3 kB (median 0.49); verse or song lines
-   - context: topic society, Odisha
-   > ପାଇକମାନେ ବ୍ୟବହାର କରୁ ଥିବା ଅସ୍ତ୍ର ଶସ୍ତ୍ରଗୁଡ଼ିକ ହେଉଛି କଣ୍ଟିଆ, ଅର୍ଦ୍ଧଚନ୍ଦ୍ର, ହବୁଡ଼ା, ଭୂଷଣ୍ଡୀ, କଟାରି, ଯୋଡ଼ାଗୁଆଳି, ଭିନ୍ଦିପାଳ, ଭାଲିମୁଖ, ପଞ୍ଚସୁର, ଜଜାଳ, କଉତୁଣ୍ଡି, ସପ୍ତସୁର, ଢାଲ, ଚକ୍ର, ଫରକଟ, ଶୂଳ, ବାଘନଖିଆ, ଗୋପୁଚ୍ଛ, ଭାଲ୍ଳା, କାଣ୍ଡଶର…
-
-14. **ସାଦିୟା ଆୟମାନ** (id 97980, para 5, `english`)
-   - para 5 (text, 1,285 B): bpb 1.03, top 0.1% of text 1-3 kB (median 0.49); 55% Latin letters, 44% common English words
-   - article: bpb 1.14, top 0.5% of articles >= 500 B (median 0.55); 60% of its bytes are in extreme paragraphs; odia\_ratio 0.25
-   - para 14 (table, 1,609 B): bpb 1.57, top 0.01% of table 1-3 kB (median 0.70); 100% Latin letters, 2% common English words
+13. **ଶ୍ରୀଦେବୀ** (id 63100, para 17, `garbled`)
+   - para 17 (text, 1,197 B): bpb 1.07, top 0.01% of text 1-3 kB (median 0.49)
+   - para 18 (text, 1,177 B): bpb 0.86, top 0.5% of text 1-3 kB (median 0.49)
+   - para 14 (text, 1,515 B): bpb 0.77, top 1% of text 1-3 kB (median 0.49)
    - context: topic film
-   > ଆୟମାନ 2019 ମସିହାରେ ଇମ୍ରାଉଲ ରାଫତଙ୍କ ନିର୍ଦ୍ଦେଶିତ ଟେଲିଭିଜନ ଡ୍ରାମା ଟୁ ବି ୱାଇଫ ଜରିଆରେ ଅଭିନୟ ଜଗତରେ କାମ କରିବା ଆରମ୍ଭ କରିଥିଲେ । ପରେ, ସେ ଆଜ ଆକାଶେ ଚାନ୍ଦ ନେଇ, ବ୍ରିଷ୍ଟିର ଓପେଖାଇ, ହାସି, ମେଡିସିନ୍ ମ୍ୟାନ୍, ନିରେର ପଖି, ତୁଇ ଚାରା ମୋନ ଭାଲୋ ନେ…
+   > ସେ କମଲ୍ ହାସନଙ୍କ ସହ 27ଟି ଚଳଚ୍ଚିତ୍ରରେ ଅଭିନୟ କରିଥିଲେ, ଯଥା: ଓକା ରାଧା ଇଧ୍ଧାରୁ କ୍ରିଷ୍ଣୁଲୁ (1986), ଆଖରୀ ସଙ୍ଗମ୍ (1984)- ହିନ୍ଦୀ, ସଦମା (1983)- ହିନ୍ଦୀ, ଅନ୍ଧାଗାଡ୍ଡୁ (1982), ମୁନରମ୍ ପିରାଇ (1982), ବାଜଭେ ମାୟମ (1982), ଅକାଳି ରାଜ୍ୟମ୍ (198…
+
+14. **ରୀତିକା ଖେରା** (id 74270, para 9, `english`)
+   - para 9 (list, 3,016 B): bpb 0.85, 94th percentile of list >=100 B (median 0.51); 100% Latin letters, 20% common English words
+   - para 7 (list, 575 B): bpb 1.35, top 5% of list 300-999 B (median 0.75); 100% Latin letters, 19% common English words
+   - context: topic education
+   > - Impact of Aadhaar on Welfare Programmes, Economic and Political Weekly, 16 December, Vol 52, No. 50. Special Article. ⏎ - Aadhaar and Food Security in Jharkhand, Pain Without Gain?, With Jean Drèze, Nazar Khalid and A…
 
 15. **ହିନ୍ଦୀ ଉଇକିପିଡ଼ିଆ** (id 98790, para 7, `templated`)
    - para 7 (list, 3,498 B): bpb 0.22, bottom 1% of list >=100 B (median 0.51); 65% of its word triples repeat within it
@@ -136,24 +136,21 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic film
    > - Kaalo (2010) ⏎ - Shri Chaitanya Mahaprabhu (2009) (Special Appearance) ⏎ - Paying Guest (2009) ⏎ - Fun 2shh: Dudes in the 10th Century (2003) ⏎ - Kasam (2001) ⏎ - Zulm-O-Sitam (1998) ⏎ - Hatyara (1998) ⏎ - Mere Sapno…
 
-18. **"ଖ ଚମ୍ପୂ" - ଖରାପ ତୁ ହେଲୁ ରେ** (id 98320, whole article, `article`)
-   - article: bpb 1.60, top 0.1% of articles >= 500 B (median 0.55)
-   - para 2 (text, 123 B): bpb 1.68, top 0.5% of text 100-299 B (median 0.69)
-   - para 7 (text, 171 B): bpb 1.64, top 1% of text 100-299 B (median 0.69)
-   > (para 2, bpb 1.68) ଖରାପ ତୁ ହେଲୁରେ ॥ ଖେଳଲୋଳଖଞ୍ଜନାଖି କି ସାହସ କଲୁ ରେ,
+18. **ବିଜୁ ଜନତା ଦଳ** (id 19026, whole article, `article`)
+   - article: bpb 0.28, bottom 0.1% of articles >= 500 B (median 0.55)
+   - para 1 (text, 1,069 B): bpb 0.28, bottom 0.5% of text 1-3 kB (median 0.49)
+   - context: topic politics
+   > (para 1, bpb 0.28) ବିଜୁ ଜନତା ଦଳ (ବିଜେଡି) ହେଉଛି ଭାରତର ଏକ ଆଞ୍ଚଳିକ ରାଜନୈତିକ ଦଳ, ଯାହାର ଓଡ଼ିଶା ରାଜ୍ୟରେ ଯଥେଷ୍ଟ ପ୍ରଭାବ ରହିଛି। ପୂର୍ବତନ ମୁଖ୍ୟମନ୍ତ୍ରୀ ବିଜୁ ପଟ୍ଟନାୟକଙ୍କ ଆଦର୍ଶକୁ ବଜାୟ ରଖିବା, ଓଡ଼ିଆ ଜାତୀୟତାବାଦକୁ ପ୍ରୋତ୍ସାହନ ଦେବା ଏବଂ ରା…
 
-19. **ଶ୍ରୀଦେବୀ** (id 63100, para 17, `garbled`)
-   - para 17 (text, 1,197 B): bpb 1.07, top 0.1% of text 1-3 kB (median 0.49)
-   - para 18 (text, 1,177 B): bpb 0.86, top 0.5% of text 1-3 kB (median 0.49)
-   - para 14 (text, 1,515 B): bpb 0.77, top 1% of text 1-3 kB (median 0.49)
-   - context: topic film
-   > ସେ କମଲ୍ ହାସନଙ୍କ ସହ 27ଟି ଚଳଚ୍ଚିତ୍ରରେ ଅଭିନୟ କରିଥିଲେ, ଯଥା: ଓକା ରାଧା ଇଧ୍ଧାରୁ କ୍ରିଷ୍ଣୁଲୁ (1986), ଆଖରୀ ସଙ୍ଗମ୍ (1984)- ହିନ୍ଦୀ, ସଦମା (1983)- ହିନ୍ଦୀ, ଅନ୍ଧାଗାଡ୍ଡୁ (1982), ମୁନରମ୍ ପିରାଇ (1982), ବାଜଭେ ମାୟମ (1982), ଅକାଳି ରାଜ୍ୟମ୍ (198…
+19. **ସରହପା** (id 12785, para 6, `garbled`)
+   - para 6 (text, 308 B): bpb 1.45, top 0.01% of text 300-999 B (median 0.53)
+   - context: topic religion, Odisha
+   > ତହି ବଟ ଚିତ୍ତ ବିସାମକରୁ ସରେହେ କହିଓ ଭୱସେ । ଘୋର ଅନ୍ଧାରେ ଚନ୍ଦ୍ରମଣି ଜିମି ଉତ୍ ଜୋଳା କରେଇ ପରମ ମହାସୁଖ ଏଣୁ କଣେ ହୁରିଓ ଅଶେଷ ହରେଇ ।"
 
-20. **ରୀତିକା ଖେରା** (id 74270, para 9, `english`)
-   - para 9 (list, 3,016 B): bpb 0.85, 94th percentile of list >=100 B (median 0.51); 100% Latin letters, 20% common English words
-   - para 7 (list, 575 B): bpb 1.35, top 5% of list 300-999 B (median 0.75); 100% Latin letters, 19% common English words
-   - context: topic education
-   > - Impact of Aadhaar on Welfare Programmes, Economic and Political Weekly, 16 December, Vol 52, No. 50. Special Article. ⏎ - Aadhaar and Food Security in Jharkhand, Pain Without Gain?, With Jean Drèze, Nazar Khalid and A…
+20. **ହରମାନ କୁଲ୍କେ** (id 99867, para 9, `english`)
+   - para 9 (list, 2,817 B): bpb 1.08, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 22% common English words
+   - context: topic history
+   > - Cidambaramahatmya (PhD, Wiesbaden 1970) ⏎ - The Cult of Jagannath and the Regional Tradition of Orissa (Delhi 1978, with A. Eschmann and G.C. Tripathi) ⏎ - The Devaraja Cult (Cornell University 1978) ⏎ - Jagannath Cul…
 
 21. **ନବରଙ୍ଗପୁର (ଲୋକ ସଭା ନିର୍ବାଚନ ମଣ୍ଡଳୀ)** (id 11546, para 4, `templated`)
    - para 4 (list, 1,495 B): bpb 0.19, bottom 0.5% of list 1-3 kB (median 0.56); 69% of its word triples repeat within it
@@ -174,23 +171,24 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic literature
    > ଟ୍ରାନ୍ସ ଲିଟେରେସନ୍: lahaur pākistānī panjāb dī rājdā̀ni ài. lok giṇtī de nāḷ karācī tõ bāad lahaur dūjā sáb tõ vaḍḍā šáir ài. lahor pākistān dā siāsī, rátalī te paṛā̀ī dā gáṛ ài te is laī ínū̃ pākistān dā dil vī kihā jān…
 
-24. **ହିମାଚଳ ପ୍ରଦେଶ ରେ ହ୍ରଦ ସମୂହ ର ସାରଣୀ** (id 56549, whole article, `article`)
-   - article: bpb 1.44, top 0.1% of articles >= 500 B (median 0.55); 64% of its bytes are in extreme paragraphs; odia\_ratio 0.34
-   - para 9 (text, 422 B): bpb 1.00, top 1% of text 300-999 B (median 0.53)
-   - para 8 (list, 348 B): bpb 1.74, top 0.5% of list 300-999 B (median 0.75); 100% Latin letters, 2% common English words
+24. **ବିଶ୍ୱ ସ୍ୱାସ୍ଥ୍ୟ ଦିବସ** (id 80742, whole article, `article`)
+   - article: bpb 0.29, bottom 0.1% of articles >= 500 B (median 0.55)
+   - para 1 (text, 1,028 B): bpb 0.29, bottom 0.5% of text 1-3 kB (median 0.49)
+   - context: topic calendar
+   > (para 1, bpb 0.29) ବିଶ୍ୱ ସ୍ୱାସ୍ଥ୍ୟ ସଂଗଠନ (WHO) ହେଉଛି ବିଶ୍ୱର ବିଭିନ୍ନ ସଦସ୍ୟ ଦେସ ମାନଙ୍କ ମଧ୍ୟରେ ସ୍ୱାସ୍ଥ୍ୟ ସମ୍ବନ୍ଧୀୟ ସମସ୍ୟା ଉପରେ ପାରସ୍ପରିକ ସହଯୋଗ ଏବଂ ମାନକ ବିକାଶ ପାଇଁ ଏକ ସଂଗଠନ । ବିଶ୍ୱ ସ୍ୱାସ୍ଥ୍ୟ ସଂଗଠନରେ 193ଟି ସଦସ୍ୟ ରାଷ୍ଟ୍ର ଏବଂ…
+
+25. **ସାଲବେଗ** (id 11367, para 9, `garbled`)
+   - para 9 (text, 310 B): bpb 1.43, top 0.01% of text 300-999 B (median 0.53)
+   - para 10 (text, 341 B): bpb 1.21, top 0.5% of text 300-999 B (median 0.53)
+   - para 11 (text, 359 B): bpb 1.14, top 0.5% of text 300-999 B (median 0.53)
+   - context: topic literature, Odisha
+   > ଆହେ ନୀଳ ଶଇଳ , ପ୍ରବଳ ମତ୍ତ ବାରଣ, ମୋ ଆରତ ନଲିନୀ ବନକୁ କର ଦଲନ । ଗଜରାଜ ଚିନ୍ତା କଲା ଥାଇ ଘୋର ଜଳେଣ, ଚକ୍ର ପେଶୀ ନକ୍ର ନାଶୀ , ଉଧାରିଲେ ଆପଣ ।
+
+26. **କୁଳଭୂଷଣ ଖରବନ୍ଦା** (id 56128, para 11, `english`)
+   - para 11 (list, 1,964 B): bpb 1.14, top 1% of list 1-3 kB (median 0.56); 99% Latin letters, 10% common English words
    - context: machine-assisted translation (Content Translation, from en)
-   - context: topic geography
-   > (para 9, bpb 1.00) ଶିମଳା ଅଞ୍ଚଳରେ ବର୍ଷାଜଳ ପ୍ଳାବିତ ଛୋଟ ହ୍ରଦ ଟାଣି ଜୁନନର , କୁନିହାର , ଓ କରବାଲି ରହିଛି । ତତ୍ ବ୍ଯତୀତ ତାଳି ଅଞ୍ଚଳରେ ପ୍ରକୃତିକ ପୁଷ୍କରିଣୀ ସବୁ ମଶୋବରା ଓ କରିଗ୍ନାନୋ ଅଞ୍ଚଳରେ ରହିଛି ।
-
-25. **ସରହପା** (id 12785, para 6, `garbled`)
-   - para 6 (text, 308 B): bpb 1.45, top 0.01% of text 300-999 B (median 0.53)
-   - context: topic religion, Odisha
-   > ତହି ବଟ ଚିତ୍ତ ବିସାମକରୁ ସରେହେ କହିଓ ଭୱସେ । ଘୋର ଅନ୍ଧାରେ ଚନ୍ଦ୍ରମଣି ଜିମି ଉତ୍ ଜୋଳା କରେଇ ପରମ ମହାସୁଖ ଏଣୁ କଣେ ହୁରିଓ ଅଶେଷ ହରେଇ ।"
-
-26. **ହରମାନ କୁଲ୍କେ** (id 99867, para 9, `english`)
-   - para 9 (list, 2,817 B): bpb 1.08, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 22% common English words
-   - context: topic history
-   > - Cidambaramahatmya (PhD, Wiesbaden 1970) ⏎ - The Cult of Jagannath and the Regional Tradition of Orissa (Delhi 1978, with A. Eschmann and G.C. Tripathi) ⏎ - The Devaraja Cult (Cornell University 1978) ⏎ - Jagannath Cul…
+   - context: topic film
+   > - Azhar (film) (Hindi) ⏎ - Dictator (2016) (Telugu) ⏎ - Brothers (Hindi) (2015) ⏎ - Haider (Hindi) (2014) ⏎ - Kirpaan - The Sword of Honour (Punjabi) (2014) ⏎ - Saadi Love Story(Punjabi) (2013) ⏎ - Delhi in a Day (2012)…
 
 27. **ଭାରତୀୟ ଜନଗଣନା** (id 82806, para 8, `templated`)
    - para 8 (list, 335 B): bpb 0.22, bottom 0.1% of list 300-999 B (median 0.75); 87% of its word triples repeat within it
@@ -202,7 +200,7 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
 28. **ଆବିଦ୍ଜି ଭାଷା** (id 99543, para 5, `table`)
    - para 5 (table, 429 B): bpb 2.41, top 0.01% of table 300-999 B (median 0.76); 98% Latin letters, 2% common English words
    - article: bpb 1.07, top 0.5% of articles >= 500 B (median 0.55); odia\_ratio 0.36
-   - para 28 (table, 3,976 B): bpb 1.75, top 1% of table >=200 B (median 0.79); 90% Latin letters, 3% common English words
+   - para 28 (table, 3,976 B): bpb 1.75, top 1% of table >=200 B (median 0.80); 90% Latin letters, 3% common English words
    - context: topic literature
    > | Village Name | Native name (IPA) | ⏎ |---|---| ⏎ | Soukoukro | sukwebi | ⏎ | Badasso | gbadatɛ | ⏎ | Elibou | elibu | ⏎ | Sahuyé | sayjɛ | ⏎ | gomon | goma | ⏎ | Yaobou | jawebi; joabu; djabõ; nadja côtôcô; Amougbrous…
 
@@ -211,33 +209,33 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic biology
    > - ରାଇଜୋବିୟମ ଏଜିପ୍ସିଆକମ ଶେମ୍ସେଲ୍ଡିନ ଏବଂ ଅନ୍ଯମାନେ. 2016 ⏎ - ରାଇଜୋବିୟମ ଆଗ୍ରେଗାଟମ (ହିର୍ସ୍ଚ ଓ ମୁଲର 1986) କୌର ଏବଂ ଅନ୍ଯମାନେ 2011 ⏎ - ରାଇଜୋବିୟମ ଆଲାମୀ ବର୍ଜ ଏବଂ ଅନ୍ଯମାନେ 2009 ⏎ - ରାଇଜୋବିୟମ ଆଲ୍ଟିପ୍ଲାନୀ ବରୌନା ଏବଂ ଅନ୍ଯମାନେ 2016 ⏎ -…
 
-30. **ନେହା କକ୍କର** (id 58885, whole article, `article`)
-   - article: bpb 1.26, top 0.1% of articles >= 500 B (median 0.55); 81% of its bytes are in extreme paragraphs; odia\_ratio 0.08
-   - para 3 (table, 2,764 B): bpb 1.38, top 0.5% of table 1-3 kB (median 0.70); 100% Latin letters, 4% common English words
-   - context: topic arts
-   > (para 3, bpb 1.38) | Year | Title | Film / Album | Co-singer(s) | ⏎ |---|---|---|---| ⏎ | 2009 | "Blue (theme)" | Blue | Blaaze, Raqeeb Alam, Sonu Kakkar, Jaspreet Jasz, Dilshad Khan | ⏎ | 2009 | "Hai Rama" | Meerabai…
+30. **ଦିଲ୍ଲୀପ କେ. ବିଶ୍ୱାସ** (id 95453, whole article, `article`)
+   - article: bpb 0.29, bottom 0.1% of articles >= 500 B (median 0.55)
+   - para 1 (text, 2,339 B): bpb 0.29, bottom 0.5% of text 1-3 kB (median 0.49)
+   - context: topic biology
+   > (para 1, bpb 0.29) ଦିଲ୍ଲୀପ କେ. ବିଶ୍ୱାସ ଜଣେ ଭାରତୀୟ ପରିବେଶବିତ୍ ଏବଂ କେନ୍ଦ୍ରୀୟ ପ୍ରଦୂଷଣ ନିୟନ୍ତ୍ରଣ ବୋର୍ଡ଼ ଓ ଦିଲ୍ଲୀ ପ୍ରଦୂଷଣ ନିୟନ୍ତ୍ରଣ କମିଟିର ପୂର୍ବତନ ଅଧ୍ୟକ୍ଷ । ସେ ସାଇଲେଣ୍ଟ ଭ୍ୟାଲିରେ ପରିବେଶ ଅଧ୍ୟୟନ କରିଥିବା ପ୍ୟାନେଲର ସଦସ୍ୟ ଥିଲେ ଏବଂ…
 
-31. **ସାଲବେଗ** (id 11367, para 9, `garbled`)
-   - para 9 (text, 310 B): bpb 1.43, top 0.01% of text 300-999 B (median 0.53)
-   - para 10 (text, 341 B): bpb 1.21, top 0.5% of text 300-999 B (median 0.53)
-   - para 11 (text, 359 B): bpb 1.14, top 0.5% of text 300-999 B (median 0.53)
-   - context: topic literature, Odisha
-   > ଆହେ ନୀଳ ଶଇଳ , ପ୍ରବଳ ମତ୍ତ ବାରଣ, ମୋ ଆରତ ନଲିନୀ ବନକୁ କର ଦଲନ । ଗଜରାଜ ଚିନ୍ତା କଲା ଥାଇ ଘୋର ଜଳେଣ, ଚକ୍ର ପେଶୀ ନକ୍ର ନାଶୀ , ଉଧାରିଲେ ଆପଣ ।
+31. **ଆତସବାଜି** (id 21611, para 7, `garbled`)
+   - para 7 (text, 373 B): bpb 1.41, top 0.1% of text 300-999 B (median 0.53)
+   - context: topic technology
+   > କେତେକ ବାଣର ନାମ ଚଂପା, କୁଂପୀ, ତୁଂବ, ହାବିଳି, ଚକ୍ର ଆକାଶ ମଲ୍ଲୀ, ଆସମାନଗୋଲା, ଚେଂଗ, କାଠଚଂପା, ଚଂଦ୍ରଉଦିଆ ବା ମହତାପ, ପାଣିକୁଆ, ବଂବାଜୀ, ତୋପବାଜୀ, କଦଂବଗଛ, ରସକଦଂବ ।
 
-32. **କୁଳଭୂଷଣ ଖରବନ୍ଦା** (id 56128, para 11, `english`)
-   - para 11 (list, 1,964 B): bpb 1.14, top 1% of list 1-3 kB (median 0.56); 99% Latin letters, 10% common English words
-   - context: machine-assisted translation (Content Translation, from en)
-   - context: topic film
-   > - Azhar (film) (Hindi) ⏎ - Dictator (2016) (Telugu) ⏎ - Brothers (Hindi) (2015) ⏎ - Haider (Hindi) (2014) ⏎ - Kirpaan - The Sword of Honour (Punjabi) (2014) ⏎ - Saadi Love Story(Punjabi) (2013) ⏎ - Delhi in a Day (2012)…
+32. **କଦଳୀଗଛ** (id 75809, para 12, `english`)
+   - para 12 (list, 1,103 B): bpb 1.36, top 0.01% of list 1-3 kB (median 0.56); 92% Latin letters, 12% common English words
+   - context: topic biology
+   > - ମୁ. × ଅଲିନ୍ସନାୟା ର.ଭ.ଭାଲ୍ମେୟର [ଅ] ⏎ - ମୁ. ଅଜିଜୀ ହାକିନେନ ⏎ - ମୁ. ବାରିଓନେନ୍ସିସ Häkkinen ⏎ - M. bauensis Häkkinen & Meekiong [C] ⏎ - M. beccarii N.W.Simmonds [A] ⏎ - M. boman Argent [A] ⏎ - M. borneensis Becc. [C] ⏎ - M.…
 
 33. **ଶ୍ରଦ୍ଧା ଜାଧବ** (id 99679, para 11, `templated`)
    - para 11 (list, 1,361 B): bpb 0.21, bottom 0.5% of list 1-3 kB (median 0.56); 44% of its word triples repeat within it
    - context: topic politics
    > - 1992: ବୃହନ୍ମୁମ୍ବାଇ ମୁନିସିପାଲ କର୍ପୋରେସନରେ କର୍ପୋରେଟର (ପ୍ରଥମ ମୟାଦ) ⏎ - 1997: ବୃହନ୍ମୁମ୍ବାଇ ମୁନିସିପାଲ କର୍ପୋରେସନରେ ପୁନର୍ନିର୍ବାଚିତ କର୍ପୋରେଟର (ଦ୍ୱିତୀୟ ମିୟାଦ) ⏎ - 2002: ବୃହନ୍ମୁମ୍ବାଇ ମୁନିସିପାଲ କର୍ପୋରେସନରେ ପୁନର୍ନିର୍ବାଚିତ କର୍ପୋରେ…
 
-34. **ମୁଦ୍ରା ଓ ଭାଷା ସହ ଦେଶ ଓ ରାଜଧାନୀର ତାଲିକା** (id 43546, para 12, `table`)
-   - para 12 (table, 873 B): bpb 0.25, bottom 1% of table 300-999 B (median 0.76); 100% Latin letters, 4% common English words
-   > | Name | Capital | Currency | Official language | ⏎ |---|---|---|---| ⏎ | Argentina | Buenos Aires | Peso | Spanish | ⏎ | Bolivia | Sucre (official), La Paz (seat of government) | Boliviano | Spanish, Quechua, Aymara |…
+34. **ଭାରତୀୟ ଜାତୀୟ କ୍ରିକେଟ ଦଳ** (id 88702, para 50, `table`)
+   - para 50 (table, 3,059 B): bpb 0.30, bottom 0.5% of table >=200 B (median 0.80); 74% of its word triples repeat within it
+   - para 78 (text, 1,947 B): bpb 0.26, bottom 0.1% of text 1-3 kB (median 0.49)
+   - para 76 (text, 3,164 B): bpb 0.31, bottom 0.1% of text >=3 kB (median 0.50)
+   - context: topic sports
+   > | ଟୁର୍ଣ୍ଣାମେଣ୍ଟ | କିଟ୍ ନିର୍ମାତା | ସ୍ଲିଭ୍ ପ୍ରାୟୋଜକ | ⏎ |---|---|---| ⏎ | 1975 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1979 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1983 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1987 କ୍ରିକେଟ ବିଶ୍ୱକପ୍ |  |  | ⏎ | 1992 କ୍ରିକେଟ ବ…
 
 35. **ଓଡ଼ିଆ ମସଲାର ଇଂରାଜୀ ପ୍ରତିଶବ୍ଦ** (id 43428, para 2, `script`)
    - para 2 (text, 1,194 B): bpb 0.97, top 0.1% of text 1-3 kB (median 0.49); 61% Latin letters, 3% common English words; verse or song lines
@@ -245,21 +243,23 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic arts, Odisha
    > ଅଦା - Ginger ⏎ ଚାରୁ ମଞ୍ଜି -Chironji ⏎ ଆମ୍ବ ଅଦା - Mango ginger ⏎ ସୋରିଷ - Mustard ⏎ ପୋସ୍ତୋ - Poppy seeds ⏎ ପାନମଧୂରୀ - Fennel ⏎ ଜିରା - Cumin ⏎ ଲଙ୍କା - Chilli ⏎ ମେଥୀ - fenugreek ⏎ କଳାଜିରା - Nigella ⏎ ଖଜୁରି -Dates ⏎ ବାଦାମ -…
 
-36. **"କ ଚମ୍ପୂ" - କି ହେଲାରେ କହିତ ନୁହଇ ଭାରତୀରେ** (id 98319, whole article, `article`)
-   - article: bpb 1.37, top 0.1% of articles >= 500 B (median 0.55); 53% of its bytes are in extreme paragraphs
-   - para 6 (text, 315 B): bpb 1.38, top 0.1% of text 300-999 B (median 0.53)
-   - para 5 (text, 323 B): bpb 1.29, top 0.1% of text 300-999 B (median 0.53)
-   > (para 6, bpb 1.38) କି ନୀତି କି ଜାତିଶୀଳ, କି କୁଳବରତ ଫଳ, ଠଉର ପାରିଲା ମୋ ମତିରେ, କୋମଳତର ମୋହନ, କୁଞ୍ଜକୁକ୍ଷିରୁ ନିଃସ୍ୱନ, ଆସି ଚୁମ୍ବିଦେଲା ମୋ ଶ୍ରୁତିରେ ॥ 4 ॥
+36. **କର୍ଣ୍ଣାଟକ** (id 3008, whole article, `article`)
+   - article: bpb 0.30, bottom 0.1% of articles >= 500 B (median 0.55); 92% of its bytes are in extreme paragraphs
+   - para 1 (text, 1,316 B): bpb 0.25, bottom 0.1% of text 1-3 kB (median 0.49)
+   - context: topic geography
+   > (para 1, bpb 0.25) କର୍ଣ୍ଣାଟକ (କନ୍ନଡ: ಕರ್ನಾಟಕ) ଦକ୍ଷିଣ-ପଶ୍ଚିମ ଭାରତର ଏକ ରାଜ୍ୟ । 1956 ମସିହା ନଭେମ୍ବର 1 ତାରିଖରେ ରାଜ୍ୟ ପୁନର୍ଗଠନ ଆଇନ ବଳରେ ଏହି ରାଜ୍ୟ ସ୍ଥାପିତ ହୋଇଥିଲା । ଏହାର ପୂର୍ବ ନାମ ମହୀଶୂର ଥିଲା । 1973 ମସିହାରେ ଏହାର ନୂତନ ନାମକରଣ ହ…
 
-37. **ଆତସବାଜି** (id 21611, para 7, `garbled`)
-   - para 7 (text, 373 B): bpb 1.41, top 0.1% of text 300-999 B (median 0.53)
-   - context: topic technology
-   > କେତେକ ବାଣର ନାମ ଚଂପା, କୁଂପୀ, ତୁଂବ, ହାବିଳି, ଚକ୍ର ଆକାଶ ମଲ୍ଲୀ, ଆସମାନଗୋଲା, ଚେଂଗ, କାଠଚଂପା, ଚଂଦ୍ରଉଦିଆ ବା ମହତାପ, ପାଣିକୁଆ, ବଂବାଜୀ, ତୋପବାଜୀ, କଦଂବଗଛ, ରସକଦଂବ ।
+37. **ତାନିଆ ଅହମଦ** (id 62459, para 3, `garbled`)
+   - para 3 (text, 2,893 B): bpb 1.01, top 0.1% of text 1-3 kB (median 0.49)
+   - article: bpb 0.93, top 1% of articles >= 500 B (median 0.55); 59% of its bytes are in extreme paragraphs
+   - para 13 (list, 2,071 B): bpb 1.21, top 0.5% of list 1-3 kB (median 0.56)
+   - context: topic film
+   > ତାନିଆ 1991ରେ ଜଣେ ମଡେଲ ଭାବରେ ତାଙ୍କର ପେଷା ଆରମ୍ଭ କରିଥିଲେ । ସେ ସମ୍ପର୍କ ନାମକ ଏକ ଦୂରଦର୍ଶନ ଧାରାବାହିକ ଜରିଆରେ ଅଭିନୟ ଦୁନିଆରେ ପ୍ରବେଶ କରିଥିଲେ । ଫାରିଆ ହୋସାଇନ ନାମକ ଏକ ନାଟକର ନିର୍ଦ୍ଦେଶନାରୁ ସେ ତାଙ୍କର ନିର୍ଦ୍ଦେଶନା ପେଷା ମଧ୍ୟ ଆରମ୍ଭ କରିଥିଲେ…
 
-38. **କଦଳୀଗଛ** (id 75809, para 12, `english`)
-   - para 12 (list, 1,103 B): bpb 1.36, top 0.01% of list 1-3 kB (median 0.56); 92% Latin letters, 12% common English words
-   - context: topic biology
-   > - ମୁ. × ଅଲିନ୍ସନାୟା ର.ଭ.ଭାଲ୍ମେୟର [ଅ] ⏎ - ମୁ. ଅଜିଜୀ ହାକିନେନ ⏎ - ମୁ. ବାରିଓନେନ୍ସିସ Häkkinen ⏎ - M. bauensis Häkkinen & Meekiong [C] ⏎ - M. beccarii N.W.Simmonds [A] ⏎ - M. boman Argent [A] ⏎ - M. borneensis Becc. [C] ⏎ - M.…
+38. **କଳ୍ପନା ଚାୱଲା** (id 18747, para 28, `english`)
+   - para 28 (list, 4,596 B): bpb 0.66, 85th percentile of list >=100 B (median 0.51); 75% Latin letters, 34% common English words
+   - context: topic science
+   > - Asteroid 51826 Kalpanachawla, କଲମ୍ବିଆରେ ଯାତ୍ରା କରିଥିବା ମହାକାଶଚାରୀ ଦଳରେ କଳ୍ପନାଙ୍କ ନାମ । ⏎ - 2003 ମସିହା ଫେବୃୟାରୀ ମାସ 5 ତାରିଖରେ ଭାରତର ପ୍ରଧାନ ମନ୍ତ୍ରୀ ଘୋଷଣା କରିଥିଲେ ଯେ ପାଣିପାଗ ସୂଚନା ଦେଉଥିବା କୃତ୍ରିମ ଉପଗ୍ରହ ଶୃଙ୍ଖଳା MetSatର ପ…
 
 39. **ବଲାଙ୍ଗୀର (ଲୋକ ସଭା ନିର୍ବାଚନ ମଣ୍ଡଳୀ)** (id 11542, para 4, `templated`)
    - para 4 (list, 823 B): bpb 0.26, bottom 0.5% of list 300-999 B (median 0.75); 58% of its word triples repeat within it
@@ -267,12 +267,12 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic politics, Odisha
    > - 2024: ସଙ୍ଗୀତା କୁମାରୀ ସିଂହ ଦେଓ (ଭାରତୀୟ ଜନତା ପାର୍ଟି) ⏎ - 2019: ସଙ୍ଗୀତା କୁମାରୀ ସିଂହଦେଓ (ଭାରତୀୟ ଜନତା ପାର୍ଟି) ⏎ - 2014: କଳିକେଶ ନାରାୟଣ ସିଂହଦେଓ (ବିଜୁ ଜନତା ଦଳ) ⏎ - 2009: କଳିକେଶ ନାରାୟଣ ସିଂଦେଓ (ବିଜୁ ଜନତା ଦଳ) ⏎ - 2004: ସଙ୍ଗୀତା କ…
 
-40. **ଭାରତୀୟ ଜାତୀୟ କ୍ରିକେଟ ଦଳ** (id 88702, para 50, `table`)
-   - para 50 (table, 3,059 B): bpb 0.30, bottom 0.5% of table >=200 B (median 0.79); 74% of its word triples repeat within it
-   - para 78 (text, 1,947 B): bpb 0.26, bottom 0.1% of text 1-3 kB (median 0.49)
-   - para 76 (text, 3,164 B): bpb 0.31, bottom 0.1% of text >=3 kB (median 0.50)
-   - context: topic sports
-   > | ଟୁର୍ଣ୍ଣାମେଣ୍ଟ | କିଟ୍ ନିର୍ମାତା | ସ୍ଲିଭ୍ ପ୍ରାୟୋଜକ | ⏎ |---|---|---| ⏎ | 1975 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1979 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1983 କ୍ରିକେଟ ବିଶ୍ୱକପ |  |  | ⏎ | 1987 କ୍ରିକେଟ ବିଶ୍ୱକପ୍ |  |  | ⏎ | 1992 କ୍ରିକେଟ ବ…
+40. **ଓଡ଼ିଶା ବିଧାନ ସଭାର ବାଚସ୍ପତିଙ୍କ ତାଲିକା** (id 87748, para 3, `table`)
+   - para 3 (table, 4,028 B): bpb 0.31, bottom 1% of table >=200 B (median 0.80); 66% of its word triples repeat within it
+   - article: bpb 0.32, bottom 0.5% of articles >= 500 B (median 0.55); 95% of its bytes are in extreme paragraphs
+   - para 1 (text, 600 B): bpb 0.32, bottom 1% of text 300-999 B (median 0.53)
+   - context: topic politics, Odisha
+   > | ନାମ | ବିଧାନ ସଭା | ଆରମ୍ଭ ଦିନ | ଶେଷ ଦିନ | ⏎ |---|---|---|---| ⏎ | ମୁକୁନ୍ଦ ପ୍ରସାଦ ଦାସ | 1ମ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବରୁ) | 28 ଜୁଲାଇ 1937 | 29 ମଇ 1946 | ⏎ | ଲାଲ ମୋହନ ପଟ୍ଟନାୟକ | 2ୟ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବର…
 
 41. **ସମ୍ବଲପୁରରେ ଶିକ୍ଷା** (id 56279, para 8, `script`)
    - para 8 (list, 1,611 B): bpb 1.30, top 0.5% of list 1-3 kB (median 0.56); 100% Latin letters, 0% common English words
@@ -281,23 +281,20 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic education, Odisha
    > - Govt. Deaf & Dumb High School, Burla ⏎ - Sri Aurobindo School (SAIIE&R) ⏎ - St. Joseph's Convent Higher Secondary School, Sambalpur ⏎ - Central School (KV) ⏎ - Delhi Public School, Sambalpur ⏎ - Madanawati Public Scho…
 
-42. **ବିଜୁ ଜନତା ଦଳ** (id 19026, whole article, `article`)
-   - article: bpb 0.28, bottom 0.1% of articles >= 500 B (median 0.55)
-   - para 1 (text, 1,069 B): bpb 0.28, bottom 0.5% of text 1-3 kB (median 0.49)
-   - context: topic politics
-   > (para 1, bpb 0.28) ବିଜୁ ଜନତା ଦଳ (ବିଜେଡି) ହେଉଛି ଭାରତର ଏକ ଆଞ୍ଚଳିକ ରାଜନୈତିକ ଦଳ, ଯାହାର ଓଡ଼ିଶା ରାଜ୍ୟରେ ଯଥେଷ୍ଟ ପ୍ରଭାବ ରହିଛି। ପୂର୍ବତନ ମୁଖ୍ୟମନ୍ତ୍ରୀ ବିଜୁ ପଟ୍ଟନାୟକଙ୍କ ଆଦର୍ଶକୁ ବଜାୟ ରଖିବା, ଓଡ଼ିଆ ଜାତୀୟତାବାଦକୁ ପ୍ରୋତ୍ସାହନ ଦେବା ଏବଂ ରା…
+42. **ଆପଲ ଇନକର୍ପୋରେଟେଡ** (id 7032, whole article, `article`)
+   - article: bpb 0.31, bottom 0.1% of articles >= 500 B (median 0.55)
+   - para 1 (text, 1,632 B): bpb 0.31, bottom 1% of text 1-3 kB (median 0.49)
+   - context: topic technology
+   > (para 1, bpb 0.31) ଆପଲ ଇନକର୍ପୋରେଟେଡ ଏକ ଆମେରିକୀୟ ବହୁରାଷ୍ଟ୍ରୀୟ ଟେକ୍ନୋଲୋଜି କମ୍ପାନୀ ଓ ଏହାର ମୁଖ୍ୟାଳୟ କାଲିଫର୍ଣ୍ଣିଆର କୁପରଟିନୋରେ ରହିଛି । ମାର୍ଚ୍ଚ 2023 ସୁଦ୍ଧା, ଆପଲ ବଜାର ପୁଞ୍ଜି ଦୃଷ୍ଟିରୁ ବିଶ୍ୱର ସର୍ବବୃହତ କମ୍ପାନୀ, ଏବଂ 2022 ରାଜସ୍ୱ ସୁ…
 
-43. **ତାନିଆ ଅହମଦ** (id 62459, para 3, `garbled`)
-   - para 3 (text, 2,893 B): bpb 1.01, top 0.1% of text 1-3 kB (median 0.49)
-   - article: bpb 0.93, top 1% of articles >= 500 B (median 0.55); 59% of its bytes are in extreme paragraphs
-   - para 13 (list, 2,071 B): bpb 1.21, top 0.5% of list 1-3 kB (median 0.56)
-   - context: topic film
-   > ତାନିଆ 1991ରେ ଜଣେ ମଡେଲ ଭାବରେ ତାଙ୍କର ପେଷା ଆରମ୍ଭ କରିଥିଲେ । ସେ ସମ୍ପର୍କ ନାମକ ଏକ ଦୂରଦର୍ଶନ ଧାରାବାହିକ ଜରିଆରେ ଅଭିନୟ ଦୁନିଆରେ ପ୍ରବେଶ କରିଥିଲେ । ଫାରିଆ ହୋସାଇନ ନାମକ ଏକ ନାଟକର ନିର୍ଦ୍ଦେଶନାରୁ ସେ ତାଙ୍କର ନିର୍ଦ୍ଦେଶନା ପେଷା ମଧ୍ୟ ଆରମ୍ଭ କରିଥିଲେ…
+43. **ସତ୍ୟମେବ ଜୟତେ** (id 13878, para 2, `garbled`)
+   - para 2 (text, 301 B): bpb 1.41, top 0.1% of text 300-999 B (median 0.53)
+   > ସତ୍ୟମେବ ଜଯତେ ନାନୃତମ୍ ସତ୍ୟନ ପନ୍ଥାବ ବିତତୋବଦେବଯାନଃ । ⏎ ଯେନାକ୍ରମନ୍ୟୁତ୍ୟଷଯୋ ହ୍ୟାତ୍ମକାମୋ ଯତ୍ର ତତ୍ତ୍ୟସ୍ୟ ପରମଂ ନିଧାନଂ ॥
 
-44. **କଳ୍ପନା ଚାୱଲା** (id 18747, para 28, `english`)
-   - para 28 (list, 4,596 B): bpb 0.66, 85th percentile of list >=100 B (median 0.51); 75% Latin letters, 34% common English words
-   - context: topic science
-   > - Asteroid 51826 Kalpanachawla, କଲମ୍ବିଆରେ ଯାତ୍ରା କରିଥିବା ମହାକାଶଚାରୀ ଦଳରେ କଳ୍ପନାଙ୍କ ନାମ । ⏎ - 2003 ମସିହା ଫେବୃୟାରୀ ମାସ 5 ତାରିଖରେ ଭାରତର ପ୍ରଧାନ ମନ୍ତ୍ରୀ ଘୋଷଣା କରିଥିଲେ ଯେ ପାଣିପାଗ ସୂଚନା ଦେଉଥିବା କୃତ୍ରିମ ଉପଗ୍ରହ ଶୃଙ୍ଖଳା MetSatର ପ…
+44. **ଆତ୍ସୁତା ଶାଳ** (id 76172, para 20, `english`)
+   - para 20 (list, 2,295 B): bpb 1.01, top 5% of list 1-3 kB (median 0.56); 86% Latin letters, 40% common English words
+   - context: topic religion
+   > - ହାତ୍ସୁ-ଏବିସୁ (5 ଜାନୁଆରୀ): ଭାଗ୍ୟର କାମି, ଏବିସୁଙ୍କଠାରୁ ନବବର୍ଷରେ ସୌଭାଗ୍ଯ ମାଗିବା ପାଇଁ । ⏎ - ଯୋଦାମେଶୀ ଶିଞ୍ଜି (7 ଜାନୁଆରୀ): ପୂର୍ବରତ୍ନଭଣ୍ଡାର ଗୃହର ଚଟାଣ ତଳେ ରଖାଯାଇଥିବା ଏକ ପାତ୍ରରେ ଥିବା ଜଳର ପରିମାଣ ମାପି ଆଗାମୀ ବର୍ଷର ବାର୍ଷିକ ବର୍ଷାର ଭ…
 
 45. **ଲୋକନାଥ ମିଶ୍ର (ରାଜନେତା, 1967 ମୃତ୍ୟୁ)** (id 83827, para 1, `templated`)
    - para 1 (text, 1,314 B): bpb 0.26, bottom 0.1% of text 1-3 kB (median 0.49); near-copy (word-pair overlap 50%) in 1 other article
@@ -306,12 +303,11 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic politics, Odisha
    > ଲୋକନାଥ ମିଶ୍ର (4 ଅପ୍ରେଲ 1909 - 17 ଜୁଲାଇ 1967) ଜଣେ ଓଡ଼ିଆ ରାଜନୀତିଜ୍ଞ ଥିଲେ । ସେ ଓଡ଼ିଶା ବିଧାନ ସଭାରେ ଜଣେ ବିଧାୟକ ଭାବରେ ସ୍ୱାଧୀନତା ପୂର୍ବରୁ ଓ ପରେ ଚାରି ଥର କାର୍ଯ୍ୟ କରିଥିଲେ । ସ୍ୱାଧୀନତା ପୂର୍ବରୁ 1936 ମସିହାରେ ହୋଇଥିବା ପ୍ରଥମ ଓଡ଼ିଶା ବିଧାନ…
 
-46. **ଓଡ଼ିଶା ବିଧାନ ସଭାର ବାଚସ୍ପତିଙ୍କ ତାଲିକା** (id 87748, para 3, `table`)
-   - para 3 (table, 4,028 B): bpb 0.31, bottom 1% of table >=200 B (median 0.79); 66% of its word triples repeat within it
-   - article: bpb 0.32, bottom 0.5% of articles >= 500 B (median 0.55); 95% of its bytes are in extreme paragraphs
-   - para 1 (text, 600 B): bpb 0.32, bottom 1% of text 300-999 B (median 0.53)
-   - context: topic politics, Odisha
-   > | ନାମ | ବିଧାନ ସଭା | ଆରମ୍ଭ ଦିନ | ଶେଷ ଦିନ | ⏎ |---|---|---|---| ⏎ | ମୁକୁନ୍ଦ ପ୍ରସାଦ ଦାସ | 1ମ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବରୁ) | 28 ଜୁଲାଇ 1937 | 29 ମଇ 1946 | ⏎ | ଲାଲ ମୋହନ ପଟ୍ଟନାୟକ | 2ୟ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବର…
+46. **କାସ ଅଧିତ୍ୟକା** (id 28613, para 9, `table`)
+   - para 9 (table, 1,628 B): bpb 1.49, top 0.5% of table 1-3 kB (median 0.70); 96% Latin letters, 0% common English words
+   - article: bpb 0.96, top 1% of articles >= 500 B (median 0.55); odia\_ratio 0.38
+   - context: topic geography
+   > | ବୈଜ୍ଞାନିକ ନାମ | ମରାଠୀ ନାମ | ⏎ |---|---| ⏎ | Ceropegia Vincaefolia | କାଣ୍ଟିଲପୁଷ୍ପ | ⏎ | Ceropegia Jainii | ସୋମଡ଼ା | ⏎ | Drosera Indica | Gavati Davbindu | ⏎ | Smithia hirsute / hirsuta | Kavala | ⏎ | Senecio grahami /…
 
 47. **ପ୍ରିୟବ୍ରତ ଦାସ** (id 72536, para 11, `script`)
    - para 11 (list, 1,294 B): bpb 1.28, top 0.5% of list 1-3 kB (median 0.56); 100% Latin letters, 6% common English words
@@ -320,20 +316,23 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic literature, Odisha
    > - Theosophical society, Brighton (UK) 1966 ⏎ - Hindu Centre, London (UK)1967 ⏎ - Yoga Centre, Brisbaden (Germany)1968 ⏎ - Brajamohan Sahitya Samiti, Bhawanipatna, Orissa 1968 ⏎ - All Orissa Sanskrit Teachers' conference…
 
-48. **ଅମୋଲ ପାଲେକର** (id 55969, whole article, `article`)
-   - article: bpb 1.23, top 0.1% of articles >= 500 B (median 0.55); 61% of its bytes are in extreme paragraphs; odia\_ratio 0.13
-   - para 7 (table, 2,327 B): bpb 1.34, top 0.5% of table 1-3 kB (median 0.70); 100% Latin letters, 10% common English words; 34% of its word triples repeat within it
-   - para 9 (list, 642 B): bpb 1.44, top 1% of list 300-999 B (median 0.75); 100% Latin letters, 23% common English words
+48. **ଗୋବିନ୍ଦ ଚନ୍ଦ୍ର ଦାସ (ରାଜନୀତିଜ୍ଞ)** (id 70535, whole article, `article`)
+   - article: bpb 0.31, bottom 0.1% of articles >= 500 B (median 0.55); 98% of its bytes are in extreme paragraphs
+   - para 3 (text, 1,231 B): bpb 0.28, bottom 0.5% of text 1-3 kB (median 0.49); near-copy (word-pair overlap 57%) in 8 other articles
+   - para 1 (text, 864 B): bpb 0.30, bottom 0.5% of text 300-999 B (median 0.53); near-copy (word-pair overlap 67%) in 3 other articles
+   - context: topic politics, Odisha
+   > (para 3, bpb 0.28) ଗୋବିନ୍ଦ ଭାରତୀୟ ଜନତା ପାର୍ଟିର କର୍ମକର୍ତ୍ତା ଭାବରେ ଓଡ଼ିଶା ରାଜନୀତିରେ ସକ୍ରିୟ ଅଛନ୍ତି । ସେ ଓଡ଼ିଶା ବିଧାନ ସଭାରେ ଜଣେ ବିଧାୟକ ଭାବରେ କାର୍ଯ୍ୟ କରିଥିଲେ । 2014 ମସିହାର ଓଡ଼ିଶା ବିଧାନ ସଭା ନିର୍ବାଚନରେ ସେ ଭାରତୀୟ ଜନତା ପାର୍ଟିର…
+
+49. **ଚନ୍ଦନ ତିୱାରୀ** (id 72805, para 8, `garbled`)
+   - para 8 (text, 884 B): bpb 1.33, top 0.1% of text 300-999 B (median 0.53)
+   - para 5 (text, 1,236 B): bpb 0.76, top 1% of text 1-3 kB (median 0.49)
+   - context: topic arts
+   > ପୁର୍ବଇୟା ଉସ୍ତାଦ, ବେଟି ଚରୟିଆ ସମାନ, ରାଧା ରସିୟା, ସବକେ (ରାମ ରସୁଲ, ବସନ୍ତି ବାୟେର, ଶିବ ଜୋଗିଆ, ସଝି ରାଗ, ସ‌ୱାନି ବାହାର, ନିର୍ଗୁନିଆ କବୀର, ମହାତ୍ମା ଗାନ୍ଧୀ, ନ‌ଦୀଆ ଧୀରେ ବ‌ହୋ, ଭଏସ ଅଫ ଗ୍ୟାଞ୍ଜେସ, ମାଇ, ଛଟ୍ଟି ମଇୟା, ରଙ୍କ କଳସ, ଚରଖ‌ୱା ଚାଲୁ ରହେ…
+
+50. **ଖୁସୱନ୍ତ ସିଂହ** (id 72168, para 27, `english`)
+   - para 27 (list, 1,680 B): bpb 1.02, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 39% common English words
+   - para 29 (list, 172 B): bpb 1.62, top 5% of list 100-299 B (median 0.97); 74% Latin letters, 44% common English words; 26% letters in other scripts
    - context: machine-assisted translation (Content Translation, from en)
-   - context: topic film
-   > (para 13, bpb 2.30) - Kachchi Dhoop – 1987 ⏎ - Naqab – 1988 ⏎ - Paoolkhuna – 1993 ⏎ - Mrignayanee – 1991 ⏎ - Kareena Kareena – 2004 ⏎ - AA Bail Mujhe Maar - 1987 ⏎ - Ek Nayi Ummeed-Roshni – 2015
-
-49. **ସତ୍ୟମେବ ଜୟତେ** (id 13878, para 2, `garbled`)
-   - para 2 (text, 301 B): bpb 1.41, top 0.1% of text 300-999 B (median 0.53)
-   > ସତ୍ୟମେବ ଜଯତେ ନାନୃତମ୍ ସତ୍ୟନ ପନ୍ଥାବ ବିତତୋବଦେବଯାନଃ । ⏎ ଯେନାକ୍ରମନ୍ୟୁତ୍ୟଷଯୋ ହ୍ୟାତ୍ମକାମୋ ଯତ୍ର ତତ୍ତ୍ୟସ୍ୟ ପରମଂ ନିଧାନଂ ॥
-
-50. **ଆତ୍ସୁତା ଶାଳ** (id 76172, para 20, `english`)
-   - para 20 (list, 2,295 B): bpb 1.01, top 5% of list 1-3 kB (median 0.56); 86% Latin letters, 40% common English words
-   - context: topic religion
-   > - ହାତ୍ସୁ-ଏବିସୁ (5 ଜାନୁଆରୀ): ଭାଗ୍ୟର କାମି, ଏବିସୁଙ୍କଠାରୁ ନବବର୍ଷରେ ସୌଭାଗ୍ଯ ମାଗିବା ପାଇଁ । ⏎ - ଯୋଦାମେଶୀ ଶିଞ୍ଜି (7 ଜାନୁଆରୀ): ପୂର୍ବରତ୍ନଭଣ୍ଡାର ଗୃହର ଚଟାଣ ତଳେ ରଖାଯାଇଥିବା ଏକ ପାତ୍ରରେ ଥିବା ଜଳର ପରିମାଣ ମାପି ଆଗାମୀ ବର୍ଷର ବାର୍ଷିକ ବର୍ଷାର ଭ…
+   - context: topic literature
+   > - The Mark of Vishnu and Other Stories, (Short Story) 1950 ⏎ - The History of Sikhs, 1953 ⏎ - Train to Pakistan, (Novel) 1956 ⏎ - The Voice of God and Other Stories, (Short Story) 1957 ⏎ - I Shall Not Hear the Nightinga…
 

@@ -1,13 +1,89 @@
+---
+pretty_name: Odia Wikipedia, cleaned for LLM training (2026-09-01 dump)
+language:
+- or
+license: cc-by-sa-4.0
+task_categories:
+- text-generation
+- translation
+tags:
+- wikipedia
+- odia
+size_categories:
+- 10K<n<100K
+configs:
+- config_name: corpus
+  default: true
+  data_files:
+  - split: train
+    path: orwiki-20260901-trainingready.jsonl.gz
+- config_name: translations
+  data_files:
+  - split: train
+    path: translations/english-to-odia.jsonl
+- config_name: excluded
+  data_files:
+  - split: train
+    path: excluded.jsonl
+- config_name: removed_blocks
+  data_files:
+  - split: train
+    path: removed-blocks.jsonl
+- config_name: topics
+  data_files:
+  - split: train
+    path: annotations/topics.jsonl
+- config_name: translation_flags
+  data_files:
+  - split: train
+    path: annotations/translation.jsonl
+- config_name: bpb
+  data_files:
+  - split: train
+    path: annotations/bpb.jsonl
+- config_name: bpb_paragraphs
+  data_files:
+  - split: train
+    path: annotations/bpb.paragraphs.jsonl
+---
+
 # Odia Wikipedia, cleaned for LLM training
 
 Every article on [Odia Wikipedia](https://or.wikipedia.org) in the **2026-09-01 dump**
-(`orwiki-20260901-pages-articles.xml.bz2`, the latest complete dump when built on 2026-09-25), as clean
-GitHub-flavoured Markdown, one article per record: **18,695 articles, 4,512,644
+(`orwiki-20260901-pages-articles.xml.bz2`, the latest complete dump when built on 2026-10-01), as clean
+GitHub-flavoured Markdown, one article per record: **18,683 articles, 4,511,338
 Odia words, 87 MB of UTF-8 text**.
+
+## Download
+
+Two files are ready to take and use as they are:
+
+- **[`orwiki-20260901-trainingready.jsonl.gz`](orwiki-20260901-trainingready.jsonl.gz)**: **the corpus**. 18,683 Odia Wikipedia articles as clean
+  Markdown, one JSON object per line, 4,511,338 Odia words (17 MB gzipped,
+  87 MB unpacked). This is the file to train on.
+- **[`translations/english-to-odia.jsonl`](translations/english-to-odia.jsonl)**: **English-to-Odia translations**, if you want them separately.
+  791 English paragraphs and headings from these articles (441 paragraphs,
+  350 headings), each with its Odia translation: `source` is the English, `odia` the
+  translation, plus `kind`, the article's `title`, the automatic `checks` it passed and who made it
+  (`by`). The corpus already has them in place of the English. The file's other
+  85 lines are names and titles kept in English (`keep_as_is`) or junk to drop
+  (`drop`).
+
+```python
+import gzip, json
+articles = [json.loads(line) for line in gzip.open("orwiki-20260901-trainingready.jsonl.gz", "rt", encoding="utf-8")]
+pairs = [p for p in map(json.loads, open("translations/english-to-odia.jsonl", encoding="utf-8"))
+         if not p.get("drop") and not p["keep_as_is"]]
+```
+
+Everything else in this repository is how they were made, and what it takes to make them again.
+
+## What is here
 
 | File | What it is |
 |---|---|
-| **`orwiki-20260901-trainingready.jsonl`** | **the training-ready corpus**, one JSON object per line (fields below) |
+| **`orwiki-20260901-trainingready.jsonl.gz`** | **the training-ready corpus**, one JSON object per line (fields below), gzipped; `build` also writes it unpacked, as `orwiki-20260901-trainingready.jsonl` |
+| **`translations/english-to-odia.jsonl`** | **Odia translations of English paragraphs and headings**, with source and checks |
 | `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `orwiki-20260901-trainingready-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |
@@ -16,14 +92,15 @@ Odia words, 87 MB of UTF-8 text**.
 | `prepare.py`, `check.py`, `translate.py`, `annotate.py`, `score_bpb.py` | the steps |
 | `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
-| `translations/english-to-odia.jsonl` | Odia translations of English paragraphs and headings, with source and checks |
 | `curation/junk-paragraphs.jsonl` | paragraphs judged by hand not to be content, with the reason; `build` drops them |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
-All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file under
-50 MB here is tracked in git; the corpus JSONL (larger) is rebuilt from them by `pipeline.py`.
+All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file here is
+tracked in git, all under 50 MB and none through Git LFS: the corpus as `orwiki-20260901-trainingready.jsonl.gz`, while the
+unpacked `orwiki-20260901-trainingready.jsonl` is left out and rebuilt by `pipeline.py` from the inputs in `raw/`,
+`translations/`, `curation/` and `reviews/`.
 
 ## Record format
 
@@ -54,8 +131,8 @@ CommonMark + GFM tables) into exactly the headings, list items and tables it is 
 with no accidental emphasis, links, code, HTML, block quotes or rules. pandoc's GFM reader agrees
 on a random sample of 405 articles. Text from the page that would read as markup is
 backslash-escaped: `\*`, `\_`, `\$`, `\<alt>`, `1\.` or `\-` at the start of a line.
-There are 2,454 escapes in 523 articles, about
-70 per million characters.
+There are 2,189 escapes in 519 articles, about
+63 per million characters.
 
 A short example record:
 
@@ -83,7 +160,7 @@ A short example record:
 1. **Download.** `orwiki-20260901-pages-articles.xml.bz2` from dumps.wikimedia.org, with its SHA-1
    (`4ace67b6c5412a78565e463066f9450bfff6df6b`) checked against the dump's `dumpstatus.json`. The build needs only
    each article's id, title, revision id, timestamp and bot/stub flags, so the dump is reduced to
-   that index (`raw/orwiki-20260901-trainingready-articles.jsonl`, with its provenance in `raw/orwiki-20260901-trainingready-dump.json`) and
+   that index (`raw/orwiki-20260901-articles.jsonl`, with its provenance in `raw/orwiki-20260901-dump.json`) and
    deleted; `download` fetches it again.
 2. **Render.** Every main-namespace page that is not a redirect (21,095 pages)
    was fetched as Wikipedia's own rendering (Parsoid HTML) **of the exact revision in the
@@ -98,8 +175,8 @@ A short example record:
    - infoboxes, navboxes, layout tables, images, galleries, captions, maps. Data tables
      (`wikitable`) are kept as Markdown tables. A cell spanning rows repeats in each row, a cell
      spanning columns fills the first one, and image-only columns are removed. Tables hold
-     168,947 Odia words (3.7%) in
-     1,727 articles: lists of districts, constituencies, award winners
+     168,886 Odia words (3.7%) in
+     1,721 articles: lists of districts, constituencies, award winners
      and office holders. For prose only, drop the lines starting with `|`.
    - hatnotes, maintenance and stub banners, coordinates, pronunciation (IPA), sister-project
      boxes, archive notes ("Archived … at the Wayback Machine"), template error messages
@@ -129,9 +206,9 @@ A short example record:
      (189; each with its reason in `curation/junk-paragraphs.jsonl`)
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed (104), paragraphs and
-     headings are replaced by their Odia translation (899,
+     headings are replaced by their Odia translation (861,
      see `translations/english-to-odia.jsonl` and `METHODOLOGY.md`), and lists, tables and names stay
-     as they are (5,133)
+     as they are (4,847)
 4. **Fix known typos.** Bots copied some misspellings into hundreds of articles; each fix is tied to
    its context: ପରୁଷ→ପୁରୁଷ (917).
 5. **Normalise.** `normalize_odia` from `odia_text.py` (ୟ written as ଯ + nukta becomes
@@ -141,7 +218,7 @@ A short example record:
    hyphens, zero-width spaces, word joiners and BOMs are removed, and runs of spaces are
    collapsed. ZWJ and ZWNJ stay, because Odia spelling uses them. There is **no** NFC or other
    Unicode normalisation (by design).
-6. **Filter.** 2,400 pages were left out, each listed in `excluded.jsonl`
+6. **Filter.** 2,412 pages were left out, each listed in `excluded.jsonl`
    with its id, revision and reason. Boilerplate pages (year pages, date pages without events,
    empty film-year lists) say nothing beyond their title. Fact-bearing stubs stay, with
    `templated_share` for down-weighting.
@@ -153,25 +230,26 @@ A short example record:
 | under 5 Odia words | 137 |
 | disambiguation | 112 |
 | empty list page | 19 |
+| reviewer: drop | 12 |
 | duplicate text | 7 |
 | main page | 1 |
 
 ## Size
 
-The median article has 151 Odia words (10th percentile 58, 90th 427).
+The median article has 151 Odia words (10th percentile 58, 90th 428).
 1,006 articles have more than half of their words in template
 sentences (`templated_share` > 0.5: bot-made villages, towns and film pages),
 and 1,910 are marked as stubs.
-332 articles
-(56,627 Odia words) have `odia_ratio` under 0.6, mostly from English
+319 articles
+(55,417 Odia words) have `odia_ratio` under 0.6, mostly from English
 bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-trainer's
 `odia-build-cpt --min-odia-ratio`) skips them.
 
 | Odia words per article | Articles | Words |
 |---|---:|---:|
-| 0–49 | 1,398 | 41,752 |
-| 50–199 | 10,648 | 1,275,955 |
-| 200–999 | 6,195 | 2,225,308 |
+| 0–49 | 1,392 | 41,522 |
+| 50–199 | 10,645 | 1,275,556 |
+| 200–999 | 6,192 | 2,224,631 |
 | 1,000–4,999 | 428 | 766,154 |
 | 5,000+ | 26 | 203,475 |
 
@@ -202,22 +280,22 @@ events by hand works as well.
 decision: articles marked *drop* are left out, and dropped paragraphs are removed, matched by the
 sha1 of their text (not by position), so they survive rebuilds. Paragraph 0 (the title) is never
 dropped. This
-build applied 0 reviews: 0 articles dropped,
-0 paragraphs dropped, 0 marked *fix*, and
+build applied 217 reviews: 12 articles dropped,
+74 paragraphs dropped, 26 marked *fix*, and
 0 paragraph decisions whose text is no longer in the article.
 Use `--no-reviews` to build without them.
 
 ## Using it
 
 ```python
-import json
-docs = [r["text"] for r in map(json.loads, open("orwiki-20260901-trainingready.jsonl", encoding="utf-8"))
+import gzip, json
+docs = [r["text"] for r in map(json.loads, gzip.open("orwiki-20260901-trainingready.jsonl.gz", "rt", encoding="utf-8"))
         if r["templated_share"] < 0.8]  # e.g. down-weight or skip formulaic stubs
 ```
 
 ```bash
 jq -r 'select(.reason == "year page") | .title' excluded.jsonl | head   # why a page is missing
-jq -c 'select(.chars >= 500 and .chars < 600) | {id, title, words, chars}' orwiki-20260901-trainingready.jsonl | head
+gzip -dc orwiki-20260901-trainingready.jsonl.gz | jq -c 'select(.chars >= 500 and .chars < 600) | {id, title, words, chars}' | head
 ```
 
 - In odia-llm-trainer, `odia-build-cpt --local orwiki-20260901-trainingready.jsonl --local-upsample 1` adds all of it
@@ -226,6 +304,15 @@ jq -c 'select(.chars >= 500 and .chars < 600) | {id, title, words, chars}' orwik
   (`wikimedia/wikipedia`, `20231101.or`).
 - The text is already normalised with `normalize_odia`, so a pipeline that applies it again
   (and line dedup) barely touches it.
+
+## Origin
+
+Built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as
+its `data/odia-wikipedia/` folder, then moved here with everything needed to rebuild it: the
+rendered HTML, the annotation inputs, every Sarvam-1 score, the translations, the curated junk
+paragraphs and the review decisions. `METHODOLOGY.md` and `LEARNINGS.md` keep that project's names:
+`src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness, experiments
+(E01, E03, …) and edaapp, its web app for browsing and reviewing datasets.
 
 ## License
 

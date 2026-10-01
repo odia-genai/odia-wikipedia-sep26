@@ -2,7 +2,7 @@
  "name": "topics",
  "description": "Subject topics of each article from its categories, its Wikidata item and its title, for weighting a school-oriented training mix. One JSON object per line (topics.jsonl), one per article of the corpus, in corpus order. See quality/topics.md.",
  "source": "orwiki-20260901: categories from the rendered HTML of the dump revision (raw/html); hidden categories and the category tree from the page, page_props, linktarget and categorylinks SQL dumps (reduced to raw/orwiki-20260901-category-graph.jsonl.gz); for articles without a direct category or title match, the Wikidata item from page_props (in raw/orwiki-20260901-article-facts.jsonl.gz) and its P31/P106/P2175/P279 fetched from the Wikidata API, wbgetentities (raw/orwiki-20260901-wikidata.jsonl.gz); annotate.py topics",
- "created": "2026-09-24T20:30:59Z",
+ "created": "2026-10-01T16:00:44Z",
  "columns": {
   "id": "page id (integer)",
   "title": "article title (Odia digits as ASCII)",

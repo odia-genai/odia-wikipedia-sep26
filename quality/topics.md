@@ -1,6 +1,6 @@
 # Topic tags for Odia Wikipedia
 
-Built by `annotate.py topics` on 2026-09-24 for the 18,695 articles of the corpus (`orwiki-20260901-trainingready.jsonl`, 4,512,644 Odia words). Output: `annotations/topics.jsonl`, one JSON object per article in corpus order; the columns are described in `annotations/topics.json`. Titles and category names are written with ASCII digits, here and in the annotation.
+Built by `annotate.py topics` on 2026-10-01 for the 18,683 articles of the corpus (`orwiki-20260901-trainingready.jsonl`, 4,511,338 Odia words). Output: `annotations/topics.jsonl`, one JSON object per article in corpus order; the columns are described in `annotations/topics.json`. Titles and category names are written with ASCII digits, here and in the annotation.
 
 **Coverage: 97.4% of articles (96.4% of words) have a topic.** Precision of `primary_topic`, checked by hand on a held-out random sample: see [Precision](#precision).
 
@@ -9,28 +9,28 @@ Built by `annotate.py topics` on 2026-09-24 for the 18,695 articles of the corpu
 | Topic | Covers | Articles (primary) | Share | Odia words | Share | Articles listing it | Biographies | Odisha |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | `calendar` | year, date, month, decade and century pages; observances | 272 | 1.5% | 33,738 | 0.7% | 292 | 1 | 8 |
-| `film` | film, television and entertainment, including actors, directors, models | 2,717 | 14.5% | 523,266 | 11.6% | 2,805 | 1,438 | 1,534 |
-| `sports` | sports, sportspeople, clubs, venues, tournaments | 539 | 2.9% | 144,597 | 3.2% | 546 | 464 | 87 |
+| `film` | film, television and entertainment, including actors, directors, models | 2,714 | 14.5% | 523,051 | 11.6% | 2,801 | 1,435 | 1,534 |
+| `sports` | sports, sportspeople, clubs, venues, tournaments | 538 | 2.9% | 144,374 | 3.2% | 545 | 463 | 87 |
 | `health` | health and medicine: diseases, drugs, anatomy, nutrition, hospitals | 3,269 | 17.5% | 678,819 | 15.0% | 3,297 | 49 | 43 |
 | `biology` | biology and nature: plants, animals, taxa, ecology, forests, sanctuaries | 587 | 3.1% | 198,700 | 4.4% | 622 | 36 | 106 |
 | `mathematics` | mathematics and numbers | 57 | 0.3% | 17,043 | 0.4% | 73 | 13 | 4 |
-| `science` | physical and earth sciences: physics, chemistry, astronomy, geology, weather | 371 | 2.0% | 101,904 | 2.3% | 462 | 115 | 32 |
+| `science` | physical and earth sciences: physics, chemistry, astronomy, geology, weather | 371 | 2.0% | 101,881 | 2.3% | 462 | 115 | 32 |
 | `technology` | technology and engineering: computing, internet, vehicles, transport, space tech | 411 | 2.2% | 130,242 | 2.9% | 453 | 47 | 30 |
 | `economy` | economy and business: companies, industry, agriculture, banking, trade | 190 | 1.0% | 57,829 | 1.3% | 216 | 98 | 35 |
 | `education` | education: schools, colleges, universities, teachers | 157 | 0.8% | 26,388 | 0.6% | 192 | 20 | 119 |
-| `religion` | religion, mythology and philosophy: deities, temples, scriptures, saints | 1,235 | 6.6% | 485,958 | 10.8% | 1,354 | 87 | 398 |
+| `religion` | religion, mythology and philosophy: deities, temples, scriptures, saints | 1,234 | 6.6% | 485,704 | 10.8% | 1,353 | 87 | 398 |
 | `literature` | literature and language: writers, poets, books, periodicals, languages, scripts | 1,726 | 9.2% | 414,180 | 9.2% | 1,888 | 1,226 | 1,163 |
-| `arts` | arts and culture: music, dance, theatre, painting, festivals, food, customs, crafts | 1,120 | 6.0% | 356,004 | 7.9% | 1,304 | 530 | 463 |
+| `arts` | arts and culture: music, dance, theatre, painting, festivals, food, customs, crafts | 1,117 | 6.0% | 355,710 | 7.9% | 1,301 | 527 | 463 |
 | `history` | history and military: empires, dynasties, rulers, wars, freedom struggle, monuments | 530 | 2.8% | 234,126 | 5.2% | 627 | 284 | 114 |
 | `politics` | politics, government and law: politicians, elections, legislatures, courts, schemes | 2,557 | 13.7% | 516,263 | 11.4% | 2,667 | 2,063 | 1,858 |
 | `society` | society: communities, tribes, castes, organisations, social movements, activists | 193 | 1.0% | 84,672 | 1.9% | 253 | 81 | 52 |
-| `geography` | geography and places: countries, states, districts, towns, villages, rivers | 2,282 | 12.2% | 347,447 | 7.7% | 2,396 | 4 | 622 |
-| (none) | no evidence | 482 | 2.6% | 161,468 | 3.6% | | 112 | 76 |
+| `geography` | geography and places: countries, states, districts, towns, villages, rivers | 2,280 | 12.2% | 347,286 | 7.7% | 2,394 | 4 | 622 |
+| (none) | no evidence | 480 | 2.6% | 161,332 | 3.6% | | 112 | 76 |
 
-- **`school_relevant`**: 10,706 articles (57.3%), 2,614,190 words (57.9%).
-- **`is_person`** (biographies): 6,668 articles (35.7%), 1,557,253 words. Film and sports biographies: 1,902 articles, 432,407 words (9.6%).
-- **`odisha`**: 6,744 articles (36.1%), 1,385,318 words (30.7%).
-- 1,141 articles list more than one topic.
+- **`school_relevant`**: 10,704 articles (57.3%), 2,614,006 words (57.9%).
+- **`is_person`** (biographies): 6,661 articles (35.7%), 1,556,629 words. Film and sports biographies: 1,898 articles, 431,969 words (9.6%).
+- **`odisha`**: 6,744 articles (36.1%), 1,385,243 words (30.7%).
+- 1,140 articles list more than one topic.
 
 `health` is large because of WikiProject Medicine's translation drive: 1,936 of its 3,269 articles are machine-assisted translations (`translated` in `annotations/translation.jsonl`), 1,912 of them from MDWiki sources, mostly drug and disease pages. `calendar` is date pages with events, weekdays and observances (year pages are excluded). `politics` includes 1,326 biographies of Odisha assembly members.
 
@@ -48,7 +48,7 @@ Every article gets evidence from three sources, strongest first:
 - *A bare district* (`କଟକ ଜିଲ୍ଲା`) holds articles of every kind located there, so it is weak `geography` evidence (0.4, against 1.0 for a rule match). A bare country, state or continent (`ଭାରତ`, `ଜାପାନ`, `ଏସିଆ`) matches no rule at all (see the walk).
 - *No rule matches*: the category's parents are searched, up to 3 levels up. The graph comes from the `page`, `linktarget` and `categorylinks` dumps, reduced to `raw/orwiki-20260901-category-graph.jsonl.gz`, and it has cycles. The nearest level with a match decides, at weight 0.5. The walk does not continue through people categories or through general hubs. If the first level only says `geography`, the category is itself a place (ଜାପାନ in ଏସିଆର ଦେଶ "Asian countries"): its articles are things of that place (a dish, a myth, a census), so the walk gives nothing. A bare year category (`2019`) gives nothing either.
 
-**Scores.** Each category adds its weight (split across its topics), a title adds 3 (year or date) or 1.5 (qualifier), and Wikidata adds 1.0 (P31, split) and 1.5 (P106, split). `primary_topic` is the highest score. Ties go to the topic of the earlier category, since editors list the main one first, or the earlier Wikidata statement. `topics` lists every topic scoring at least 0.5 and 35% of the top score. `topic_scores` keeps the sums. `topic_source` names the evidence behind the primary topic: `category` 15,066, `wikidata` 2,073, `category+title` 797, `none` 482, `category+wikidata` 68, `title` 60, `category+parent_category` 59, `parent_category` 44, `parent_category+wikidata` 41, `category+parent_category+title` 3, `parent_category+title` 2.
+**Scores.** Each category adds its weight (split across its topics), a title adds 3 (year or date) or 1.5 (qualifier), and Wikidata adds 1.0 (P31, split) and 1.5 (P106, split). `primary_topic` is the highest score. Ties go to the topic of the earlier category, since editors list the main one first, or the earlier Wikidata statement. `topics` lists every topic scoring at least 0.5 and 35% of the top score. `topic_scores` keeps the sums. `topic_source` names the evidence behind the primary topic: `category` 15,061, `wikidata` 2,068, `category+title` 797, `none` 480, `category+wikidata` 68, `title` 60, `category+parent_category` 59, `parent_category` 44, `parent_category+wikidata` 41, `category+parent_category+title` 3, `parent_category+title` 2.
 
 **Flags.**
 
@@ -58,13 +58,13 @@ Every article gets evidence from three sources, strongest first:
 
 ## Coverage
 
-18,213 of 18,695 articles (97.4%) have a topic; 482 (2.6%, 3.6% of words) have none. Why the untagged have none:
+18,203 of 18,683 articles (97.4%) have a topic; 480 (2.6%, 3.6% of words) have none. Why the untagged have none:
 
 - Wikidata class not mapped to a topic: 132 (e.g. ଭାରତ ରତ୍ନ, ମମତା, ଦାଶ, କୌରବ, ଗ୍ରାଣ୍ଡ ହୋଟେଲ କାଠମାଣ୍ଡୁ)
 - no Wikidata item, and no category or title rule: 122 (e.g. କାର୍ତ୍ତିକ ବ୍ରତ, ପରମାନନ୍ଦ ଆଚାର୍ଯ୍ୟ, ଓଡ଼ିଶାରେ ସାଧବ ସଂସ୍କୃତି, ହାଟଡିହୀ, କେଦାରନାଥ ଜେନା)
 - Wikidata item without P31 or P279: 115 (e.g. ଓଡ଼ିଶାର ତହସିଲ ତାଲିକା, ସୁକାନ୍ତ କୁମାର ତ୍ରିପାଠୀ, ରକ୍ଷା ଉତ୍ପାଦନ ବିଭାଗ, ରକ୍ଷା ଅନୁସନ୍ଧାନ ଓ ବିକାଶ ବିଭାଗ, ରକ୍ଷା ବିଭାଗ)
 - a person with no field in categories or Wikidata P106: 78 (e.g. ଗୌରୀଶଙ୍କର ରାୟ, ଦେବକୀ, ଦାଶରଥି ପଟ୍ଟନାୟକ, ପ୍ରଥମ ନରସିଂହ ଦେବ, ପ୍ରତାପ ଚନ୍ଦ୍ର ଭଞ୍ଜଦେଓ)
-- a list or disambiguation page: 35 (e.g. ସାର୍ବଭୌମ ସ୍ୱାଧୀନ ଦେଶମାନଙ୍କର ତାଲିକା, ଓଡ଼ିଆ ଖବରକାଗଜ ତାଲିକା, ଓଡ଼ିଶାର ସାଂସଦ ମାନଙ୍କର ତାଲିକା, ଆସନ ତାଲିକା, ଓଡ଼ିଆ ପତ୍ରିକା ଗୁଡ଼ିକର ତାଲିକା)
+- a list or disambiguation page: 33 (e.g. ସାର୍ବଭୌମ ସ୍ୱାଧୀନ ଦେଶମାନଙ୍କର ତାଲିକା, ଓଡ଼ିଆ ଖବରକାଗଜ ତାଲିକା, ଓଡ଼ିଶାର ସାଂସଦ ମାନଙ୍କର ତାଲିକା, ଆସନ ତାଲିକା, ଓଡ଼ିଆ ପତ୍ରିକା ଗୁଡ଼ିକର ତାଲିକା)
 
 ## Precision
 

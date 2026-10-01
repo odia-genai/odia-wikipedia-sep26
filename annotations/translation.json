@@ -2,7 +2,7 @@
  "name": "translation",
  "description": "Articles created or largely written with Content Translation (CX) or MDWiki's CX-based translation dashboard: machine-assisted translations, mostly from English. One JSON object per line (translation.jsonl), one per article of the corpus, in corpus order. See quality/translation.md.",
  "source": "orwiki-20260901: stub-meta-history (every revision's id, timestamp, contributor, edit summary, size) and the change_tag and change_tag_def SQL dumps (tags on revisions), reduced to raw/orwiki-20260901-article-facts.jsonl.gz; user_groups and user_former_groups SQL dumps (bot accounts); annotate.py translation",
- "created": "2026-09-24T20:31:00Z",
+ "created": "2026-10-01T16:00:44Z",
  "columns": {
   "id": "page id (integer)",
   "ct_created": "the page's first revision carries a CX tag (contenttranslation, contenttranslation-v2, sectiontranslation, contenttranslation-high-unmodified-mt-text)",

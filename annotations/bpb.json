@@ -1,8 +1,8 @@
 {
   "name": "bpb",
   "description": "Sarvam-1 bits per byte of every article, and a review queue of likely data problems (garbled or wrong-script text, untranslated English, boilerplate, odd tables, conversion leftovers) from paragraph and article bpb extremes.",
-  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 634b1411a0d1",
-  "created": "2026-09-24T20:31:23Z",
+  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 68c6a19f1bf4",
+  "created": "2026-10-01T16:01:04Z",
   "columns": {
     "id": "page id (join key)",
     "text_sha1": "sha1 of the article text (UTF-8) that was scored; differs from the current text = stale",
