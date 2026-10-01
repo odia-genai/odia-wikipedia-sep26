@@ -1,10 +1,11 @@
 """Odia text helpers the build scripts share: Odia script checks, normalisation, numbers, jsonl io.
 
 A verbatim copy of `src/odia_llm/text.py` from odia-llm-trainer, the project this dataset was built
-in (copied 2026-10-01), so this repository needs nothing outside itself. Keep the two in step:
+in (copied 2026-10-01, updated 2026-10-02), so this repository needs nothing outside itself. Keep the two in step:
 `normalize_odia`, `odia_words` and `ODIA_DIGITS` decide what every article looks like.
 """
 
+import gzip
 import json
 import re
 from pathlib import Path
@@ -72,7 +73,8 @@ def odia_words(text: str) -> list[str]:
 
 
 def read_jsonl(path):
-    with open(path, encoding="utf-8") as f:
+    """The rows of a JSON lines file; a path ending in .gz is read through gzip."""
+    with (gzip.open if str(path).endswith(".gz") else open)(path, "rt", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
 
 
