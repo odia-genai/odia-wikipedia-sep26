@@ -63,6 +63,34 @@ in when convenient. Same entry format: **what happened** — **lesson** — **ac
 
 ## Data (Odia)
 
+- **The first review of the queue: 142 of 217 articles were fine, and the English lists are where
+  the work is** (2026-10-01, the owner's review of the whole review-first queue).
+  - **What happened.** 179 kept, 12 dropped, 26 *fix*; 74 paragraphs dropped from 6 articles.
+    Corpus 18,695 → 18,683 articles, −1,306 Odia words. Asking one question per kind (works lists,
+    fact lists, mostly English, fine on reading) instead of per article got 200 decisions in one
+    sitting.
+  - **The queue finds unusual text, not bad text.** Verse, Sanskrit, formulaic stubs and lists of
+    works are most of it. Its bad finds were English (10 drops, 25 fixes), one garbled page, one raw
+    machine translation and a few damaged paragraphs.
+  - **`gutted()` misses English kept as data.** All 10 mostly-English drops passed it: it only
+    weighs English that was taken out, and their English is lists and tables, which stay. 63
+    articles now have an Odia ratio under 0.35 and under 120 Odia words. The 7 of them reviewed went
+    2 keep and 5 fix, so a ratio threshold would drop good pages too.
+  - **Rebuilding moved the queue.** The re-ranking after the drops brought in 17 unseen articles.
+    The second pass took minutes because the rules were already set.
+  - todo: review the 56 unreviewed low-ratio articles (Odia ratio under 0.35, under 120 Odia
+    words; mostly English tables in list articles) by the same rules.
+  - todo: a translation round for the 26 *fix* articles (the notes name the paragraph;
+    transliterate names, by the owner's rule).
+  - **Review drops reach data already made from the dump.** 59 of E08's 4,500 passages come from
+    reviewed articles. One, `orwiki-49282-03445601`, is from the garbled ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର, now
+    dropped. It gave one question set and 4 reasoning traces in `e08_31b_synth.jsonl` and
+    `e08_31b_reason.jsonl`, which are on the Hub as `odia-teacher-data`.
+  - todo: the next dataset build should leave out items whose article a reviewer dropped, by reading
+    `excluded.jsonl` for "reviewer: drop".
+  - idea: rank the queue against what reviewers decide. Verse and lists of works are almost always
+    kept, so they could be ranked lower and leave room for the English and garbled kinds.
+
 - **Reading 577 odd paragraphs in context found three rule gaps bigger than the paragraphs**
   (2026-09-25, owner's request to decide on the paragraphs with no Odia letter).
   - ପୁନଶ୍ଚ ଦେଖଣା ("see also") heads 227 articles and wasn't recognised. Neither were several

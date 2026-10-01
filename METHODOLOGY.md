@@ -8,15 +8,16 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 
 | | |
 |---|---|
-| Articles | 18,695 (of 21,095 main-namespace pages that are not redirects) |
-| Odia words | 4,512,644 (runs of Odia letters; digits are ASCII) |
-| Characters / UTF-8 bytes | 34,810,662 / 87,307,918 |
-| Sarvam-1 tokens | 12.82M, without the BOS token of each scored paragraph (150.0 per kB of scored text) |
-| Paragraphs | 162,052, of which 143,357 are not the title |
-| Data tables | 2,962 in 1,727 articles, 168,947 Odia words |
-| Pages left out | 2,400, each in `excluded.jsonl` with id, revision and reason: 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 7 exact duplicates, the main page |
-| English inside articles | 899 paragraphs and headings translated into Odia (in 368 articles), 5,754 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
+| Articles | 18,683 (of 21,095 main-namespace pages that are not redirects) |
+| Odia words | 4,511,338 (runs of Odia letters; digits are ASCII) |
+| Characters / UTF-8 bytes | 34,716,497 / 87,198,728 |
+| Sarvam-1 tokens | 12.78M, without the BOS token of each scored paragraph (150.0 per kB of scored text) |
+| Paragraphs | 161,726, of which 143,043 are not the title |
+| Data tables | 2,948 in 1,721 articles, 168,886 Odia words |
+| Pages left out | 2,412, each in `excluded.jsonl` with id, revision and reason: 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 12 dropped by the reviewer, 7 exact duplicates, the main page |
+| English inside articles | 861 paragraphs and headings translated into Odia (in 362 articles), 4,847 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
+| Human review | 217 articles read by the owner (2026-10-01): 179 kept, 12 dropped, 26 marked *fix*; 74 paragraphs dropped from 6 kept articles |
 
 `pipeline.py` runs everything from the cached inputs in one command (`uv run pipeline.py`, a few minutes; `--fetch` starts from scratch): build, annotations, scores, checks, stopping at the first failure. The steps are scripts of their own, all in this folder:
 
@@ -284,7 +285,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 
 ## Filtering
 
-`build()` leaves out 2,400 of the 21,095 pages. Each one is a line of `excluded.jsonl`: `id`, `revid` (the dump revision, so `https://or.wikipedia.org/w/index.php?oldid=<revid>` shows it), `title` (ASCII digits), `reason` and `detail`. `check.py` confirms that every page of the article index is in exactly one of the corpus and `excluded.jsonl`. edaapp shows the file as its Excluded view.
+`build()` leaves out 2,412 of the 21,095 pages. Each one is a line of `excluded.jsonl`: `id`, `revid` (the dump revision, so `https://or.wikipedia.org/w/index.php?oldid=<revid>` shows it), `title` (ASCII digits), `reason` and `detail`. `check.py` confirms that every page of the article index is in exactly one of the corpus and `excluded.jsonl`. edaapp shows the file as its Excluded view.
 
 | Reason | Pages | Rule | Examples |
 |---|---:|---|---|
@@ -296,9 +297,9 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 | exact duplicate | 7 | the same body text as an earlier article (sha1); `detail` names the kept one | ଏକିନୋକୋକୋସିସ, a copy of ଏକିନୋକୋକୋସିସ ସଂକ୍ଷିପ୍ତ |
 | mostly English | 0 | what is left after taking out citations is under 25 Odia words (`gutted()`) | ଆବ୍ରୋସରସ and ଈଲୋସରସ until 2026-09-25, when their English bibliographies went with the new reference-section rules |
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
-| reviewer: drop | 0 | an edaapp review decision | |
+| reviewer: drop | 12 | an edaapp review decision (see [Human review loop](#human-review-loop)) | 7 left mostly English after the citations went (କେଷ୍ଟୋ ମୁଖାର୍ଜୀ, ନେହା କକ୍କର, ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା); ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର, garbled throughout |
 
-Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (332, 56,627 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
+Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (319, 55,417 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
 
 ### Boilerplate pages
 
@@ -463,7 +464,34 @@ edaapp, the web app of odia-llm-trainer for browsing and reviewing datasets, sho
 - *fix* verdicts are counted for follow-up; they change nothing by themselves.
 - A half-written last line is skipped. `--no-reviews` builds without any decisions.
 
-The counts are in the build JSON and `README.md`. So far no reviews have been applied.
+The counts are in the build JSON and `README.md`.
+
+### First review, 2026-10-01
+
+**What was done.** The owner decided every article in the [review-first queue](#review-first-queue). Claude read each flagged paragraph in its article, grouped the 200 articles by kind, and asked the owner one question per kind with a recommendation; the few single cases were asked one by one. The rebuild with those decisions re-ranked the queue and brought in 17 articles never seen before. Those were decided by the same rules, and their notes say so. Every note ends "(owner's review, 2026-10-01)", so the decisions can be told apart from later ones.
+
+| Kind | Articles | Decision |
+|---|---:|---|
+| Fine on reading: formulaic but correct, verse and songs, Odia tables and word lists, other scripts where the article needs them, English names and glosses inside Odia | 142 | keep |
+| A list of works in English (films, books, albums, TV) | 31 | keep: titles stay as written |
+| A list or table of facts in English (stations, rivers, players, schools, cars) | 18 | *fix*: translate into Odia later, leaning heavily to transliterating names |
+| English sentences left inside Odia text | 7 | *fix*: translate later, transliterating names |
+| The lead names a different person (ମନିରା ମିଠୁ) | 1 | *fix* |
+| Mostly English: under 35 Odia words would remain without the English | 10 | drop the article |
+| Garbled throughout (ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର) or raw machine translation (ମୋନିକା ସେଲ୍ସ) | 2 | drop the article |
+| Damaged or unwanted paragraphs in a good article | 6 | keep, drop the paragraphs |
+
+**Paragraphs dropped** (74 in 6 articles):
+- ୟୁରୁ ୟୁରୁ ଦେ-ଓ: the full song lyrics, in Japanese, English and Odia renderings (68 paragraphs, 57 distinct texts, since lines repeat);
+- 2018 କେରଳ ବନ୍ୟା: the helpline numbers of 2018 (2);
+- ଗସ୍ - ସିଡ଼ାଲ୍ ପଦ୍ଧତି: a program's console output flattened into one line;
+- ମ୍ୟାଟ୍‌ଲାବ୍‌: a MATLAB session run together on one line;
+- ଅଜୟଗଡ ରାଜ୍ୟ: a family tree drawn with underscores and pipes;
+- ଦାମନଯୋଡ଼ି: a badly typed paragraph.
+
+**Effect.** 18,695 → 18,683 articles, 4,512,644 → 4,511,338 Odia words (−1,306), 110,222 fewer UTF-8 bytes and 44,751 fewer Sarvam-1 tokens. Most of what went is English. Kept-as-is English blocks fell from 5,133 to 4,847, translated paragraphs from 899 to 861, and the articles under 0.6 Odia from 332 to 319. All 63 paragraph references matched. The 26 *fix* articles are unchanged until a translation round does them; each note names the paragraph.
+
+**What it says about the queue.** 142 of the 217 were fine as they were, and only 12 had to go. The queue's types are good at finding odd text but not at telling bad from merely unusual: verse, Sanskrit, formulaic stubs and lists of works make up most of it. The 10 mostly-English drops (30–118 Odia words, an Odia ratio of 0.02–0.34) all passed the "mostly English" rule (`gutted()`). It looks only at the English that was taken out, and their English is lists and tables, which stay as data. 63 articles in the corpus now have an Odia ratio under 0.35 and under 120 Odia words. Only 7 of them were reviewed (2 kept, 5 *fix*); most of the other 56 are English tables in list articles (airports, national highways, mountains). So a ratio threshold is not a safe drop rule, but those 56 are the next articles to review.
 
 ## Text cleanups, 2026-09-24
 
@@ -598,7 +626,9 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 - **Boilerplate.** Year pages, empty date pages and empty film-year lists are out (2,143 pages). What stays is fact-bearing stubs with repeated frames: 1,007 articles have `templated_share` ≥ 0.5, and about 1.8% of the corpus's Odia words are in template sentences. The training mix does not yet use `templated_share` (a down-weight or a repeat cap is still to do). Frames are matched on whole paragraphs, so a template sentence inside a longer paragraph is not counted.
 - **Paragraph granularity.** A list is one paragraph, so a paragraph drop removes the whole list block.
 - **Translations are LLM output.** They passed automatic checks and a sample review, not a full human review. They are marked per article (`translated_paragraphs`) and listed with their sources in `translations/english-to-odia.jsonl`.
-- **English lists and tables stay.** 5,754 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
+- **English lists and tables stay.** 4,847 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
+- **26 reviewed articles await a fix** (2026-10-01): 18 English lists and tables of facts and 7 English passages to translate (names transliterated), and one lead that names the wrong person. The review notes name each paragraph; the text is unchanged until a translation round does them.
+- **Only the review queue has been read.** The 217 reviewed articles are the queue's extremes, not a sample; there is still no blind review of random articles.
 - **Topics.** The small topics have thin evidence (science and society 5/8 in the stratified check); `odisha` misses articles without categories; Wikidata was read live on 2026-09-24, not from a dump.
 - **Translation.** Untagged machine translation cannot be detected from the dumps.
 - **319 paragraph texts are not scored** (233 articles). The wikitext-heading, superscript, subscript and section changes of 2026-09-25 made new texts, and re-scoring was deferred by the owner. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run (about 60k tokens, seconds of GPU time) fills them in.
@@ -611,6 +641,11 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-10-01: the first human review.**
+  - The owner decided all 217 articles of the review-first queue (the 200, plus 17 the re-ranking brought in): 179 kept, 12 dropped, 26 marked *fix*; 74 paragraphs dropped from 6 kept articles. See [First review](#first-review-2026-10-01).
+  - 18,683 articles, 4,511,338 Odia words (−1,306); 2,412 pages in `excluded.jsonl` (12 "reviewer: drop").
+  - English lists of works stay as written; English lists of facts and English passages are to be translated, transliterating names.
 
 - **2026-09-25: junk paragraphs, more reference sections, LaTeX superscripts, everything under 50 MB in git.**
   - All 577 paragraphs with no Odia letter reviewed by hand. 189 junk paragraphs in 72 articles are now dropped, each with its reason in `curation/junk-paragraphs.jsonl`. The rest are kept as names, titles and data.
