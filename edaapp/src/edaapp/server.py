@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import discovery
 from .filters import FilterError
-from .paths import APP_ROOT, STATE_DIR, SafeWriter, UnsafePathError
+from .paths import APP_ROOT, REVIEWS_DIR, SafeWriter, UnsafePathError
 from .reviews import InvalidEvent, ReviewStore
 from .service import Conflict, NotFound, Service
 from .store import Catalog, DataError
@@ -30,14 +30,16 @@ def create_app(
     data_root: Path,
     *,
     writer: SafeWriter | None = None,
-    state_dir: Path = STATE_DIR,
+    state_dir: Path = REVIEWS_DIR,
     allowed_hosts: set[str] | None = None,
     cache_dir: Path | None = None,
     sources: list[dict] | None = None,
 ) -> FastAPI:
-    """The app over `data_root`. `sources` says where its datasets come from (hub.Source.public(), one
-    per Hugging Face dataset), for the home page; empty for a local data root."""
-    writer = writer or SafeWriter(APP_ROOT)
+    """The app over `data_root`. Decisions are appended to `state_dir`/reviews.jsonl (default: the
+    repository's reviews/reviews.jsonl, the log the build reads). `sources` says where the datasets
+    come from (this repository, or the Hugging Face snapshots), for the Home page; empty for a
+    data root given with --data."""
+    writer = writer or SafeWriter()
     reviews = ReviewStore(writer.guard(Path(state_dir) / "reviews.jsonl"), writer)
     kw = {"cache_dir": cache_dir} if cache_dir else {}
     catalog = Catalog(data_root, writer, reviews, **kw)

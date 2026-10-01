@@ -1,85 +1,132 @@
 # edaapp
 
-A local web app for exploring and improving datasets: browse and search the articles, look at the
-topic, machine-translation and bits-per-byte annotations, see which pages and blocks the build left
-out and why, and record which articles and paragraphs to drop. By default it serves the Odia
-Wikipedia corpus as published on Hugging Face,
-[`fastpixels/odia-wikipedia-sep26`](https://huggingface.co/datasets/fastpixels/odia-wikipedia-sep26).
-This repository keeps no copy of the data. The decisions go to `state/reviews.jsonl`; see
-*How decisions reach the dataset* for how they get into it.
+The review web app of this dataset, the Odia Wikipedia corpus (`odia-wikipedia`): browse and search
+the articles, look at the topic, machine-translation and bits-per-byte annotations, see which pages
+and blocks the build left out and why, and record which articles to keep, drop or fix and which
+paragraphs to drop. It lives in the dataset's repository, in `edaapp/`, and by default serves the
+repository itself, the folder above it. Decisions go to `../reviews/reviews.jsonl`, the review log
+the build reads.
+
+## Running it
+
+In a clone. Nothing needs building first: the corpus is committed as
+`orwiki-20260901-trainingready.jsonl.gz`.
 
 ```bash
-cd edaapp
-uv run edaapp                    # the Hugging Face dataset, at main: http://127.0.0.1:8765/
-uv run edaapp --hub-revision f84c9d9   # a branch, tag or commit of it instead of main
-uv run edaapp --data ~/work      # a local data root instead, e.g. a checkout you are editing
-uv run edaapp --port 8766 --state .cache/try-state   # a trial run that leaves state/ alone
+git clone https://github.com/odia-genai/odia-wikipedia-sep26
+cd odia-wikipedia-sep26/edaapp
+uv run edaapp                     # this repository: http://127.0.0.1:8765/
+uv run edaapp --hub               # the published copy on Hugging Face, at main
+uv run edaapp --hub-revision 52a4f35   # a branch, tag or commit of it (implies --hub)
+uv run edaapp --data ~/other      # any other data root: one folder per dataset
+uv run edaapp --port 8766 --state .cache/try-state   # a trial: decisions go to .cache/try-state/
 ```
 
-`--state DIR` sets where `reviews.jsonl` goes. It must be inside `edaapp/`; anything else is
-refused. The default is `state/`, the real decisions the build reads. Use a folder under
-`.cache/` (git-ignored) for trials and demos.
+`uv run` sets up the environment (`edaapp/.venv`) on first use. The app serves on 127.0.0.1 only.
 
-It serves on 127.0.0.1 only. The first request loads the corpus and its annotations into memory
-(1.6 s for this dataset, measured 2026-10-01 from Hugging Face: 0.43 s of it is the gzipped corpus,
-0.17 s the score store that `bpb.paragraphs` joins in, see *Sidecar joins* below, and most of the
-rest is DuckDB inferring the types of the JSON lines files), and the Overview's first computation
-takes another 0.8 s. Everything after that is interactive: Browse and Excluded queries take a few
-milliseconds, and a search over the full text of all 18,683 articles takes 0.03–0.25 s.
+`--state DIR` sets the folder of `reviews.jsonl`. The default is the repository's `reviews/`, in
+every mode: with `--hub` too, because the Hub copy is the same dataset and its decisions belong in
+the same log. Any other folder must be inside `edaapp/` (use one under `.cache/`, which is
+git-ignored, for trials and demos); anything else is refused.
 
-## Where the data comes from
+The first request loads the corpus and its annotations into memory (1.5 s, measured 2026-10-01:
+0.41 s of it is the gzipped corpus, 0.17 s the score store that `bpb.paragraphs` joins in, see
+*Sidecar joins* below, and most of the rest is DuckDB inferring the types of the JSON lines files),
+and the Overview's first computation takes another 0.75 s. Everything after that is interactive:
+Browse and Excluded queries take a few milliseconds, and a search over the full text of all 18,683
+articles takes 0.03–0.25 s.
 
-Without `--data`, the app serves the datasets named in `src/edaapp/hub.py`:
+## Data sources
+
+### This repository (the default)
+
+The folder above `edaapp/` is served as one dataset named `odia-wikipedia`: `REPO_DATASET` in
+`src/edaapp/paths.py`, the same as `DATASET` in `../prepare.py` and the `dataset` of every review
+event. It is never named after the clone's folder, which is `odia-wikipedia-sep26` or whatever the
+clone was called. The app makes `.cache/repo-root/odia-wikipedia` (git-ignored) a symlink to the
+repository and serves `.cache/repo-root/` as its data root. The terminal and the Home page name the
+repository's path and its checked-out commit; the files shown are the working tree, changes not
+committed included.
+
+The corpus is committed gzipped, and `uv run pipeline.py` writes the plain `orwiki-*.jsonl` next to
+it (git-ignored). After a rebuild both exist: the newer file is read, and the Overview names the
+other as not read (see *One table in several formats*). The app reloads what changed while it runs,
+so a rebuild shows up without a restart.
+
+Inside the repository the app leaves out what is not data. `edaapp/` is never a dataset, and the
+Files view hides it along with `.git/` and every other dot-folder. Discovery only looks at the top
+level, `annotations/`, `quality/` and the files that sidecars join, so nothing in `edaapp/` or
+`reviews/` is read as a table or an annotation, and appending a decision is not a change of the data.
+
+### The published copy on Hugging Face (`--hub`)
+
+`--hub` serves the dataset as published on Hugging Face,
+[`fastpixels/odia-wikipedia-sep26`](https://huggingface.co/datasets/fastpixels/odia-wikipedia-sep26),
+named in `src/edaapp/hub.py`:
 
 ```python
-HUB_DATASETS = {"odia-wikipedia": "fastpixels/odia-wikipedia-sep26"}
+HUB_DATASETS = {REPO_DATASET: "fastpixels/odia-wikipedia-sep26"}
 ```
 
-The key is the dataset's name, the folder name the app shows and that every review event carries
-(`"dataset": "odia-wikipedia"`); the value is the Hugging Face dataset repository. At start, for
-each one:
+At start, for each one:
 
 1. The Hub is asked for the revision (`--hub-revision`, default `main`), and `snapshot_download`
    brings the Hugging Face cache up to date with it. The cache is the normal one
-   (`~/.cache/huggingface/hub`, or wherever `HF_HOME` or `HF_HUB_CACHE` point), outside this
+   (`~/.cache/huggingface/hub`, or wherever `HF_HOME` or `HF_HUB_CACHE` point), outside the
    repository. Only changed files are downloaded: the first start fetches about 100 MB (46 files,
    6 s), later ones only check (0.7 s).
 2. `raw/html/` is skipped (149 MB of rendered HTML, the build's input). Nothing in the app reads
    it: discovery looks at the top level, `annotations/` and `quality/`, and the one file a sidecar
    joins is `raw/bpb/scores.jsonl.gz`. The Files view therefore doesn't list it.
 3. `.cache/hub-root/odia-wikipedia` (git-ignored) is made a symlink to the snapshot folder, and
-   `.cache/hub-root/` is the data root. Links of names no longer in the map are removed. The app
-   never writes through the link: the path guard resolves it, and it leads out of `edaapp/`.
+   `.cache/hub-root/` is the data root. The app never writes through the link: the path guard
+   resolves it, and it leads out of the folders the app may write in.
 
-The terminal says which source is used, with the commit. So does the Home page.
+The terminal and the Home page say which revision is shown, with its commit. When the Hub can't be
+reached (no network, a timeout, `HF_HUB_OFFLINE=1`), the cached snapshot of the revision is used
+instead (`local_files_only`), and both say so, since it may be out of date. With no cached copy the
+app exits with a message saying so. A revision or repository that the Hub says doesn't exist is an
+error, not a fallback. The dataset is public, so no token is needed (huggingface_hub warns that
+unauthenticated requests have lower rate limits; that is harmless here). A newer revision on the
+Hub is picked up at the next start, not while the app runs.
 
-When the Hub can't be reached (no network, a timeout, `HF_HUB_OFFLINE=1`), the cached snapshot of
-the revision is used instead (`local_files_only`), and both the terminal and the Home page say so,
-since it may be out of date. With no cached copy, the app exits with a message saying so. A
-revision or repository that the Hub says doesn't exist is an error, not a fallback. The dataset is
-public, so no token is needed (huggingface_hub warns that unauthenticated requests have lower rate
-limits; that is harmless here). A newer revision on the Hub is picked up at the next start, not
-while the app runs.
+### Any other data root (`--data PATH`)
 
-`--data PATH` serves a local data root instead, for example while editing the dataset: a folder
-holding one folder per dataset. Name the dataset's folder `odia-wikipedia`, whatever the repository
-is called, so that its reviews match:
+A folder holding one folder per dataset, each named after its dataset (see *Discovery conventions*).
+Decisions still go to the repository's `reviews/reviews.jsonl` unless `--state` says otherwise.
+Events carry their dataset's name and the build applies only those of `odia-wikipedia`, but a log
+of another dataset's decisions belongs elsewhere: give it a `--state` folder of its own. To serve
+another checkout of this dataset this way, name its folder `odia-wikipedia`.
 
-```bash
-git clone https://github.com/odia-genai/odia-wikipedia-sep26 ~/work/odia-wikipedia
-uv run edaapp --data ~/work
-```
+`--hub` and `--data` exclude each other, and so do `--hub-revision` and `--data`.
 
-The repository tracks the corpus gzipped and git-ignores the plain `orwiki-*.jsonl` that a rebuild
-writes next to it. After a rebuild the checkout has both; the newer file is read, and the Overview
-names the other as not read (see *One table in several formats*). `--hub-revision` can't be
-combined with `--data`.
+## The review loop
+
+1. **Decide in the app**: keep, drop or fix an article, drop paragraphs, or act in bulk from
+   Patterns. Each decision is appended to `reviews/reviews.jsonl` at once.
+2. **Rebuild** at the repository's root: `uv run pipeline.py` (build, annotate, scores, checks; a
+   few minutes). The build applies the latest event per article (see *The review log* below). The
+   running app picks up the rebuilt files.
+3. **Commit and push** the review log and what the rebuild changed, to
+   <https://github.com/odia-genai/odia-wikipedia-sep26>.
+4. **Upload the dataset to Hugging Face, without `edaapp/`**: `uv run publish_hub.py` at the root
+   uploads the files git tracks at HEAD and leaves `edaapp/` out. By hand, the same is roughly:
+
+   ```bash
+   hf upload fastpixels/odia-wikipedia-sep26 . . --repo-type dataset \
+     --exclude "edaapp/*" --exclude "orwiki-*.jsonl"
+   ```
+
+   The second pattern leaves out the plain corpus a rebuild writes, which git ignores; other
+   untracked files would go up too, which `publish_hub.py` avoids.
+
+The app is published on GitHub only; the Hugging Face copy is the data.
 
 ## Views
 
 | View | What it does |
 |---|---|
-| **Home** | Where the data comes from (the Hugging Face dataset and commit, and a warning when the Hub could not be reached and the cached snapshot is used). One card per dataset: articles, words, newest version (and which file is read if it exists in several formats), build date, annotations (fresh, stale or with warnings), review progress, and links to its pages. |
+| **Home** | Where the data comes from (this repository and its commit, or the Hugging Face dataset and commit, with a warning when the Hub could not be reached and the cached snapshot is used). One card per dataset: articles, words, newest version (and which file is read if it exists in several formats), build date, annotations (fresh, stale or with warnings), review progress, and links to its pages. |
 | **Methodology** | The dataset's `METHODOLOGY.md`, shown only when the file exists. It has a sticky table of contents that marks the section in view, an anchor on every heading (`?h=<heading id>`), GFM tables, KaTeX math and linked references (see below). "Last updated" comes from the file's mtime, and the page reloads in place, keeping your section, when the file changes. |
 | **Review first** | `quality/review-first.md` as an actionable list, shown only when the file exists. Each item (`` 1. **title** (id N, para P, `type`) ``) links to its article, opened at the flagged paragraph. It shows the article's current verdict (keep/drop/fix, "¶ dropped" when just the flagged paragraph is marked, or none), live, with Keep/Drop/Fix and "Drop ¶P" buttons. Filter by failure type and hide reviewed; the filters are in the URL, and j/k in the article view walks the filtered list. It flags a paragraph that moved, changed or is gone since scoring, and articles whose text changed. It links to the Review queue (the `*.review_rank` column). If the items can't be parsed, the file is shown as a document instead. |
 | **Overview** | `?ann=<key>` scrolls to that annotation's row (links to `annotations/<key>.jsonl`, `.jsonl.gz` or `.parquet` land here). Build statistics from `<stem>-build.json`. Pages left out, by reason, from `excluded.jsonl`: a reason opens the Excluded view filtered to it, and counts that differ from the build file's `dropped` are listed. (Without `excluded.jsonl` the build file's `dropped` counts are shown; an older build file's `dropped_titles` still opens a list of titles.) A histogram for every numeric column, including annotation columns (log bins when skewed); click a bar to browse that bin. Value counts for boolean, categorical and list columns (click to filter). Paragraph-level distributions, with the count of null values (e.g. paragraphs not scored yet). Annotation status: rows, matched, missing, stale, ids not in the corpus, the columns (joined ones with their file and how many rows found a match), and the file read (with the older copy that is not read, during a conversion). Warnings. |
@@ -90,7 +137,7 @@ combined with `--data`.
 | **Excluded** | Shown when `excluded.jsonl` or `removed-blocks.jsonl` exists. *Excluded pages*: counts per reason (click to filter), then a table filtered by reason, searched by title or detail (or an exact id or revid), sortable and paged. Each page links to the revision in the dump (`…/w/index.php?oldid=<revid>`) and to the current page (`…/?curid=<id>`); a detail that names an id ("same text as id 1234 (…)", a duplicate) links to that article when it is in the corpus. A page that is also in the corpus (the two files come from different builds) is flagged. *Removed blocks*: counts per reason and kind, filters for reason, kind, article (`id=`) and whether the article stayed in the corpus, a title/text search, the block's text, and a link to the article (or, for an article left out as a whole, to its excluded entry). The state is in the URL (`?tab=blocks&reason=…&q=…&page=…`). |
 | **Decisions** | The current decision per article (the latest event), counts by verdict, filters (keep, drop, fix, paragraphs only, made on another text, cleared), a search, per-article undo, bulk undo of what is shown, and export as JSONL or JSON (current decisions) or the raw log. |
 | **Reports** | `quality/*.md` plus the dataset's `README.md` and `LEARNINGS.md`, rendered with linked references, heading anchors (`?h=`) and the open report's contents. `review-first.md` also appears here as a plain document. |
-| **Files** | The dataset folder as a tree with sizes. Folders with more than 300 entries, and folders over 100 MB below the top level, show counts and totals instead of their contents. Symlinked files (every file of a Hugging Face snapshot is one, into the cache's `blobs/`) show their target's size and mtime. |
+| **Files** | The dataset folder as a tree with sizes. Folders with more than 300 entries, and folders over 100 MB below the top level, show counts and totals instead of their contents. Symlinked files (every file of a Hugging Face snapshot is one, into the cache's `blobs/`) show their target's size and mtime. The app's own folder (`edaapp/`) and dot-folders (`.git/`, ...) are left out. |
 
 The app polls the server every 4 s. When tables or annotations in the data folder change, list
 views re-render; the article view shows a banner instead, so it doesn't lose a note you are typing.
@@ -118,9 +165,10 @@ the focus is in an input, a textarea or a select, or when a modifier key is held
 
 ## Discovery conventions
 
-Nothing in discovery is hard-coded to a dataset (only `hub.py` names the Hugging Face ones). The
-app looks at the data root's structure: the Hugging Face root by default (see *Where the data comes
-from*), or the folder given with `--data`:
+Nothing in discovery is hard-coded to a dataset (only `paths.py` names this repository's, and
+`hub.py` the Hugging Face ones). The app looks at the data root's structure: the repository root
+by default, the Hugging Face root with `--hub` (see *Data sources*), or the folder given with
+`--data`:
 
 - A **dataset** is an immediate subfolder (or a symlink to one) with a JSONL (`.jsonl`, or gzipped
   `.jsonl.gz`) or Parquet table at its top level that has `id` and `text` columns. Each such table
@@ -133,11 +181,14 @@ from*), or the folder given with `--data`:
   the newer file by mtime is read; on a tie JSONL, then JSONL.gz. The others are named as not read,
   in a warning on the Overview and the Home card, and in the Overview's header or annotation row.
   Parquet keeps working; nothing requires it.
-- **Gzipped JSON lines** (`.jsonl.gz`, as the corpus is published on Hugging Face: 17 MB, 96 MB
+- **Gzipped JSON lines** (`.jsonl.gz`, as the corpus is committed and published: 17 MB, 96 MB
   unpacked) are read by DuckDB directly, never unpacked to disk. Reading and typing the corpus takes
-  0.43 s instead of about 0.2 s for the plain file. Annotations may be gzipped too.
+  0.41–0.43 s instead of about 0.2 s for the plain file. Annotations may be gzipped too.
 - **Symlinks are followed** for files, so a Hugging Face cache snapshot, where every file is a
   symlink into the cache's `blobs/` folder, reads like a plain folder.
+- **Not data**: dot-folders of the data root (and of a dataset) are never looked at, and the app's
+  own folder is never a dataset, even when `--data` names the repository itself. Within a dataset
+  only the top level, `annotations/`, `quality/` and joined files are read.
 - **JSON lines are typed explicitly.** DuckDB infers each column's type from every record, then
   the app keeps strings that DuckDB would turn into dates, timestamps or UUIDs as strings (as in the
   Parquet files; `"2026-07-17T18:50:18Z"` would otherwise lose its `T` and `Z`), and reads
@@ -224,9 +275,10 @@ dataset's top level, `annotations/` and `quality/`, and the files that sidecars 
 mtime or inode changed is read again; new files are picked up and vanished ones dropped. A file
 that is replaced but can't be read keeps its previous copy, and the problem is shown as a warning.
 
-## The review file: `state/reviews.jsonl`
+## The review log: `../reviews/reviews.jsonl`
 
-Append-only, one JSON object per line, UTF-8 (Odia is written as-is, not `\u` escaped):
+The repository's `reviews/reviews.jsonl` (or `reviews.jsonl` in the `--state` folder). Append-only,
+one JSON object per line, UTF-8 (Odia is written as-is, not `\u` escaped):
 
 ```json
 {"ts": "2026-09-24T14:10:51.528Z", "dataset": "odia-wikipedia", "id": 3008, "title": "କର୍ଣ୍ଣାଟକ", "verdict": "fix", "note": "…", "drop_paragraphs": [{"para": 3, "sha1": "88ec39305e07028aecd0a168ec2f10ed5d033ec6"}], "text_sha1": "bac525810f6c8e6f26c814a7744775178a29819c"}
@@ -235,7 +287,7 @@ Append-only, one JSON object per line, UTF-8 (Odia is written as-is, not `\u` es
 | Field | Meaning |
 |---|---|
 | `ts` | when the event was written, ISO-8601 UTC |
-| `dataset` | the dataset folder's name |
+| `dataset` | the dataset's name (its folder's name in the data root): `odia-wikipedia` for this repository, in every mode |
 | `id` | page id (the join key) |
 | `title` | the article title, for people reading the file |
 | `verdict` | `"keep"`, `"drop"`, `"fix"` or `null` (no verdict) |
@@ -260,43 +312,22 @@ Rules:
   A rebuild that applied its paragraph drops also changes the text.
 - Saving the same decision again appends nothing. The article view saves one change at a time, in
   order. Bulk actions write all their events with one timestamp, in a single append.
-- The dataset's build reads its own copy of this log (see below; `load_reviews`/`apply_review`
-  in its `prepare.py`): `drop` removes the article, dropped paragraphs are removed by sha1, and
-  `fix` is counted as pending. It applies the events whose `dataset` is `odia-wikipedia`.
+- The build reads this file (`load_reviews`/`apply_review` in `../prepare.py`, run by `uv run
+  pipeline.py`) and applies the latest event per article whose `dataset` is `odia-wikipedia`:
+  `drop` removes the article, dropped paragraphs are removed by sha1, and `fix` is counted as
+  pending (paragraph fixes come from `curation/paragraph-fixes.jsonl`, made by `translate.py fixes`
+  and `merge-fixes`).
 
-`state/` holds human work. It is not git-ignored.
-
-### How decisions reach the dataset
-
-Decisions stay in `state/reviews.jsonl` until they are appended to `reviews/reviews.jsonl` in a
-checkout of the dataset's repository, <https://github.com/odia-genai/odia-wikipedia-sep26>, which is
-then rebuilt, pushed to GitHub and uploaded to Hugging Face. The next start of the app (at `main`)
-shows the rebuilt corpus.
-
-The dataset's file is an earlier copy of this one (on 2026-10-01 the two were identical, 217
-decisions), so the new events are the lines after its end. Check that before appending:
-
-```bash
-cd ~/work/odia-wikipedia                     # the checkout
-n=$(wc -l < reviews/reviews.jsonl)
-head -n "$n" ~/…/edaapp/state/reviews.jsonl | cmp - reviews/reviews.jsonl   # no output: a prefix
-tail -n +"$((n + 1))" ~/…/edaapp/state/reviews.jsonl >> reviews/reviews.jsonl
-uv run pipeline.py                           # rebuild: build, annotate, scores, checks
-git commit -am "Reviews" && git push         # then upload the folder to Hugging Face
-```
-
-Appending the whole log again would also work (the latest event per article wins, and every event
-is a whole decision), but it doubles the file.
-
-While editing the dataset, `uv run edaapp --data ~/work` serves the checkout itself (see *Where the
-data comes from*).
+The log is human work, committed with the dataset. Tests never touch it.
 
 ## Architecture
 
 ```
+edaapp/ (in the dataset's repository; ../ is the dataset)
 src/edaapp/
   cli.py         entry point (uv run edaapp): argparse, the data source, uvicorn on 127.0.0.1
-  hub.py         the Hugging Face datasets: snapshot_download into the cache, the offline
+  roots.py       data roots of symlinks; the default one, this repository (.cache/repo-root/)
+  hub.py         the Hugging Face copy (--hub): snapshot_download into the cache, the offline
                  fallback, the data root of symlinks (.cache/hub-root/)
   server.py      FastAPI routes under /api, static page, host/origin guard
   service.py     browse, article, reviews, patterns, bulk actions, overview, excluded pages and
@@ -310,23 +341,25 @@ src/edaapp/
   render.py      markdown-it-py (CommonMark + tables + dollarmath), raw HTML off; documents get
                  heading ids, a table of contents and reference links (core rules)
   reviewfirst.py parses quality/review-first.md into items
-  paths.py       the only module that writes files or makes links (SafeWriter, path guard)
+  paths.py       the repository's paths and dataset name; the only module that writes files or
+                 makes links (SafeWriter, path guard)
 static/          index.html, app.css, js/ (ES modules, hash routing, no build step)
 static/vendor/katex/   KaTeX 0.18.9 (MIT), woff2 fonts only
-state/reviews.jsonl    review decisions (created on the first save)
+.cache/repo-root/      the default data root: odia-wikipedia -> .. (git-ignored)
 .cache/hub-root/       the Hugging Face data root: one symlink per dataset (git-ignored)
-tests/           pytest; fixtures are built in .pytest-tmp/, never in data/
+tests/           pytest; fixtures are built in .pytest-tmp/, never in the dataset
+../reviews/reviews.jsonl   the review log (the app appends; the build reads)
 ```
 
 - **DuckDB, in memory.** Each corpus version, annotation file, `excluded.jsonl` and
   `removed-blocks.jsonl` is loaded into a DuckDB table once per file version (size, mtime,
   inode). Reading the 96 MB JSONL corpus takes about 0.1 s and inferring its types another 0.1 s
-  (the Parquet copy took 0.3 s), and both together take 0.43 s from the 17 MB gzipped copy that
-  Hugging Face has (measured 2026-10-01; DuckDB unpacks it twice, in one thread); the 47 MB
-  paragraph annotation, 143,357 small records, takes 0.06 s to read but 0.30 s to infer, and the
-  4.9 MB gzipped score store it joins (116,318 rows) 0.05 s to read and 0.15 s to infer (measured
-  2026-09-25). Inference reads every record, because a column seen only
-  late in a file would otherwise be dropped silently. A view per dataset version joins the corpus to every
+  (the Parquet copy took 0.3 s), and both together take 0.41–0.43 s from the 17 MB gzipped copy
+  that is committed and published (measured 2026-10-01; DuckDB unpacks it twice, in one thread).
+  The 47 MB paragraph annotation, 143,357 small records, takes 0.06 s to read but 0.30 s to infer,
+  and the 4.9 MB gzipped score store it joins (116,318 rows) 0.05 s to read and 0.15 s to infer
+  (measured 2026-09-25). Inference reads every record, because a column seen only late in a file
+  would otherwise be dropped silently. A view per dataset version joins the corpus to every
   article-level annotation and to the current review decisions, by `id`. This deviates from
   querying the files directly, for two reasons. Queries on the table are 3–10× faster
   (the regex search runs in 0.03–0.25 s instead of 0.3–1 s). And a table is a consistent
@@ -340,11 +373,13 @@ tests/           pytest; fixtures are built in .pytest-tmp/, never in data/
   catastrophic backtracking. Snippets locate the RE2 matches in Python, so highlighting agrees
   with filtering.
 - **Writes.** Everything the app writes goes through `paths.SafeWriter`. It resolves the path
-  (following symlinks and `..`) and refuses anything outside `edaapp/`. That covers the review
-  log, DuckDB's spill directory (`.cache/duckdb-tmp`) and the links in `.cache/hub-root/`. A link
-  may point out of `edaapp/` (into the Hugging Face cache), but nothing can be written through it.
-  DuckDB extension auto-install is off. A test scans the source to check that no other module
-  writes files or makes links.
+  (following symlinks and `..`) and refuses anything outside its two roots: `edaapp/` (DuckDB's
+  spill directory `.cache/duckdb-tmp`, the links in `.cache/repo-root/` and `.cache/hub-root/`, a
+  `--state` trial) and the repository's `reviews/` folder (the review log). The rest of the
+  repository, the dataset, is never written. A link may point out of the roots (to the
+  repository, into the Hugging Face cache), but a write through it is refused unless it lands in a
+  root. DuckDB extension auto-install is off. A test scans the source to check that no other
+  module writes files or makes links.
 - **Local only.** The app binds 127.0.0.1. Requests whose `Host` is not `127.0.0.1:<port>` or
   `localhost:<port>` are refused (DNS rebinding). Writes must be JSON with a same-origin (or no)
   `Origin`, so another website can't post to it.
@@ -373,14 +408,15 @@ Browse parameters: `is.<col>=true|false`, `min.<col>`, `max.<col>`, `in.<col>` (
 
 ```bash
 cd edaapp
-uv run pytest -q                     # 194 tests: discovery, filters (incl. injection), paragraphs,
+uv run pytest -q                     # 205 tests: discovery, filters (incl. injection), paragraphs,
                                      # reviews (write/replay/undo), path guard, change detection, API,
                                      # documents and links, Review first, --state, the JSON-lines
                                      # layout (JSONL-only, mixed Parquet/JSONL, excluded pages,
                                      # removed blocks), sidecar joins (gz store, missing or
                                      # unreadable store, null bpb, join problems), gzipped tables,
                                      # the Hugging Face source (snapshot_download mocked, a fake
-                                     # cache of symlinks, the offline fallback) and the command line
+                                     # cache of symlinks, the offline fallback), the repository mode
+                                     # (the name, the review log, hidden folders) and the command line
 uv run ruff check --no-cache src tests
 uv run ruff format --no-cache src tests
 for f in static/js/*.js static/js/views/*.js; do node --input-type=module --check < $f; done
@@ -392,10 +428,12 @@ for f in static/js/*.js static/js/views/*.js; do node --input-type=module --chec
 The environment (`.venv`), `uv.lock`, the ruff cache (`cache-dir` in `pyproject.toml`) and pytest's
 cache and temporary folders all live in `edaapp/`. Run the commands from here.
 
-Tests never touch `state/` or the network. Every test builds its own data and state in pytest's
-temporary folder (`.pytest-tmp/`), and a session fixture fails the run if `state/` changed. The
-Hugging Face tests replace `snapshot_download` and `dataset_info` with fakes. For manual checks, run
-the server with `--state .cache/<something>`.
+Tests never touch the review log (`../reviews/reviews.jsonl`) or the network. Every test builds
+its own data and state in pytest's temporary folder (`.pytest-tmp/`), and a session fixture fails
+the run if anything in `../reviews/` changed (size, mtime or content). The Hugging Face tests
+replace `snapshot_download` and `dataset_info` with fakes. Two tests read the real repository
+(its dataset name in `prepare.py`, and discovery of the clone, read only). For manual checks that
+save decisions, run the server with `--state .cache/<something>`.
 
 ## Known limitations
 
@@ -412,8 +450,10 @@ the server with `--state .cache/<something>`.
   values shown darker. There is no invert switch for columns where low is bad.
 - Regex search uses RE2 syntax: no look-around or back-references.
 - The Files view follows symlinked files, not symlinked folders (those are left out).
-- Without `--data`, a start needs the Hub, or a cached snapshot of the revision. A newer revision
-  on the Hub is only seen at the next start.
+- With `--hub`, a start needs the Hub, or a cached snapshot of the revision. A newer revision on
+  the Hub is only seen at the next start.
+- One review log serves every dataset the app shows; with `--data` and other datasets, give them a
+  `--state` folder of their own.
 - `excluded.jsonl` and `removed-blocks.jsonl` belong to the dataset, not to a version: with an
   older version selected, the Excluded view checks them against that version's corpus (so pages
   excluded later show as "in corpus").

@@ -11,7 +11,7 @@ import pytest
 from huggingface_hub.errors import LocalEntryNotFoundError, RevisionNotFoundError
 from test_joins import STORE, build_joined_root
 
-from edaapp import cli, discovery, hub
+from edaapp import cli, discovery, hub, roots
 from edaapp.paths import SafeWriter
 
 REPO = "fastpixels/odia-wikipedia-sep26"
@@ -150,6 +150,7 @@ def test_the_app_over_the_hub_root(fake, writer):
         assert [x["name"] for x in home["datasets"]] == [NAME] and home["datasets"][0]["articles"] == 6
         assert home["sources"] == [
             {
+                "kind": "hub",
                 "name": NAME,
                 "repo_id": REPO,
                 "url": f"https://huggingface.co/datasets/{REPO}",
@@ -257,33 +258,34 @@ def test_writes_through_the_link_are_refused(fake, writer):
 # ---- the command line ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def no_server(monkeypatch):
-    """cli.main up to the point where it would serve: uvicorn.run records its app instead."""
-    import uvicorn
-
-    ran = {}
-    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: ran.update(app=app, **kw))
-    return ran
-
-
-def test_cli_serves_the_hub_by_default(fake, writer, monkeypatch, no_server, capsys, tmp_path):
+def test_cli_hub(fake, writer, monkeypatch, no_server, capsys, tmp_path):
     monkeypatch.setattr(hub, "HUB_ROOT", writer.root / "cache" / "hub-root")
     monkeypatch.setattr(hub, "SafeWriter", lambda: writer)
-    cli.main(["--port", "8799", "--hub-revision", NEW, "--state", str(tmp_path / "state")])
+    cli.main(["--port", "8798", "--hub", "--state", str(tmp_path / "state")])
     out = capsys.readouterr().out
-    assert f"checking Hugging Face dataset {REPO} at {NEW}" in out
-    assert f"Hugging Face dataset {REPO} at {NEW}" in out and "data root" in out and NAME in out
+    assert f"checking Hugging Face dataset {REPO} at main" in out
+    assert f"Hugging Face dataset {REPO} at main" in out and "data root" in out and NAME in out
     app = no_server["app"]
-    assert no_server["port"] == 8799 and app.state.svc.sources[0]["revision"] == NEW
+    assert no_server["port"] == 8798 and app.state.svc.sources[0]["kind"] == "hub"
+    assert sorted(app.state.catalog.datasets()) == [NAME]
+    assert app.state.reviews.path == (tmp_path / "state" / "reviews.jsonl").resolve()
+
+
+def test_cli_hub_revision_implies_hub(fake, writer, monkeypatch, no_server, capsys, tmp_path):
+    monkeypatch.setattr(hub, "HUB_ROOT", writer.root / "cache" / "hub-root")
+    monkeypatch.setattr(hub, "SafeWriter", lambda: writer)
+    cli.main(["--hub-revision", NEW, "--state", str(tmp_path / "state")])
+    assert f"Hugging Face dataset {REPO} at {NEW}" in capsys.readouterr().out
+    assert no_server["app"].state.svc.sources[0]["revision"] == NEW
     assert fake.calls[0] == ("info", REPO, NEW)
 
 
 def test_cli_local_data_root(no_server, capsys, jdata_root, monkeypatch, tmp_path):
-    def no_hub(*a, **kw):
-        raise AssertionError("the Hub is not asked when --data is given")
+    def no_source(*a, **kw):
+        raise AssertionError("neither the Hub nor the repository is used when --data is given")
 
-    monkeypatch.setattr(hub, "build_root", no_hub)
+    monkeypatch.setattr(hub, "build_root", no_source)
+    monkeypatch.setattr(roots, "repo_root", no_source)
     cli.main(["--data", str(jdata_root), "--state", str(tmp_path / "state")])
     out = capsys.readouterr().out
     assert f"data from a local folder (--data): {jdata_root.resolve()}" in out and "jwiki" in out
@@ -294,9 +296,12 @@ def test_cli_errors(fake, writer, monkeypatch, capsys, jdata_root):
     with pytest.raises(SystemExit):
         cli.main(["--data", str(jdata_root), "--hub-revision", "main"])
     assert "can't be used with --data" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["--data", str(jdata_root), "--hub"])
+    assert "not allowed with argument" in capsys.readouterr().err
     fake.online, fake.cached = False, None
     monkeypatch.setattr(hub, "HUB_ROOT", writer.root / "cache" / "hub-root")
     monkeypatch.setattr(hub, "SafeWriter", lambda: writer)
     with pytest.raises(SystemExit) as e:
-        cli.main([])
+        cli.main(["--hub"])
     assert "could not download" in str(e.value.code) and "--data PATH" in str(e.value.code)

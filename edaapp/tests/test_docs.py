@@ -211,11 +211,18 @@ def test_review_first_falls_back_to_plain_rendering(client, data_root):
     assert r["parsed"] is False and 'href="#/d/wiki/a/103"' in r["html"]
 
 
-def test_state_option_must_stay_inside_edaapp(tmp_path):
+def test_state_option_must_stay_inside_edaapp_or_reviews(tmp_path):
     from edaapp.cli import resolve_state
-    from edaapp.paths import APP_ROOT, UnsafePathError
+    from edaapp.paths import APP_ROOT, REPO_ROOT, REVIEWS_DIR, UnsafePathError
 
     assert resolve_state(APP_ROOT / ".cache" / "try-state") == APP_ROOT / ".cache" / "try-state"
-    for bad in ["/tmp/state", APP_ROOT.parent / "data" / "state", APP_ROOT / "state" / ".." / ".." / "x"]:
+    assert resolve_state(REVIEWS_DIR) == REVIEWS_DIR.resolve()  # the default: the log the build reads
+    for bad in [
+        "/tmp/state",
+        REPO_ROOT / "annotations",
+        REPO_ROOT,
+        APP_ROOT / "state" / ".." / ".." / "x",
+        REVIEWS_DIR / ".." / "quality",
+    ]:
         with pytest.raises(UnsafePathError):
             resolve_state(bad)

@@ -1,7 +1,9 @@
-"""edaapp command line: `uv run edaapp [--port 8765] [--data PATH | --hub-revision REV] [--state DIR]`.
+"""edaapp command line: `uv run edaapp [--port 8765] [--hub [--hub-revision REV] | --data PATH] [--state DIR]`.
 
-Without --data the datasets come from the Hugging Face Hub (see hub.py); --data serves a local data
-root instead, e.g. a checkout of a dataset you are editing.
+edaapp lives in the dataset's repository. Without options it serves that repository (the folder
+above edaapp/) as the dataset "odia-wikipedia" (roots.py); --hub serves the published copy on
+Hugging Face (hub.py); --data serves any other data root. Decisions go to the repository's
+reviews/reviews.jsonl, the log the build reads, unless --state names a trial folder.
 """
 
 from __future__ import annotations
@@ -16,16 +18,28 @@ HOST = "127.0.0.1"  # local only, by design; there is no option to change it
 
 def resolve_state(path: Path | str) -> Path:
     """The review state folder: relative paths are taken from the current directory, and the
-    result must lie inside edaapp/ (UnsafePathError otherwise)."""
-    from .paths import APP_ROOT, SafeWriter
+    result must lie inside edaapp/ or the repository's reviews/ folder (UnsafePathError otherwise)."""
+    from .paths import SafeWriter
 
     p = Path(path).expanduser()
     if not p.is_absolute():
         p = Path.cwd() / p
-    return SafeWriter(APP_ROOT).guard(p)
+    return SafeWriter().guard(p)
 
 
-def hub_data_root(revision: str) -> tuple[Path, list]:
+def repo_data_root() -> tuple[Path, list[dict]]:
+    """The repository as the dataset "odia-wikipedia", through the repository data root."""
+    from . import roots
+
+    try:
+        root, source = roots.repo_root()
+    except roots.RootError as e:
+        sys.exit(f"edaapp: {e}")
+    print(f"edaapp: {roots.describe_repo(source)}")
+    return root, [source]
+
+
+def hub_data_root(revision: str) -> tuple[Path, list[dict]]:
     """Download (or update) the Hugging Face datasets and link them into the hub data root; exits
     with a message when that is not possible."""
     from . import hub
@@ -38,41 +52,47 @@ def hub_data_root(revision: str) -> tuple[Path, list]:
         sys.exit(f"edaapp: {e}")
     for s in sources:
         print(f"edaapp: {s.describe()}")
-    return root, sources
+    return root, [s.public() for s in sources]
 
 
 def main(argv: list[str] | None = None) -> None:
-    from .paths import STATE_DIR, UnsafePathError
+    from .paths import REPO_DATASET, REVIEWS_DIR, UnsafePathError
 
     ap = argparse.ArgumentParser(
         prog="edaapp",
-        description="Explore and improve datasets: by default the Hugging Face ones, or those in a local data folder.",
+        description=f"Explore and review the {REPO_DATASET} dataset: this repository by default, its published "
+        "copy on Hugging Face (--hub), or any data folder (--data).",
     )
     ap.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
-    ap.add_argument(
+    src = ap.add_mutually_exclusive_group()
+    src.add_argument(
+        "--hub",
+        action="store_true",
+        help="serve the published copy on Hugging Face instead of this repository",
+    )
+    src.add_argument(
         "--data",
         type=Path,
         default=None,
-        help="a local data root holding one folder per dataset (e.g. a checkout of the dataset you are editing); "
-        "default: the Hugging Face datasets",
+        help="serve another data root: a folder holding one folder per dataset",
     )
     ap.add_argument(
         "--hub-revision",
         metavar="REV",
         default=None,
-        help="branch, tag or commit of the Hugging Face datasets (default main); not with --data",
+        help="branch, tag or commit of the Hugging Face copy (default main); implies --hub",
     )
     ap.add_argument(
         "--state",
         type=Path,
-        default=STATE_DIR,
-        help=f"folder for reviews.jsonl; must be inside edaapp/ (default {STATE_DIR}). "
-        "Use a scratch folder such as .cache/try-state for test runs, so real decisions are not touched.",
+        default=REVIEWS_DIR,
+        help=f"folder for reviews.jsonl (default {REVIEWS_DIR}, the log the build reads). A trial folder "
+        "must be inside edaapp/, e.g. .cache/try-state, so real decisions are not touched.",
     )
     ap.add_argument("--log-level", default="info", choices=["debug", "info", "warning"])
     args = ap.parse_args(argv)
     if args.data is not None and args.hub_revision is not None:
-        ap.error("--hub-revision picks a revision of the Hugging Face datasets; it can't be used with --data")
+        ap.error("--hub-revision picks a revision of the Hugging Face copy; it can't be used with --data")
 
     try:
         state = resolve_state(args.state)
@@ -83,21 +103,23 @@ def main(argv: list[str] | None = None) -> None:
         for name in ("httpx", "httpx2"):
             logging.getLogger(name).setLevel(logging.WARNING)
 
-    sources = []
-    if args.data is None:
-        data, sources = hub_data_root(args.hub_revision or "main")
-    else:
+    sources: list[dict] = []
+    if args.data is not None:
         data = args.data.expanduser().resolve()
         if not data.is_dir():
             sys.exit(f"edaapp: data root {data} is not a directory")
         print(f"edaapp: data from a local folder (--data): {data}")
+    elif args.hub or args.hub_revision is not None:
+        data, sources = hub_data_root(args.hub_revision or "main")
+    else:
+        data, sources = repo_data_root()
 
     import uvicorn
 
     from .server import create_app
 
     hosts = {f"{HOST}:{args.port}", f"localhost:{args.port}"}
-    app = create_app(data, state_dir=state, allowed_hosts=hosts, sources=[s.public() for s in sources])
+    app = create_app(data, state_dir=state, allowed_hosts=hosts, sources=sources)
     names = sorted(app.state.catalog.datasets())
     print(f"edaapp: data root {data} ({len(names)} dataset{'s' if len(names) != 1 else ''}: {', '.join(names)})")
     print(f"edaapp: reviews go to {app.state.reviews.path}")

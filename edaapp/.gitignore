@@ -1,4 +1,5 @@
-# local environment and caches (state/ is human work and is NOT ignored)
+# local environment and caches, and the data roots of links (.cache/repo-root, .cache/hub-root);
+# the review decisions are not here but in ../reviews/reviews.jsonl
 .venv/
 .cache/
 __pycache__/

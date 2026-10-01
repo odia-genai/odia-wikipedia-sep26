@@ -82,14 +82,40 @@ def test_writes_land_inside_and_are_whole_lines(tmp_path):
     assert not q.exists()
 
 
-def test_app_writer_is_rooted_at_edaapp():
+def test_app_writer_writes_in_edaapp_and_the_repositorys_reviews_only():
+    from edaapp.paths import REPO_ROOT, REVIEWS_DIR
+
     w = SafeWriter()
-    assert w.root == APP_ROOT
-    assert APP_ROOT.name == "edaapp"
+    assert w.roots == (APP_ROOT, REVIEWS_DIR.resolve()) and w.root == APP_ROOT
+    assert APP_ROOT.name == "edaapp" and REPO_ROOT == APP_ROOT.parent
+    assert w.guard(REVIEWS_DIR / "reviews.jsonl") == (REVIEWS_DIR / "reviews.jsonl").resolve()  # only checked
+    assert w.guard(".cache/x") == APP_ROOT / ".cache" / "x"  # relative: from edaapp/
+    for bad in [
+        REPO_ROOT / "LEARNINGS.md",
+        REPO_ROOT / "annotations" / "bpb.jsonl",
+        REPO_ROOT / "orwiki-20260901-trainingready.jsonl.gz",
+        REVIEWS_DIR / ".." / "prepare.py",
+        APP_ROOT.parent.parent / "x",
+    ]:
+        with pytest.raises(UnsafePathError):
+            w.guard(bad)
+
+
+def test_a_writer_with_two_roots(tmp_path):
+    a, b, out = tmp_path / "a", tmp_path / "b", tmp_path / "out"
+    for d in (a, b, out):
+        d.mkdir()
+    w = SafeWriter(a, b)
+    assert w.append_lines("x.jsonl", ["1"]) == a.resolve() / "x.jsonl"  # relative paths: the first root
+    assert w.append_lines(b / "log.jsonl", ["2"]).read_text() == "2\n"
+    (a / "to-b").symlink_to(b)
+    (a / "to-out").symlink_to(out)
+    w.append_lines(a / "to-b" / "via.jsonl", ["3"])  # lands in a root: fine
     with pytest.raises(UnsafePathError):
-        w.guard(APP_ROOT.parent / "data" / "x.parquet")
+        w.append_lines(a / "to-out" / "x.jsonl", ["4"])
     with pytest.raises(UnsafePathError):
-        w.guard(APP_ROOT.parent / "LEARNINGS.md")
+        w.guard(b / ".." / "out" / "x")
+    assert os.listdir(out) == []
 
 
 # Everything that can create, change or remove a file or a link. Only paths.py may use these.

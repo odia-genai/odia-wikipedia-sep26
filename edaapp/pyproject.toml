@@ -1,7 +1,7 @@
 [project]
 name = "edaapp"
 version = "0.1.0"
-description = "Local web app for exploring and improving datasets: the Hugging Face ones by default, or a local data folder"
+description = "Review web app of the odia-wikipedia dataset: serves the repository it lives in (or its Hugging Face copy, or any data folder) and appends decisions to ../reviews/reviews.jsonl"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

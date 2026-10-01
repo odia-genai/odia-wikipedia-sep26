@@ -382,19 +382,26 @@ def jclient(jdata_root, writer):
         yield c
 
 
+def reviews_snapshot(folder: Path):
+    """Every file in the folder with its size, mtime and content hash (None: no folder)."""
+    if not folder.exists():
+        return None
+    return sorted(
+        (p.name, p.stat().st_size, p.stat().st_mtime_ns, hashlib.sha256(p.read_bytes()).hexdigest())
+        for p in folder.iterdir()
+        if p.is_file()
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
-def real_state_untouched():
-    """No test may touch the real review state (edaapp/state/): every test uses a temp folder."""
-    from edaapp.paths import STATE_DIR
+def real_reviews_untouched():
+    """No test may touch the real review log, the repository's reviews/reviews.jsonl that the build
+    reads (nor anything else in reviews/): every test uses a temporary state folder."""
+    from edaapp.paths import REVIEWS_DIR
 
-    def snapshot():
-        if not STATE_DIR.exists():
-            return None
-        return sorted((p.name, p.stat().st_size, p.stat().st_mtime_ns) for p in STATE_DIR.iterdir())
-
-    before = snapshot()
+    before = reviews_snapshot(REVIEWS_DIR)
     yield
-    assert snapshot() == before, "a test changed edaapp/state/"
+    assert reviews_snapshot(REVIEWS_DIR) == before, f"a test changed {REVIEWS_DIR}"
 
 
 @pytest.fixture
@@ -426,3 +433,13 @@ def client(data_root, writer):
     app.state.catalog.throttle = 0
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def no_server(monkeypatch):
+    """cli.main up to the point where it would serve: uvicorn.run records its app instead."""
+    import uvicorn
+
+    ran = {}
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kw: ran.update(app=app, **kw))
+    return ran

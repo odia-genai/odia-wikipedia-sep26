@@ -1,8 +1,9 @@
-"""The datasets edaapp serves by default, from the Hugging Face Hub.
+"""The published copy of the dataset, from the Hugging Face Hub (`edaapp --hub`).
 
 HUB_DATASETS maps a dataset's name to the Hub dataset repository it comes from. The name is the
 dataset's folder name in the data root, which keys the review log (`"dataset": "odia-wikipedia"`),
-so it stays the same wherever the data comes from.
+so it is the same as in the repository mode (roots.py): decisions made on the Hub copy are
+decisions about the same dataset.
 
 `build_root` downloads each repository with `snapshot_download` into the normal Hugging Face cache
 (~/.cache/huggingface/hub, or wherever HF_HOME / HF_HUB_CACHE point) and returns a data root,
@@ -24,9 +25,10 @@ from pathlib import Path
 from huggingface_hub import constants, dataset_info, snapshot_download
 from huggingface_hub.errors import LocalEntryNotFoundError, RepositoryNotFoundError, RevisionNotFoundError
 
-from .paths import CACHE_DIR, SafeWriter, UnsafePathError
+from .paths import CACHE_DIR, REPO_DATASET, SafeWriter
+from .roots import RootError, link_root
 
-HUB_DATASETS = {"odia-wikipedia": "fastpixels/odia-wikipedia-sep26"}
+HUB_DATASETS = {REPO_DATASET: "fastpixels/odia-wikipedia-sep26"}
 HUB_ROOT = CACHE_DIR / "hub-root"
 DEFAULT_REVISION = "main"
 # raw/html/ is the rendered HTML of every page (149 MB of gzipped JSON lines), the build's input.
@@ -68,6 +70,7 @@ class Source:
 
     def public(self) -> dict:
         return {
+            "kind": "hub",
             "name": self.name,
             "repo_id": self.repo_id,
             "url": self.url,
@@ -125,13 +128,8 @@ def build_root(
     root = HUB_ROOT if root is None else root
     datasets = HUB_DATASETS if datasets is None else datasets
     sources = [fetch(name, repo_id, revision) for name, repo_id in datasets.items()]
-    root = writer.mkdir(root)
-    for s in sources:
-        try:
-            writer.symlink(root / s.name, s.snapshot)
-        except UnsafePathError as e:  # e.g. a real folder where the link goes
-            raise HubError(f"could not link {root / s.name} to the snapshot: {e}") from e
-    for e in sorted(os.scandir(root), key=lambda e: e.name):
-        if e.is_symlink() and e.name not in datasets:
-            writer.remove_link(root / e.name)
+    try:
+        root = link_root(root, {s.name: s.snapshot for s in sources}, writer)
+    except RootError as e:
+        raise HubError(str(e)) from e
     return root, sources

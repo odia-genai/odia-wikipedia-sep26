@@ -576,9 +576,8 @@ class Catalog:
                 return
             self._last_check = time.monotonic()
             names = set()
-            for e in sorted(self.data_root.iterdir()) if self.data_root.is_dir() else []:
-                if not e.is_dir() or e.name.startswith("."):
-                    continue
+            for entry in discovery.candidate_dirs(self.data_root):  # never dot-folders or the app's own
+                e = Path(entry.path)
                 sig = discovery.dir_signature(e)
                 old = self._datasets.get(e.name)
                 if old is not None and old.signature == sig:

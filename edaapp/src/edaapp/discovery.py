@@ -27,6 +27,9 @@ Conventions (nothing here names a particular dataset):
 - Files ending in `.tmp` (a build's atomic write in progress) and dotfiles are not looked at.
 - Symlinked files are followed: in a Hugging Face cache snapshot every file is a symlink into the
   cache's blobs/ folder.
+- The app's own folder (edaapp/, which lives inside the dataset's repository) is never a dataset,
+  and the Files view leaves it out, with every dot-folder (.git, .cache, .venv, ...). Discovery
+  never looks inside a dataset's subfolders other than annotations/ and quality/ anyway.
 """
 
 from __future__ import annotations
@@ -39,6 +42,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pyarrow.parquet as pq
+
+from . import paths
 
 TABLE_EXTS = (".jsonl.gz", ".jsonl", ".parquet")  # a table file's format is its extension, without the dot
 # on an mtime tie: JSONL is the canonical format, then the same gzipped (as published on Hugging Face)
@@ -471,11 +476,30 @@ def discover_annotations(ann_dir: Path) -> tuple[list[Annotation], list[str], li
     return out, ignored, notes
 
 
+APP_DIR = paths.APP_ROOT  # the app's own folder: never a dataset, not in the Files view
+
+
+def is_app_dir(path: Path) -> bool:
+    """Whether `path` (after following symlinks) is the app's own folder."""
+    try:
+        return Path(path).resolve() == APP_DIR.resolve()
+    except OSError:
+        return False
+
+
+def hidden_dir(e: os.DirEntry) -> bool:
+    """Folders that are not data: dot-folders (.git, .cache, .venv, ...) and the app's own folder."""
+    return e.name.startswith(".") or is_app_dir(Path(e.path))
+
+
+def candidate_dirs(data_root: Path) -> list[os.DirEntry]:
+    """The data root's subfolders that may be datasets (symlinks to folders included)."""
+    return [e for e in _listdir(data_root) if e.is_dir() and not hidden_dir(e)]
+
+
 def discover(data_root: Path) -> dict[str, Dataset]:
     out = {}
-    for e in _listdir(data_root):
-        if e.name.startswith(".") or not e.is_dir():
-            continue
+    for e in candidate_dirs(data_root):
         ds = discover_dataset(Path(e.path))
         if ds:
             out[ds.name] = ds
@@ -484,7 +508,7 @@ def discover(data_root: Path) -> dict[str, Dataset]:
 
 def other_dirs(data_root: Path) -> list[str]:
     """Subdirectories of the data root that are not datasets (shown on the home page)."""
-    return [e.name for e in _listdir(data_root) if e.is_dir() and not e.name.startswith(".")]
+    return [e.name for e in candidate_dirs(data_root)]
 
 
 # ---- the Files view -----------------------------------------------------------------------
@@ -497,7 +521,7 @@ MAX_DEPTH = 4
 def _du(path: Path, limit: int = 200_000) -> tuple[int, int, int]:
     """(files, dirs, bytes) under path, stopping after `limit` entries. Symlinked files count with
     their target's size (a Hugging Face cache snapshot is made of them); symlinked folders are not
-    followed."""
+    followed, and dot-folders are left out."""
     files = dirs = size = seen = 0
     stack = [path]
     while stack and seen < limit:
@@ -506,6 +530,8 @@ def _du(path: Path, limit: int = 200_000) -> tuple[int, int, int]:
             seen += 1
             try:
                 if e.is_dir(follow_symlinks=False):
+                    if e.name.startswith("."):
+                        continue
                     dirs += 1
                     stack.append(Path(e.path))
                 elif e.is_file():
@@ -519,12 +545,15 @@ def _du(path: Path, limit: int = 200_000) -> tuple[int, int, int]:
 def file_tree(root: Path, depth: int = 0) -> dict:
     """The directory as a tree of {name, type, size, files, children}. Subdirectories that are
     big (many entries or many bytes) or deep get counts and totals instead of children. Symlinked
-    files are shown with their target's size and mtime; symlinked folders are left out."""
+    files are shown with their target's size and mtime; symlinked folders are left out, and so are
+    dot-folders (.git, ...) and the app's own folder (edaapp/ in the dataset's repository)."""
     node: dict = {"name": root.name, "type": "dir", "children": []}
     total_files = total_size = 0
     for e in _listdir(root):
         try:
             if e.is_dir(follow_symlinks=False):
+                if hidden_dir(e):
+                    continue
                 sub = Path(e.path)
                 n_entries = len(_listdir(sub))
                 f, d, s = _du(sub)

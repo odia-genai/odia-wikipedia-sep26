@@ -1,11 +1,13 @@
 """The one place edaapp writes files.
 
-Every write the app makes (review events, caches, DuckDB spill files, the links of the Hugging
-Face data root) goes through a SafeWriter, which resolves the target path (following symlinks and
-"..") and refuses anything outside its root. The app's writer is rooted at the edaapp/ directory;
-tests root their own writers in a temporary directory. Nothing else in the package opens a file
-for writing or makes a link (tests/test_paths.py checks the source for that). A link may point
-out of the root (the Hugging Face cache); writes through it are refused, since the guard resolves it.
+edaapp lives in the dataset's own repository (edaapp/ next to prepare.py). It writes in two places
+only: its own folder (caches, DuckDB spill files, the links of its data roots, `--state` trials)
+and the repository's reviews/ folder, which holds reviews/reviews.jsonl, the review log the build
+reads. Every write goes through a SafeWriter, which resolves the target path (following symlinks
+and "..") and refuses anything outside its roots. Tests root their own writers in a temporary
+directory. Nothing else in the package opens a file for writing or makes a link
+(tests/test_paths.py checks the source for that). A link may point out of the roots (the
+repository, the Hugging Face cache); writes through it are refused unless they land in a root.
 """
 
 from __future__ import annotations
@@ -16,36 +18,45 @@ from pathlib import Path
 
 # .../edaapp/src/edaapp/paths.py -> .../edaapp
 APP_ROOT = Path(__file__).resolve().parents[2]
-STATE_DIR = APP_ROOT / "state"
+REPO_ROOT = APP_ROOT.parent  # the dataset's repository: the folder above edaapp/
+# The repository's dataset name: DATASET in ../prepare.py, the `dataset` of its review events. Never
+# the folder's name, which is whatever a clone is called.
+REPO_DATASET = "odia-wikipedia"
+REVIEWS_DIR = REPO_ROOT / "reviews"  # reviews/reviews.jsonl: the review log the build reads
 CACHE_DIR = APP_ROOT / ".cache"
+WRITE_ROOTS = (APP_ROOT, REVIEWS_DIR)  # where the app's writer may write
 
 
 class UnsafePathError(PermissionError):
-    """A write was aimed outside the writer's root."""
+    """A write was aimed outside the writer's roots."""
 
 
-def inside(path: Path | str, root: Path | str) -> Path:
-    """Resolve `path` (relative paths are taken relative to `root`) and return it if it lies
-    inside `root`. Symlinks are followed, so a link pointing out of the root is refused."""
-    root = Path(root).resolve()
+def inside(path: Path | str, roots: Path | str | tuple | list) -> Path:
+    """Resolve `path` (relative paths are taken relative to the first root) and return it if it
+    lies inside one of `roots` (a folder, or several). Symlinks are followed, so a link pointing out
+    of the roots is refused."""
+    roots = [Path(r).resolve() for r in (roots if isinstance(roots, (tuple, list)) else [roots])]
     p = Path(path)
     if not p.is_absolute():
-        p = root / p
+        p = roots[0] / p
     p = p.resolve()
-    if p != root and root not in p.parents:
-        raise UnsafePathError(f"refusing to write outside {root}: {p}")
+    if not any(p == r or r in p.parents for r in roots):
+        where = roots[0] if len(roots) == 1 else " or ".join(map(str, roots))
+        raise UnsafePathError(f"refusing to write outside {where}: {p}")
     return p
 
 
 class SafeWriter:
-    """All file writes, each behind the path guard."""
+    """All file writes, each behind the path guard. `SafeWriter()` is the app's: edaapp/ and the
+    repository's reviews/ folder (WRITE_ROOTS); `SafeWriter(folder, ...)` writes only in those."""
 
-    def __init__(self, root: Path | str = APP_ROOT):
-        self.root = Path(root).resolve()
+    def __init__(self, *roots: Path | str):
+        self.roots = tuple(Path(r).resolve() for r in (roots or WRITE_ROOTS))
+        self.root = self.roots[0]  # relative paths are taken from here
         self._lock = threading.Lock()
 
     def guard(self, path: Path | str) -> Path:
-        return inside(path, self.root)
+        return inside(path, self.roots)
 
     def mkdir(self, path: Path | str) -> Path:
         p = self.guard(path)

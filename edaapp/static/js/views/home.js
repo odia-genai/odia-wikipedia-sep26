@@ -6,8 +6,14 @@ export async function render({ main, reloadHome }) {
   main.append(h("h1", null, "Datasets"),
     h("p", { class: "muted" }, "Data root ", h("code", null, data.data_root),
       ". A dataset is any folder here with a JSONL (or gzipped JSONL) or Parquet table that has id and text columns."));
-  // the Hugging Face datasets behind the data root (none when it is a local folder, --data)
+  // where the datasets come from: this repository (the default), or its Hugging Face copy (--hub);
+  // nothing for a data root given with --data
   for (const s of data.sources || []) {
+    if (s.kind === "repository") {
+      main.append(h("p", { class: "muted small" }, h("code", null, s.name), " is this repository, ",
+        h("code", null, s.path), s.commit ? ` (commit ${s.commit.slice(0, 7)}, plus any changes not committed).` : "."));
+      continue;
+    }
     main.append(h("p", { class: s.offline ? "card warnings small" : "muted small" },
       h("code", null, s.name), " is the Hugging Face dataset ",
       h("a", { href: s.url, target: "_blank", rel: "noopener" }, `${s.repo_id} ↗`),
