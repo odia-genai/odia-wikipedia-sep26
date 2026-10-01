@@ -1,8 +1,8 @@
 {
   "name": "bpb.paragraphs",
   "description": "Sarvam-1 bits per byte of every paragraph except the title (paragraph i = text.split('\\n\\n')[i]), with its percentile within its kind and length band. Each row's bits, bytes, tokens, pieces and scoring run are in the score store, joined on para_sha1 (see 'joins').",
-  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 68c6a19f1bf4",
-  "created": "2026-10-01T16:01:04Z",
+  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 f64237b34f17",
+  "created": "2026-10-01T18:34:23Z",
   "columns": {
     "id": "page id",
     "para": "paragraph index; 0 (the title heading) is not scored",

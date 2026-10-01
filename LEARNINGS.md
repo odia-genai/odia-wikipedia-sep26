@@ -66,6 +66,25 @@ browsing and reviewing datasets. Entry format: **what happened** — **lesson** 
 
 ## Data (Odia)
 
+- **The review's fixes needed a way to replace a whole paragraph** (2026-10-02, the owner asked for
+  the translation round of the 26 *fix* articles).
+  - **What happened.** The translation table only replaces English prose that the build set aside.
+    The review's fixes were lists and tables kept as data, and English sentences inside Odia
+    paragraphs, so the build had no way to apply them.
+  - **Lesson.** A review that can say "fix" needs a fix that the build applies.
+  - **Action.** done:
+    - `curation/paragraph-fixes.jsonl`, applied by paragraph sha1 like the curated junk;
+    - `translate.py fixes` and `merge-fixes`, which add a shape check (lines, list markers, table
+      cells and rules) to the translation checks;
+    - a review event per fixed article, so *fix* pending is 0.
+  - **How the round went.** Five translator agents of five paragraphs each took 7–17 minutes per
+    batch. All 25 translations passed every check. The translators also fixed obvious misspellings
+    in the English and listed the names they were unsure of in `notes`.
+  - **Verify a "wrong name" before correcting it.** English and Bengali Wikipedia both confirmed it
+    first: the lead's name was another person's, not a real name of the actress.
+  - idea: an Odia speaker reads the names listed in the fixes' `notes`, villages and small stations
+    above all.
+
 - **The translation table's "English" is not always English** (2026-10-01, the owner asked for the
   translations as clean pairs for training). 48 of the 791 translations had Odia in their source,
   because blocks that mixed the languages were sent for translation by their share of Latin

@@ -4,18 +4,18 @@ The 200 articles most likely to hold data problems, ranked from Sarvam-1 bits pe
 
 The full list is in `annotations/bpb.jsonl` (`review_rank`, `review_type`, `review_para`, `review_reasons`; null rank = not flagged). The web app (`edaapp`) shows it as a review queue. Every paragraph's score is in `annotations/bpb.paragraphs.jsonl`.
 
-Not in this queue: 319 paragraphs (319 distinct texts, 366,751 B, in 233 articles) whose text has no score yet (`bpb` null; see `quality/bpb.md`, Not scored yet).
+Not in this queue: 345 paragraphs (345 distinct texts, 439,253 B, in 258 articles) whose text has no score yet (`bpb` null; see `quality/bpb.md`, Not scored yet).
 
 ## Legend
 
 | type | meaning | in queue | candidates |
 | --- | --- | ---: | ---: |
-| `garbled` | Odia text the model finds very unlikely for its kind and length: garbled OCR or typing, broken sentences, odd mixtures. Verse, songs and Sanskrit also score high; they are ranked after prose within this type | 34 | 839 |
-| `english` | a paragraph that is mostly English: untranslated leftovers, quotes, citations, OCR'd English | 34 | 287 |
+| `garbled` | Odia text the model finds very unlikely for its kind and length: garbled OCR or typing, broken sentences, odd mixtures. Verse, songs and Sanskrit also score high; they are ranked after prose within this type | 34 | 845 |
+| `english` | a paragraph that is mostly English: untranslated leftovers, quotes, citations, OCR'd English | 34 | 276 |
 | `templated` | very predictable text for its kind and length (bottom 1%): formulaic sentences, lists and near-copies across articles; the reasons say when a copy was found | 34 | 898 |
 | `table` | a table in the top or bottom 1% of tables: English-only tables, IPA or name lists, repeated career tables | 30 | 53 |
 | `markup` | leftovers of the HTML/wikitext conversion ({{ }}, [[ ]], {\| \|}, tags, class=, namespace prefixes, px sizes, URLs), any bpb | 0 | 0 |
-| `script` | a paragraph mostly in another script (Shahmukhi, Brahmi, Telugu, ...) or in Latin letters that are not English (transliteration, IPA, other languages, romanised titles) | 34 | 298 |
+| `script` | a paragraph mostly in another script (Shahmukhi, Brahmi, Telugu, ...) or in Latin letters that are not English (transliteration, IPA, other languages, romanised titles) | 34 | 290 |
 | `article` | the article as a whole: its bpb is in the top or bottom 1% of articles >= 500 B, or most of its bytes are in extreme paragraphs (catches pages made of many tiny paragraphs) | 34 | 448 |
 
 Reason wording: *para 7 (text, 412 B): bpb 1.84, top 0.1% of text 300-999 B (median 0.45)* means paragraph 7 (`text.split("\n\n")[7]`) is a 412-byte prose paragraph whose bpb is in the top 0.1% of prose paragraphs of 300-999 bytes, whose median is 0.45. Extra notes: the share of Latin or other-script letters and of common English words among the Latin ones, conversion leftovers found (`markup`), verse, how many other articles hold a near-copy or the same sentence frame, repetition inside the paragraph, and a table header shared with other articles. *context:* lines come from the topic and Content Translation annotations when present.
@@ -131,7 +131,7 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
 17. **ପେଣ୍ଟାଲ, ହାସ୍ୟ ଅଭିନେତା** (id 55987, para 4, `script`)
    - para 4 (list, 3,271 B): bpb 1.32, top 5% of list >=100 B (median 0.51); 100% Latin letters, 2% common English words
    - article: bpb 1.27, top 0.1% of articles >= 500 B (median 0.55); odia\_ratio 0.07
-   - para 6 (list, 415 B): bpb 1.77, top 0.5% of list 300-999 B (median 0.75); 100% Latin letters, 13% common English words; high even for English (English paragraphs: median 1.02)
+   - para 6 (list, 415 B): bpb 1.77, top 0.1% of list 300-999 B (median 0.75); 100% Latin letters, 13% common English words; high even for English (English paragraphs: median 1.02)
    - context: machine-assisted translation (Content Translation, from en)
    - context: topic film
    > - Kaalo (2010) ⏎ - Shri Chaitanya Mahaprabhu (2009) (Special Appearance) ⏎ - Paying Guest (2009) ⏎ - Fun 2shh: Dudes in the 10th Century (2003) ⏎ - Kasam (2001) ⏎ - Zulm-O-Sitam (1998) ⏎ - Hatyara (1998) ⏎ - Mere Sapno…
@@ -274,27 +274,27 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic politics, Odisha
    > | ନାମ | ବିଧାନ ସଭା | ଆରମ୍ଭ ଦିନ | ଶେଷ ଦିନ | ⏎ |---|---|---|---| ⏎ | ମୁକୁନ୍ଦ ପ୍ରସାଦ ଦାସ | 1ମ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବରୁ) | 28 ଜୁଲାଇ 1937 | 29 ମଇ 1946 | ⏎ | ଲାଲ ମୋହନ ପଟ୍ଟନାୟକ | 2ୟ ଓଡ଼ିଶା ବିଧାନ ସଭା (ସ୍ୱାଧୀନତା ପୂର୍ବର…
 
-41. **ସମ୍ବଲପୁରରେ ଶିକ୍ଷା** (id 56279, para 8, `script`)
-   - para 8 (list, 1,611 B): bpb 1.30, top 0.5% of list 1-3 kB (median 0.56); 100% Latin letters, 0% common English words
-   - para 6 (list, 498 B): bpb 1.23, top 5% of list 300-999 B (median 0.75); 100% Latin letters, 5% common English words
+41. **ସାତକର୍ଣ୍ଣୀ-2ୟ** (id 101018, para 5, `script`)
+   - para 5 (text, 507 B): bpb 1.36, top 0.1% of text 300-999 B (median 0.53); 28% letters in other scripts; verse or song lines
    - context: machine-assisted translation (Content Translation, from en)
-   - context: topic education, Odisha
-   > - Govt. Deaf & Dumb High School, Burla ⏎ - Sri Aurobindo School (SAIIE&R) ⏎ - St. Joseph's Convent Higher Secondary School, Sambalpur ⏎ - Central School (KV) ⏎ - Delhi Public School, Sambalpur ⏎ - Madanawati Public Scho…
+   > 𑀭𑀸𑀜𑁄 𑀲𑀺𑀭𑀺 𑀲𑀸𑀢𑀓𑀡𑀺𑀲 (ରାଞୋ ସିରି ସାତକଣିସ) ⏎ 𑀆𑀯𑁂𑀲𑀡𑀺𑀲 𑀯𑀸𑀲𑀺𑀣𑀻𑀧𑀼𑀢𑀲 (ଆବେସଣିସ ବାସିଥୀପୁତସ) ⏎ 𑀆𑀦𑀁𑀤𑀲 𑀤𑀸𑀦𑀁 (ଆନଂଦସ ଦାନଂ) ⏎ "ରାଜନ ସିରି ସାତକର୍ଣ୍ଣୀଙ୍କ କାରିଗରମାନଙ୍କ ମୁଖିଆ, ବାସିଥୀଙ୍କ ପୁତ୍ର ଆନନ୍ଦଙ୍କ ଦାନ"
 
-42. **ଆପଲ ଇନକର୍ପୋରେଟେଡ** (id 7032, whole article, `article`)
-   - article: bpb 0.31, bottom 0.1% of articles >= 500 B (median 0.55)
-   - para 1 (text, 1,632 B): bpb 0.31, bottom 1% of text 1-3 kB (median 0.49)
-   - context: topic technology
-   > (para 1, bpb 0.31) ଆପଲ ଇନକର୍ପୋରେଟେଡ ଏକ ଆମେରିକୀୟ ବହୁରାଷ୍ଟ୍ରୀୟ ଟେକ୍ନୋଲୋଜି କମ୍ପାନୀ ଓ ଏହାର ମୁଖ୍ୟାଳୟ କାଲିଫର୍ଣ୍ଣିଆର କୁପରଟିନୋରେ ରହିଛି । ମାର୍ଚ୍ଚ 2023 ସୁଦ୍ଧା, ଆପଲ ବଜାର ପୁଞ୍ଜି ଦୃଷ୍ଟିରୁ ବିଶ୍ୱର ସର୍ବବୃହତ କମ୍ପାନୀ, ଏବଂ 2022 ରାଜସ୍ୱ ସୁ…
+42. **ମନିରା ମିଠୁ** (id 98098, whole article, `article`)
+   - article: bpb 1.17, top 0.1% of articles >= 500 B (median 0.55); 55% of its bytes are in extreme paragraphs
+   - para 4 (list, 1,214 B): bpb 1.21, top 0.5% of list 1-3 kB (median 0.56)
+   - context: topic film
+   > (para 4, bpb 1.21) - ଅପେଣ୍ଟି ବାଇସ୍କୋପ୍ (2001) ⏎ - ନିଲ୍ ତୋୱାଲେ ⏎ - ଏମୋନ ଦେଶଟି କୋଥାଓ କୁଜେୟ ପାବେ ନାକୋ ତୁମି ⏎ - ସ୍ପାର୍ଟାକସ୍ ଏକୋତ୍ତର ⏎ - ହାଉସ୍ ଫୁଲ୍ ⏎ - ବିକୋଲ୍ ପାଖିର୍ ଗାଁ ⏎ - ବୁଆ ବିଲାଶ ⏎ - କମିଂ ସୁନ୍ ⏎ - ପୁତୁଲ୍ ଖେଲା ⏎ - ଚାନ୍ଦ…
 
 43. **ସତ୍ୟମେବ ଜୟତେ** (id 13878, para 2, `garbled`)
    - para 2 (text, 301 B): bpb 1.41, top 0.1% of text 300-999 B (median 0.53)
    > ସତ୍ୟମେବ ଜଯତେ ନାନୃତମ୍ ସତ୍ୟନ ପନ୍ଥାବ ବିତତୋବଦେବଯାନଃ । ⏎ ଯେନାକ୍ରମନ୍ୟୁତ୍ୟଷଯୋ ହ୍ୟାତ୍ମକାମୋ ଯତ୍ର ତତ୍ତ୍ୟସ୍ୟ ପରମଂ ନିଧାନଂ ॥
 
-44. **ଆତ୍ସୁତା ଶାଳ** (id 76172, para 20, `english`)
-   - para 20 (list, 2,295 B): bpb 1.01, top 5% of list 1-3 kB (median 0.56); 86% Latin letters, 40% common English words
-   - context: topic religion
-   > - ହାତ୍ସୁ-ଏବିସୁ (5 ଜାନୁଆରୀ): ଭାଗ୍ୟର କାମି, ଏବିସୁଙ୍କଠାରୁ ନବବର୍ଷରେ ସୌଭାଗ୍ଯ ମାଗିବା ପାଇଁ । ⏎ - ଯୋଦାମେଶୀ ଶିଞ୍ଜି (7 ଜାନୁଆରୀ): ପୂର୍ବରତ୍ନଭଣ୍ଡାର ଗୃହର ଚଟାଣ ତଳେ ରଖାଯାଇଥିବା ଏକ ପାତ୍ରରେ ଥିବା ଜଳର ପରିମାଣ ମାପି ଆଗାମୀ ବର୍ଷର ବାର୍ଷିକ ବର୍ଷାର ଭ…
+44. **ଖୁସୱନ୍ତ ସିଂହ** (id 72168, para 27, `english`)
+   - para 27 (list, 1,680 B): bpb 1.02, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 39% common English words
+   - para 29 (list, 172 B): bpb 1.62, top 5% of list 100-299 B (median 0.97); 74% Latin letters, 44% common English words; 26% letters in other scripts
+   - context: machine-assisted translation (Content Translation, from en)
+   - context: topic literature
+   > - The Mark of Vishnu and Other Stories, (Short Story) 1950 ⏎ - The History of Sikhs, 1953 ⏎ - Train to Pakistan, (Novel) 1956 ⏎ - The Voice of God and Other Stories, (Short Story) 1957 ⏎ - I Shall Not Hear the Nightinga…
 
 45. **ଲୋକନାଥ ମିଶ୍ର (ରାଜନେତା, 1967 ମୃତ୍ୟୁ)** (id 83827, para 1, `templated`)
    - para 1 (text, 1,314 B): bpb 0.26, bottom 0.1% of text 1-3 kB (median 0.49); near-copy (word-pair overlap 50%) in 1 other article
@@ -309,19 +309,18 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic geography
    > | ବୈଜ୍ଞାନିକ ନାମ | ମରାଠୀ ନାମ | ⏎ |---|---| ⏎ | Ceropegia Vincaefolia | କାଣ୍ଟିଲପୁଷ୍ପ | ⏎ | Ceropegia Jainii | ସୋମଡ଼ା | ⏎ | Drosera Indica | Gavati Davbindu | ⏎ | Smithia hirsute / hirsuta | Kavala | ⏎ | Senecio grahami /…
 
-47. **ପ୍ରିୟବ୍ରତ ଦାସ** (id 72536, para 11, `script`)
-   - para 11 (list, 1,294 B): bpb 1.28, top 0.5% of list 1-3 kB (median 0.56); 100% Latin letters, 6% common English words
-   - para 14 (list, 345 B): bpb 1.57, top 0.5% of list 300-999 B (median 0.75); 100% Latin letters, 0% common English words
-   - para 17 (list, 227 B): bpb 1.74, top 5% of list 100-299 B (median 0.97); 100% Latin letters, 4% common English words
-   - context: topic literature, Odisha
-   > - Theosophical society, Brighton (UK) 1966 ⏎ - Hindu Centre, London (UK)1967 ⏎ - Yoga Centre, Brisbaden (Germany)1968 ⏎ - Brajamohan Sahitya Samiti, Bhawanipatna, Orissa 1968 ⏎ - All Orissa Sanskrit Teachers' conference…
+47. **ଡାଇନୋସର ଶ୍ରେଣୀବିଭାଗ** (id 32047, para 10, `script`)
+   - para 10 (list, 5,422 B): bpb 0.60, 77th percentile of list >=100 B (median 0.51); 100% Latin letters, 3% common English words
+   - para 1 (text, 1,101 B): bpb 0.76, top 1% of text 1-3 kB (median 0.49)
+   - para 13 (list, 2,293 B): bpb 0.53, 44th percentile of list 1-3 kB (median 0.56); 100% Latin letters, 0% common English words
+   - context: topic biology
+   > - Herrerasauria (Herrerasaurus > Liliensternus, Plateosaurus) ⏎   - Herrerasauridae (Herrerasaurus + Staurikosaurus) ⏎ - ? Eoraptor lunensis ⏎ - Sauropodomorpha (Saltasaurus > Theropoda) ⏎   - ? Saturnalia tupiniquim ⏎…
 
-48. **ଗୋବିନ୍ଦ ଚନ୍ଦ୍ର ଦାସ (ରାଜନୀତିଜ୍ଞ)** (id 70535, whole article, `article`)
-   - article: bpb 0.31, bottom 0.1% of articles >= 500 B (median 0.55); 98% of its bytes are in extreme paragraphs
-   - para 3 (text, 1,231 B): bpb 0.28, bottom 0.5% of text 1-3 kB (median 0.49); near-copy (word-pair overlap 57%) in 8 other articles
-   - para 1 (text, 864 B): bpb 0.30, bottom 0.5% of text 300-999 B (median 0.53); near-copy (word-pair overlap 67%) in 3 other articles
-   - context: topic politics, Odisha
-   > (para 3, bpb 0.28) ଗୋବିନ୍ଦ ଭାରତୀୟ ଜନତା ପାର୍ଟିର କର୍ମକର୍ତ୍ତା ଭାବରେ ଓଡ଼ିଶା ରାଜନୀତିରେ ସକ୍ରିୟ ଅଛନ୍ତି । ସେ ଓଡ଼ିଶା ବିଧାନ ସଭାରେ ଜଣେ ବିଧାୟକ ଭାବରେ କାର୍ଯ୍ୟ କରିଥିଲେ । 2014 ମସିହାର ଓଡ଼ିଶା ବିଧାନ ସଭା ନିର୍ବାଚନରେ ସେ ଭାରତୀୟ ଜନତା ପାର୍ଟିର…
+48. **ଆପଲ ଇନକର୍ପୋରେଟେଡ** (id 7032, whole article, `article`)
+   - article: bpb 0.31, bottom 0.1% of articles >= 500 B (median 0.55)
+   - para 1 (text, 1,632 B): bpb 0.31, bottom 1% of text 1-3 kB (median 0.49)
+   - context: topic technology
+   > (para 1, bpb 0.31) ଆପଲ ଇନକର୍ପୋରେଟେଡ ଏକ ଆମେରିକୀୟ ବହୁରାଷ୍ଟ୍ରୀୟ ଟେକ୍ନୋଲୋଜି କମ୍ପାନୀ ଓ ଏହାର ମୁଖ୍ୟାଳୟ କାଲିଫର୍ଣ୍ଣିଆର କୁପରଟିନୋରେ ରହିଛି । ମାର୍ଚ୍ଚ 2023 ସୁଦ୍ଧା, ଆପଲ ବଜାର ପୁଞ୍ଜି ଦୃଷ୍ଟିରୁ ବିଶ୍ୱର ସର୍ବବୃହତ କମ୍ପାନୀ, ଏବଂ 2022 ରାଜସ୍ୱ ସୁ…
 
 49. **ଚନ୍ଦନ ତିୱାରୀ** (id 72805, para 8, `garbled`)
    - para 8 (text, 884 B): bpb 1.33, top 0.1% of text 300-999 B (median 0.53)
@@ -329,10 +328,9 @@ Usually fine on inspection: verse, songs and Sanskrit (`garbled`, marked *verse 
    - context: topic arts
    > ପୁର୍ବଇୟା ଉସ୍ତାଦ, ବେଟି ଚରୟିଆ ସମାନ, ରାଧା ରସିୟା, ସବକେ (ରାମ ରସୁଲ, ବସନ୍ତି ବାୟେର, ଶିବ ଜୋଗିଆ, ସଝି ରାଗ, ସ‌ୱାନି ବାହାର, ନିର୍ଗୁନିଆ କବୀର, ମହାତ୍ମା ଗାନ୍ଧୀ, ନ‌ଦୀଆ ଧୀରେ ବ‌ହୋ, ଭଏସ ଅଫ ଗ୍ୟାଞ୍ଜେସ, ମାଇ, ଛଟ୍ଟି ମଇୟା, ରଙ୍କ କଳସ, ଚରଖ‌ୱା ଚାଲୁ ରହେ…
 
-50. **ଖୁସୱନ୍ତ ସିଂହ** (id 72168, para 27, `english`)
-   - para 27 (list, 1,680 B): bpb 1.02, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 39% common English words
-   - para 29 (list, 172 B): bpb 1.62, top 5% of list 100-299 B (median 0.97); 74% Latin letters, 44% common English words; 26% letters in other scripts
-   - context: machine-assisted translation (Content Translation, from en)
-   - context: topic literature
-   > - The Mark of Vishnu and Other Stories, (Short Story) 1950 ⏎ - The History of Sikhs, 1953 ⏎ - Train to Pakistan, (Novel) 1956 ⏎ - The Voice of God and Other Stories, (Short Story) 1957 ⏎ - I Shall Not Hear the Nightinga…
+50. **ଜେ. ବି. ଏସ. ହାଲଡେନ** (id 24214, para 8, `english`)
+   - para 8 (list, 1,327 B): bpb 1.03, top 5% of list 1-3 kB (median 0.56); 100% Latin letters, 28% common English words
+   - para 6 (list, 1,677 B): bpb 0.71, 78th percentile of list 1-3 kB (median 0.56); 100% Latin letters, 46% common English words
+   - context: topic science
+   > - A Mathematical Theory of Natural and Artificial Selection, a series of papers beginning in 1924 ⏎ - Callinicus: A Defence of Chemical Warfare (1925), E. P. Dutton ⏎ - Animal Biology (1929) Oxford: Clarendon ⏎ - The In…
 

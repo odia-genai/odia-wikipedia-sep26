@@ -1,6 +1,6 @@
 # Topic tags for Odia Wikipedia
 
-Built by `annotate.py topics` on 2026-10-01 for the 18,683 articles of the corpus (`orwiki-20260901-trainingready.jsonl`, 4,511,338 Odia words). Output: `annotations/topics.jsonl`, one JSON object per article in corpus order; the columns are described in `annotations/topics.json`. Titles and category names are written with ASCII digits, here and in the annotation.
+Built by `annotate.py topics` on 2026-10-01 for the 18,683 articles of the corpus (`orwiki-20260901-trainingready.jsonl`, 4,514,702 Odia words). Output: `annotations/topics.jsonl`, one JSON object per article in corpus order; the columns are described in `annotations/topics.json`. Titles and category names are written with ASCII digits, here and in the annotation.
 
 **Coverage: 97.4% of articles (96.4% of words) have a topic.** Precision of `primary_topic`, checked by hand on a held-out random sample: see [Precision](#precision).
 
@@ -9,27 +9,27 @@ Built by `annotate.py topics` on 2026-10-01 for the 18,683 articles of the corpu
 | Topic | Covers | Articles (primary) | Share | Odia words | Share | Articles listing it | Biographies | Odisha |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | `calendar` | year, date, month, decade and century pages; observances | 272 | 1.5% | 33,738 | 0.7% | 292 | 1 | 8 |
-| `film` | film, television and entertainment, including actors, directors, models | 2,714 | 14.5% | 523,051 | 11.6% | 2,801 | 1,435 | 1,534 |
-| `sports` | sports, sportspeople, clubs, venues, tournaments | 538 | 2.9% | 144,374 | 3.2% | 545 | 463 | 87 |
-| `health` | health and medicine: diseases, drugs, anatomy, nutrition, hospitals | 3,269 | 17.5% | 678,819 | 15.0% | 3,297 | 49 | 43 |
+| `film` | film, television and entertainment, including actors, directors, models | 2,714 | 14.5% | 523,135 | 11.6% | 2,801 | 1,435 | 1,534 |
+| `sports` | sports, sportspeople, clubs, venues, tournaments | 538 | 2.9% | 144,676 | 3.2% | 545 | 463 | 87 |
+| `health` | health and medicine: diseases, drugs, anatomy, nutrition, hospitals | 3,269 | 17.5% | 678,971 | 15.0% | 3,297 | 49 | 43 |
 | `biology` | biology and nature: plants, animals, taxa, ecology, forests, sanctuaries | 587 | 3.1% | 198,700 | 4.4% | 622 | 36 | 106 |
 | `mathematics` | mathematics and numbers | 57 | 0.3% | 17,043 | 0.4% | 73 | 13 | 4 |
-| `science` | physical and earth sciences: physics, chemistry, astronomy, geology, weather | 371 | 2.0% | 101,881 | 2.3% | 462 | 115 | 32 |
-| `technology` | technology and engineering: computing, internet, vehicles, transport, space tech | 411 | 2.2% | 130,242 | 2.9% | 453 | 47 | 30 |
+| `science` | physical and earth sciences: physics, chemistry, astronomy, geology, weather | 371 | 2.0% | 101,932 | 2.3% | 462 | 115 | 32 |
+| `technology` | technology and engineering: computing, internet, vehicles, transport, space tech | 411 | 2.2% | 130,569 | 2.9% | 453 | 47 | 30 |
 | `economy` | economy and business: companies, industry, agriculture, banking, trade | 190 | 1.0% | 57,829 | 1.3% | 216 | 98 | 35 |
-| `education` | education: schools, colleges, universities, teachers | 157 | 0.8% | 26,388 | 0.6% | 192 | 20 | 119 |
-| `religion` | religion, mythology and philosophy: deities, temples, scriptures, saints | 1,234 | 6.6% | 485,704 | 10.8% | 1,353 | 87 | 398 |
-| `literature` | literature and language: writers, poets, books, periodicals, languages, scripts | 1,726 | 9.2% | 414,180 | 9.2% | 1,888 | 1,226 | 1,163 |
-| `arts` | arts and culture: music, dance, theatre, painting, festivals, food, customs, crafts | 1,117 | 6.0% | 355,710 | 7.9% | 1,301 | 527 | 463 |
+| `education` | education: schools, colleges, universities, teachers | 157 | 0.8% | 26,590 | 0.6% | 192 | 20 | 119 |
+| `religion` | religion, mythology and philosophy: deities, temples, scriptures, saints | 1,234 | 6.6% | 485,914 | 10.8% | 1,353 | 87 | 398 |
+| `literature` | literature and language: writers, poets, books, periodicals, languages, scripts | 1,726 | 9.2% | 414,312 | 9.2% | 1,888 | 1,226 | 1,163 |
+| `arts` | arts and culture: music, dance, theatre, painting, festivals, food, customs, crafts | 1,117 | 6.0% | 355,771 | 7.9% | 1,301 | 527 | 463 |
 | `history` | history and military: empires, dynasties, rulers, wars, freedom struggle, monuments | 530 | 2.8% | 234,126 | 5.2% | 627 | 284 | 114 |
-| `politics` | politics, government and law: politicians, elections, legislatures, courts, schemes | 2,557 | 13.7% | 516,263 | 11.4% | 2,667 | 2,063 | 1,858 |
-| `society` | society: communities, tribes, castes, organisations, social movements, activists | 193 | 1.0% | 84,672 | 1.9% | 253 | 81 | 52 |
-| `geography` | geography and places: countries, states, districts, towns, villages, rivers | 2,280 | 12.2% | 347,286 | 7.7% | 2,394 | 4 | 622 |
-| (none) | no evidence | 480 | 2.6% | 161,332 | 3.6% | | 112 | 76 |
+| `politics` | politics, government and law: politicians, elections, legislatures, courts, schemes | 2,557 | 13.7% | 516,440 | 11.4% | 2,667 | 2,063 | 1,858 |
+| `society` | society: communities, tribes, castes, organisations, social movements, activists | 193 | 1.0% | 84,977 | 1.9% | 253 | 81 | 52 |
+| `geography` | geography and places: countries, states, districts, towns, villages, rivers | 2,280 | 12.2% | 348,013 | 7.7% | 2,394 | 4 | 622 |
+| (none) | no evidence | 480 | 2.6% | 161,966 | 3.6% | | 112 | 76 |
 
-- **`school_relevant`**: 10,704 articles (57.3%), 2,614,006 words (57.9%).
-- **`is_person`** (biographies): 6,661 articles (35.7%), 1,556,629 words. Film and sports biographies: 1,898 articles, 431,969 words (9.6%).
-- **`odisha`**: 6,744 articles (36.1%), 1,385,243 words (30.7%).
+- **`school_relevant`**: 10,704 articles (57.3%), 2,615,902 words (57.9%).
+- **`is_person`** (biographies): 6,661 articles (35.7%), 1,557,273 words. Film and sports biographies: 1,898 articles, 432,253 words (9.6%).
+- **`odisha`**: 6,744 articles (36.1%), 1,385,650 words (30.7%).
 - 1,140 articles list more than one topic.
 
 `health` is large because of WikiProject Medicine's translation drive: 1,936 of its 3,269 articles are machine-assisted translations (`translated` in `annotations/translation.jsonl`), 1,912 of them from MDWiki sources, mostly drug and disease pages. `calendar` is date pages with events, weekdays and observances (year pages are excluded). `politics` includes 1,326 biographies of Odisha assembly members.

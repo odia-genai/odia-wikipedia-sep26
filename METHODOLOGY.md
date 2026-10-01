@@ -11,15 +11,15 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 | | |
 |---|---|
 | Articles | 18,683 (of 21,095 main-namespace pages that are not redirects) |
-| Odia words | 4,511,338 (runs of Odia letters; digits are ASCII) |
-| Characters / UTF-8 bytes | 34,716,497 / 87,198,728 |
+| Odia words | 4,514,702 (runs of Odia letters; digits are ASCII) |
+| Characters / UTF-8 bytes | 34,716,329 / 87,237,550 |
 | Sarvam-1 tokens | 12.78M, without the BOS token of each scored paragraph (150.0 per kB of scored text) |
 | Paragraphs | 161,726, of which 143,043 are not the title |
-| Data tables | 2,948 in 1,721 articles, 168,886 Odia words |
+| Data tables | 2,948 in 1,721 articles, 169,433 Odia words |
 | Pages left out | 2,412, each in `excluded.jsonl` with id, revision and reason: 1,864 year pages, 260 date pages without events, 137 under 5 Odia words, 112 disambiguation, 19 empty film-year lists, 12 dropped by the reviewer, 7 exact duplicates, the main page |
 | English inside articles | 861 paragraphs and headings translated into Odia (in 362 articles), 4,847 lists, tables and names kept as they are, 133 citations and 15 junk or reference blocks removed |
 | Annotations | topics, machine-assisted translation, Sarvam-1 bits per byte (article and paragraph), a review-first queue |
-| Human review | 217 articles read by the owner (2026-10-01): 179 kept, 12 dropped, 26 marked *fix*; 74 paragraphs dropped from 6 kept articles |
+| Human review | 217 articles read by the owner (2026-10-01): 179 kept, 12 dropped, 26 marked *fix* and fixed on 2026-10-02 (25 English blocks translated, one name corrected); 74 paragraphs dropped from 6 kept articles |
 
 `pipeline.py` runs everything from the cached inputs in one command (`uv run pipeline.py`, a few minutes; `--fetch` starts from scratch): build, annotations, scores, checks, stopping at the first failure. The steps are scripts of their own, all in this folder:
 
@@ -303,7 +303,7 @@ Every article is parsed with markdown-it (CommonMark plus GFM tables and striket
 | main page | 1 | ପ୍ରଧାନ ପୃଷ୍ଠା is in the article namespace | |
 | reviewer: drop | 12 | an edaapp review decision (see [Human review loop](#human-review-loop)) | 7 left mostly English after the citations went (କେଷ୍ଟୋ ମୁଖାର୍ଜୀ, ନେହା କକ୍କର, ଭାରତୀୟ ହ୍ରଦ ସମୂହର ତାଲିକା); ବିଶାଳାକ୍ଷୀ ମନ୍ଦିର, garbled throughout |
 
-Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (319, 55,417 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
+Stubs (1,910) are kept and flagged (`stub`). Articles whose `odia_ratio` is under 0.6 (310, 54,816 Odia words) are kept too; `odia-build-cpt`'s default `--min-odia-ratio 0.6` skips them.
 
 ### Boilerplate pages
 
@@ -493,9 +493,25 @@ The counts are in the build JSON and `README.md`.
 - ଅଜୟଗଡ ରାଜ୍ୟ: a family tree drawn with underscores and pipes;
 - ଦାମନଯୋଡ଼ି: a badly typed paragraph.
 
-**Effect.** 18,695 → 18,683 articles, 4,512,644 → 4,511,338 Odia words (−1,306), 110,222 fewer UTF-8 bytes and 44,751 fewer Sarvam-1 tokens. Most of what went is English. Kept-as-is English blocks fell from 5,133 to 4,847, translated paragraphs from 899 to 861, and the articles under 0.6 Odia from 332 to 319. All 63 paragraph references matched. The 26 *fix* articles are unchanged until a translation round does them; each note names the paragraph.
+**Effect.** 18,695 → 18,683 articles, 4,512,644 → 4,511,338 Odia words (−1,306), 110,222 fewer UTF-8 bytes and 44,751 fewer Sarvam-1 tokens. Most of what went is English. Kept-as-is English blocks fell from 5,133 to 4,847, translated paragraphs from 899 to 861, and the articles under 0.6 Odia from 332 to 319. All 63 paragraph references matched. The 26 *fix* articles were fixed the next day (see [Fix round](#fix-round-2026-10-02)).
 
 **What it says about the queue.** 142 of the 217 were fine as they were, and only 12 had to go. The queue's types are good at finding odd text but not at telling bad from merely unusual: verse, Sanskrit, formulaic stubs and lists of works make up most of it. The 10 mostly-English drops (30–118 Odia words, an Odia ratio of 0.02–0.34) all passed the "mostly English" rule (`gutted()`). It looks only at the English that was taken out, and their English is lists and tables, which stay as data. 63 articles in the corpus now have an Odia ratio under 0.35 and under 120 Odia words. Only 7 of them were reviewed (2 kept, 5 *fix*); most of the other 56 are English tables in list articles (airports, national highways, mountains). So a ratio threshold is not a safe drop rule, but those 56 are the next articles to review.
+
+### Fix round, 2026-10-02
+
+**Rule.** A paragraph a reviewer marked *fix* is replaced by its fixed text from `curation/paragraph-fixes.jsonl` (`load_fixes()`, `apply_fixes()` in `prepare.py`). The entry is keyed by the page id and the sha1 of the paragraph as the build produces it, like the curated junk. An entry whose paragraph is no longer in its article is counted and reported, not applied. A translated paragraph counts in the article's `translated_paragraphs`.
+
+**How it was done.**
+- `translate.py fixes` wrote the 25 paragraphs named in the *fix* notes to work batches. The lead with the wrong name has no paragraph number in its note and was fixed by hand.
+- Five Claude Opus 5.5 translator agents translated them, each batch of five on its own. The rules were the owner's: translate the facts, lean heavily towards transliterating names, keep the Odia already there, keep every number, write ASCII digits, and spell names the way the article and the corpus already do.
+- `translate.py merge-fixes` checked each one with the translation checks (digits, script, Odia share, length, spelling) and a shape check: the same lines, list markers, indentation, table cells and table rules as the source. All 25 passed.
+- The translators also corrected obvious misspellings in the English while transliterating (Nesvill is Nashville, Sauthal is Southall), and noted every choice they were unsure of in the entry's `notes`.
+- The lead of ମନିରା ମିଠୁ named another person, ରିଓଡି ଅହମ୍ମଦ ରୋଜୋବ. English and Bengali Wikipedia both name her Monira Mithu (also credited as Monira Akter Mithu), so the lead now does too (`kind: correction`).
+- Each fixed article got a new review event, verdict *keep*, whose note says what was fixed and keeps the owner's original note; the latest event wins, so *fix* pending is 0.
+
+**What was fixed.** 18 English lists and tables of facts: train timetables of four railway articles, a river list, schools of Sambalpur, sports records, an electric-car table, Burj Khalifa's construction milestones and the unification of Nepal. Also 7 English passages inside Odia articles, and one name.
+
+**Effect.** 26 paragraphs in 26 articles; 4,511,338 → 4,514,702 Odia words (+3,364); articles under 0.6 Odia from 319 to 310. The 26 new paragraph texts have no Sarvam-1 score yet, so 345 texts are unscored, up from 319.
 
 ## Text cleanups, 2026-09-24
 
@@ -646,11 +662,11 @@ The English loses its Markdown escapes outside math (`538\.` becomes `538.`, `\$
 - **Paragraph granularity.** A list is one paragraph, so a paragraph drop removes the whole list block.
 - **Translations are LLM output.** They passed automatic checks and a sample review, not a full human review. They are marked per article (`translated_paragraphs`) and listed with their sources in `translations/english-to-odia.jsonl`.
 - **English lists and tables stay.** 4,847 blocks of names, titles and data remain in Latin script, by decision. `odia-build-cpt`'s `--min-odia-ratio` filter sees them.
-- **26 reviewed articles await a fix** (2026-10-01): 18 English lists and tables of facts and 7 English passages to translate (names transliterated), and one lead that names the wrong person. The review notes name each paragraph; the text is unchanged until a translation round does them.
+- **The fixes are LLM translations** (2026-10-02). The 25 translated paragraphs passed the automatic and shape checks and were reread by their translators, not by an Odia speaker. Some local names (villages, small stations, Japanese shrine terms) have no settled Odia spelling; each entry's `notes` lists the ones its translator was unsure of.
 - **Only the review queue has been read.** The 217 reviewed articles are the queue's extremes, not a sample; there is still no blind review of random articles.
 - **Topics.** The small topics have thin evidence (science and society 5/8 in the stratified check); `odisha` misses articles without categories; Wikidata was read live on 2026-09-24, not from a dump.
 - **Translation.** Untagged machine translation cannot be detected from the dumps.
-- **319 paragraph texts are not scored** (233 articles). The wikitext-heading, superscript, subscript and section changes of 2026-09-25 made new texts, and re-scoring was deferred by the owner. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run (about 60k tokens, seconds of GPU time) fills them in.
+- **345 paragraph texts are not scored** (258 articles). The wikitext-heading, superscript, subscript and section changes of 2026-09-25 made new texts, re-scoring was deferred by the owner, and the fix round of 2026-10-02 added 26. They have `bpb: null`; everything else matches the current corpus. One `score --only-missing` pod run (about 69k tokens, seconds of GPU time) fills them in.
 - **bpb.** Per-paragraph ranks carry bf16 noise; short paragraphs (under 100 B) are only flagged through their article.
 - **Digits.** This corpus uses ASCII digits, but Sangraha, FineWeb-2, the eval sets and Odisha's textbooks use Odia digits; the same conversion in `cpt.py` and the eval prompts needs the owner's go-ahead.
 - **Held-out overlap.** `cpt.py` holds out 300 documents from the 2023 Wikipedia snapshot; newer revisions of the same articles are in this corpus. Exclude them before training on it.
@@ -660,6 +676,8 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-10-02: the fix round.** The 26 articles the owner marked *fix* are fixed: 25 English lists, tables and passages translated into Odia with the names transliterated, and one wrong name corrected, all in `curation/paragraph-fixes.jsonl`, which `build` applies by paragraph sha1. `translate.py fixes` and `merge-fixes` make and check them. 4,514,702 Odia words (+3,364); *fix* pending 0. See [Fix round](#fix-round-2026-10-02).
 
 - **2026-10-01: English-Odia pairs for training.** `build` writes `translations/english-odia-pairs.jsonl`: 726 pairs from the 876 rows of the translation table, `english` and `odia` only. See [Training pairs](#training-pairs). `check.py` checks the file.
 

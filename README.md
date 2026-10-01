@@ -54,8 +54,8 @@ configs:
 # Odia Wikipedia, cleaned for LLM training
 
 Every article on [Odia Wikipedia](https://or.wikipedia.org) in the **2026-09-01 dump**
-(`orwiki-20260901-pages-articles.xml.bz2`, the latest complete dump when built on 2026-10-01), as clean
-GitHub-flavoured Markdown, one article per record: **18,683 articles, 4,511,338
+(`orwiki-20260901-pages-articles.xml.bz2`, the latest complete dump when built on 2026-10-02), as clean
+GitHub-flavoured Markdown, one article per record: **18,683 articles, 4,514,702
 Odia words, 87 MB of UTF-8 text**.
 
 ## Download
@@ -63,7 +63,7 @@ Odia words, 87 MB of UTF-8 text**.
 Two files are ready to take and use as they are:
 
 - **[`orwiki-20260901-trainingready.jsonl.gz`](orwiki-20260901-trainingready.jsonl.gz)**: **the corpus**. 18,683 Odia Wikipedia articles as clean
-  Markdown, one JSON object per line, 4,511,338 Odia words (17 MB gzipped,
+  Markdown, one JSON object per line, 4,514,702 Odia words (17 MB gzipped,
   87 MB unpacked). This is the file to train on.
 - **[`translations/english-odia-pairs.jsonl`](translations/english-odia-pairs.jsonl)**: **English-to-Odia translation pairs**, if you want them separately, ready
   for training: 726 pairs, one per line, `{"english": …, "odia": …}`. They are English
@@ -180,7 +180,7 @@ A short example record:
    - infoboxes, navboxes, layout tables, images, galleries, captions, maps. Data tables
      (`wikitable`) are kept as Markdown tables. A cell spanning rows repeats in each row, a cell
      spanning columns fills the first one, and image-only columns are removed. Tables hold
-     168,886 Odia words (3.7%) in
+     169,433 Odia words (3.8%) in
      1,721 articles: lists of districts, constituencies, award winners
      and office holders. For prose only, drop the lines starting with `|`.
    - hatnotes, maintenance and stub banners, coordinates, pronunciation (IPA), sister-project
@@ -209,6 +209,9 @@ A short example record:
    - paragraphs judged by hand not to be content: test edits, colour legends of tables whose colours
      are gone, a leaked timeline template, pasted search-result snippets
      (189; each with its reason in `curation/junk-paragraphs.jsonl`)
+   - paragraphs a reviewer marked *fix*, replaced by their fixed text: English lists, tables and
+     passages translated into Odia with the names transliterated, and a wrong name corrected
+     (26; each with its source in `curation/paragraph-fixes.jsonl`)
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed (104), paragraphs and
      headings are replaced by their Odia translation (861,
@@ -245,17 +248,17 @@ The median article has 151 Odia words (10th percentile 58, 90th 428).
 1,006 articles have more than half of their words in template
 sentences (`templated_share` > 0.5: bot-made villages, towns and film pages),
 and 1,910 are marked as stubs.
-319 articles
-(55,417 Odia words) have `odia_ratio` under 0.6, mostly from English
+310 articles
+(54,816 Odia words) have `odia_ratio` under 0.6, mostly from English
 bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-trainer's
 `odia-build-cpt --min-odia-ratio`) skips them.
 
 | Odia words per article | Articles | Words |
 |---|---:|---:|
 | 0–49 | 1,392 | 41,522 |
-| 50–199 | 10,645 | 1,275,556 |
-| 200–999 | 6,192 | 2,224,631 |
-| 1,000–4,999 | 428 | 766,154 |
+| 50–199 | 10,637 | 1,274,479 |
+| 200–999 | 6,200 | 2,228,752 |
+| 1,000–4,999 | 428 | 766,474 |
 | 5,000+ | 26 | 203,475 |
 
 ## Annotations
@@ -286,9 +289,11 @@ decision: articles marked *drop* are left out, and dropped paragraphs are remove
 sha1 of their text (not by position), so they survive rebuilds. Paragraph 0 (the title) is never
 dropped. This
 build applied 217 reviews: 12 articles dropped,
-74 paragraphs dropped, 26 marked *fix*, and
+74 paragraphs dropped, 0 still marked *fix*, and
 0 paragraph decisions whose text is no longer in the article.
-Use `--no-reviews` to build without them.
+26 paragraphs of articles marked *fix* have been fixed
+(`curation/paragraph-fixes.jsonl`, made by `translate.py fixes` and `merge-fixes`).
+Use `--no-reviews` to build without the decisions.
 
 ## Using it
 

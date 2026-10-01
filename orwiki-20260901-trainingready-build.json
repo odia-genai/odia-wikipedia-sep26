@@ -1,13 +1,13 @@
 {
  "dump": "orwiki-20260901-pages-articles.xml.bz2",
  "dump_sha1": "4ace67b6c5412a78565e463066f9450bfff6df6b",
- "built": "2026-10-01",
+ "built": "2026-10-02",
  "pages_in_dump": 21095,
  "articles": 18683,
  "excluded": 2412,
- "words": 4511338,
- "chars": 34716497,
- "utf8_bytes": 87198728,
+ "words": 4514702,
+ "chars": 34716329,
+ "utf8_bytes": 87237550,
  "bot_created": 0,
  "stub": 1910,
  "templated_share_over_half": 1006,
@@ -49,10 +49,10 @@
   "stray wikitable marks": 8,
   "raw wikitable blocks dropped": 1
  },
- "table_words": 168886,
+ "table_words": 169433,
  "articles_with_tables": 1721,
- "odia_ratio_below_0.6": 319,
- "odia_ratio_below_0.6_words": 55417,
+ "odia_ratio_below_0.6": 310,
+ "odia_ratio_below_0.6_words": 54816,
  "markdown_escapes": 2189,
  "articles_with_escapes": 519,
  "reviews": {
@@ -60,7 +60,7 @@
   "articles_reviewed": 217,
   "articles_dropped": 12,
   "paragraphs_dropped": 74,
-  "fix_pending": 26,
+  "fix_pending": 0,
   "paragraph_refs_not_found": 0
  },
  "translation_pairs": {
@@ -72,6 +72,12 @@
    "failed an automatic check": 25,
    "template residue in the English": 1
   }
+ },
+ "paragraph_fixes": {
+  "file": "curation/paragraph-fixes.jsonl",
+  "entries": 26,
+  "paragraphs_fixed": 26,
+  "entries_not_found": 0
  },
  "curated": {
   "file": "curation/junk-paragraphs.jsonl",

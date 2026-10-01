@@ -15,22 +15,22 @@ Built by `annotate.py translation` on 2026-10-01 from the `orwiki-20260901` dump
 
 | Flag | Articles | Share | Odia words | Share of words |
 |---|---:|---:|---:|---:|
-| `ct_created` | 3,523 | 18.9% | 665,566 | 14.8% |
-| `ct_any` | 3,548 | 19.0% | 683,058 | 15.1% |
+| `ct_created` | 3,523 | 18.9% | 667,720 | 14.8% |
+| `ct_any` | 3,548 | 19.0% | 685,212 | 15.2% |
 | `mdwiki_created` | 298 | 1.6% | 52,907 | 1.2% |
 | `mdwiki_any` | 309 | 1.7% | 54,237 | 1.2% |
-| **`translated`** | 3,840 | 20.6% | 730,792 | 16.2% |
+| **`translated`** | 3,840 | 20.6% | 732,946 | 16.2% |
 
-All 18,683 articles hold 4,511,338 Odia words.
+All 18,683 articles hold 4,514,702 Odia words.
 
 By year of the translation (`translated_at`), for `translated` articles:
 
 | Year | Articles | Odia words | CX | MDWiki | Median words |
 |---|---:|---:|---:|---:|---:|
 | 2015 | 23 | 3,399 | 23 | 0 | 119 |
-| 2016 | 854 | 136,670 | 854 | 0 | 134 |
-| 2017 | 263 | 51,094 | 263 | 0 | 143 |
-| 2018 | 61 | 23,567 | 61 | 0 | 259 |
+| 2016 | 854 | 138,583 | 854 | 0 | 136 |
+| 2017 | 263 | 51,233 | 263 | 0 | 143 |
+| 2018 | 61 | 23,669 | 61 | 0 | 259 |
 | 2019 | 95 | 28,618 | 95 | 0 | 181 |
 | 2020 | 108 | 44,478 | 108 | 0 | 312 |
 | 2021 | 304 | 71,855 | 304 | 0 | 182 |
@@ -48,14 +48,14 @@ Source wikis of `translated` articles: `en` 3,500, `mdwiki` 300, `simple` 21, `h
 
 | Group | Articles | Mean `odia_ratio` | Median `odia_ratio` | Articles < 0.6 | English-dominant paragraphs | of prose paragraphs | Articles with any | Median words |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| CX-created (`ct_created`) | 3,523 | 0.910 | 0.946 | 3.3% | 467 of 25,477 (1.8%) | 0.1% | 6.3% | 137 |
+| CX-created (`ct_created`) | 3,523 | 0.912 | 0.946 | 3.1% | 454 of 25,477 (1.8%) | 0.1% | 6.2% | 137 |
 | MDWiki-created (`mdwiki_created`) | 298 | 0.953 | 0.956 | 0.0% | 0 of 1,363 (0.0%) | 0.0% | 0.0% | 180 |
-| `translated` (all machine-assisted) | 3,840 | 0.914 | 0.947 | 3.0% | 469 of 27,178 (1.7%) | 0.1% | 5.8% | 140 |
-| not `translated` | 14,843 | 0.906 | 0.938 | 1.4% | 568 of 134,548 (0.4%) | 0.1% | 2.2% | 156 |
-| not `translated`, created 2015 or later | 10,964 | 0.904 | 0.936 | 1.4% | 438 of 98,273 (0.4%) | 0.1% | 2.3% | 162 |
-| not `translated`, human-created, 2015 or later | 10,075 | 0.912 | 0.940 | 0.9% | 433 of 91,472 (0.5%) | 0.1% | 2.5% | 174 |
+| `translated` (all machine-assisted) | 3,840 | 0.915 | 0.947 | 2.9% | 456 of 27,178 (1.7%) | 0.1% | 5.7% | 140 |
+| not `translated` | 14,843 | 0.907 | 0.938 | 1.3% | 560 of 134,548 (0.4%) | 0.1% | 2.1% | 156 |
+| not `translated`, created 2015 or later | 10,964 | 0.904 | 0.936 | 1.4% | 430 of 98,273 (0.4%) | 0.1% | 2.3% | 162 |
+| not `translated`, human-created, 2015 or later | 10,075 | 0.912 | 0.941 | 0.9% | 425 of 91,472 (0.5%) | 0.1% | 2.4% | 174 |
 
-`translated` articles hold 469 of the corpus's 1,037 English-dominant paragraphs (45.2%), against 16.8% of all paragraphs. Blocks are the contract's paragraphs, so tables and lists count: 946 of the 1,037 are table, list or heading blocks (untranslated names in lists of rivers, lakes, records). All English-dominant paragraphs together contain 3,012 Odia words.
+`translated` articles hold 456 of the corpus's 1,016 English-dominant paragraphs (44.9%), against 16.8% of all paragraphs. Blocks are the contract's paragraphs, so tables and lists count: 925 of the 1,016 are table, list or heading blocks (untranslated names in lists of rivers, lakes, records). All English-dominant paragraphs together contain 2,960 Odia words.
 
 Post-editing of `translated` articles (non-bot revisions after the first):
 

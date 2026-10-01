@@ -1,8 +1,8 @@
 {
   "name": "bpb",
   "description": "Sarvam-1 bits per byte of every article, and a review queue of likely data problems (garbled or wrong-script text, untranslated English, boilerplate, odd tables, conversion leftovers) from paragraph and article bpb extremes.",
-  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 68c6a19f1bf4",
-  "created": "2026-10-01T16:01:04Z",
+  "source": "sarvamai/sarvam-1@e9607337286d, 3 scoring runs on RunPod GPUs (records: 'runs' in bpb.json), scores kept per text in raw/bpb/scores.jsonl.gz; score_bpb.py; corpus orwiki-20260901-trainingready.jsonl sha1 f64237b34f17",
+  "created": "2026-10-01T18:34:23Z",
   "columns": {
     "id": "page id (join key)",
     "text_sha1": "sha1 of the article text (UTF-8) that was scored; differs from the current text = stale",
@@ -25,13 +25,13 @@
   "depends_on_text": true,
   "unscored": {
     "note": "paragraphs of the current corpus whose text has no score in the store: bpb null, not in the review queue; pod_command runs `score --only-missing` on a GPU pod (steps in the docstring of score_bpb.py), add_command merges its output",
-    "paragraphs": 319,
-    "texts": 319,
-    "articles": 233,
-    "bytes": 366751,
+    "paragraphs": 345,
+    "texts": 345,
+    "articles": 258,
+    "bytes": 439253,
     "latin_texts": 17,
-    "tokens_estimate": 57961,
-    "gpu_seconds_estimate_a6000": 3.6,
+    "tokens_estimate": 68782,
+    "gpu_seconds_estimate_a6000": 4.3,
     "pod_command": "cd /root && setsid nohup python score_bpb.py score --corpus orwiki-20260901-trainingready.jsonl --work /root/bpb --only-missing scores.jsonl.gz < /dev/null > score.log 2>&1 &",
     "add_command": "uv run --script score_bpb.py build --add raw/bpb/<date>"
   },
