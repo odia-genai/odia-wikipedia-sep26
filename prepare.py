@@ -784,6 +784,40 @@ if TRANSLATIONS_FILE.exists():
             _t = json.loads(_line)
             TRANSLATIONS[_t["sha1"]] = _t
 
+# The translation table as plain English-Odia pairs for training (written by build).
+PAIRS_FILE = ROOT / "translations" / "english-odia-pairs.jsonl"
+MD_UNESCAPE = re.compile(r"\\([!-/:-@\[-`{-~])")
+MATH_SPAN = re.compile(r"((?<!\\)\$\$[^$]+\$\$|(?<!\\)\$[^$\n]+?(?<!\\)\$)")
+
+
+def training_pairs():
+    """The translation table as English-Odia pairs fit for training: (pairs, Counter of what was left
+    out and why). A pair is kept when it is a translation (not junk, not English kept as it is),
+    passed every automatic check, has no Odia letter on the English side (a block that mixed the two
+    languages), no template residue, and differs from its English. The English loses its Markdown
+    escapes (outside math); the Odia gets ASCII digits, as in the corpus. Each pair once, in the
+    table's order."""
+    pairs, seen, left = [], set(), collections.Counter()
+    for t in TRANSLATIONS.values():
+        en = "".join(q if i % 2 else MD_UNESCAPE.sub(r"\1", q) for i, q in enumerate(MATH_SPAN.split(t["source"])))
+        en, od = en.strip(), (t.get("odia") or "").translate(ODIA_DIGITS).strip()
+        if t.get("drop") or t.get("keep_as_is"):
+            left["junk, or names and titles kept in English"] += 1
+        elif not t.get("checks") or not all(t["checks"].values()):
+            left["failed an automatic check"] += 1
+        elif ODIA_LETTER.search(en):
+            left["the English side has Odia in it"] += 1
+        elif not od or en == od:
+            left["the same on both sides"] += 1
+        elif "|" in en or "{{" in en:
+            left["template residue in the English"] += 1
+        elif (en, od) in seen:
+            left["duplicate"] += 1
+        else:
+            seen.add((en, od))
+            pairs.append({"english": en, "odia": od})
+    return pairs, left
+
 
 def escape_translation(text, kind):
     """A translation is plain text: normalise it like the rest and escape it for Markdown,
@@ -1389,6 +1423,9 @@ def build(args):
     atomic_write(jl, lambda tmp: write_jsonl(tmp, records))
     # The gzipped copy is what git tracks and what to download (the corpus itself is over 50 MB).
     atomic_write(gz_path(jl), lambda tmp: gzip_copy(jl, tmp))
+    pairs, pairs_left = training_pairs()
+    if TRANSLATIONS:
+        atomic_write(PAIRS_FILE, lambda tmp: write_jsonl(tmp, pairs))
     atomic_write(ROOT / "excluded.jsonl", lambda tmp: write_jsonl(tmp, excluded))
     atomic_write(ROOT / "removed-blocks.jsonl", lambda tmp: write_jsonl(tmp, removed_blocks))
     if args.markdown:
@@ -1416,6 +1453,8 @@ def build(args):
         "articles_with_escapes": sum(bool(MD_ESCAPE.search(r["text"])) for r in records),
         "reviews": {"file": shown_path(args.reviews) if reviews else None, "articles_reviewed": len(reviews),
                     **review_counts},
+        "translation_pairs": {"file": str(PAIRS_FILE.relative_to(ROOT)), "pairs": len(pairs),
+                              "left_out": dict(pairs_left.most_common())},
         "curated": {"file": str(CURATED.relative_to(ROOT)), "entries": sum(map(len, curated.values())),
                     "paragraphs_dropped": curated_counts["paragraphs_dropped"],
                     "entries_not_found": len(curated_stale)},
@@ -1509,7 +1548,8 @@ def dataset_card(stats, stem, pretty):
     size = next((f"{a}<n<{b}" for a, b, lo, hi in [("1K", "10K", 1e3, 1e4), ("10K", "100K", 1e4, 1e5),
                                                    ("100K", "1M", 1e5, 1e6)] if lo <= n < hi),
                 "n<1K" if n < 1e3 else "1M<n<10M")
-    tables = [("corpus", f"{stem}.jsonl.gz"), ("translations", "translations/english-to-odia.jsonl"),
+    tables = [("corpus", f"{stem}.jsonl.gz"), ("translation_pairs", "translations/english-odia-pairs.jsonl"),
+              ("translation_table", "translations/english-to-odia.jsonl"),
               ("excluded", "excluded.jsonl"), ("removed_blocks", "removed-blocks.jsonl"),
               ("topics", "annotations/topics.jsonl"), ("translation_flags", "annotations/translation.jsonl"),
               ("bpb", "annotations/bpb.jsonl"), ("bpb_paragraphs", "annotations/bpb.paragraphs.jsonl")]
@@ -1524,10 +1564,9 @@ def download_section(stats, stem):
     """The two files to take and use, at the top of README.md."""
     gz = gz_path(ROOT / f"{stem}.jsonl")
     gz_mb = gz.stat().st_size / 1e6 if gz.exists() else 0
-    pairs = [json.loads(line) for line in TRANSLATIONS_FILE.open(encoding="utf-8")] if TRANSLATIONS_FILE.exists() else []
-    real = [p for p in pairs if not p.get("drop") and not p.get("keep_as_is")]
-    kinds = collections.Counter(p["kind"] for p in real)
-    tf = TRANSLATIONS_FILE.relative_to(ROOT)
+    tp = stats["translation_pairs"]
+    pf, tf = PAIRS_FILE.relative_to(ROOT), TRANSLATIONS_FILE.relative_to(ROOT)
+    left = "; ".join(f"{reason} ({n:,})" for reason, n in tp["left_out"].items())
     return f"""## Download
 
 Two files are ready to take and use as they are:
@@ -1535,20 +1574,19 @@ Two files are ready to take and use as they are:
 - **[`{gz.name}`]({gz.name})**: **the corpus**. {stats['articles']:,} Odia Wikipedia articles as clean
   Markdown, one JSON object per line, {stats['words']:,} Odia words ({gz_mb:,.0f} MB gzipped,
   {stats['utf8_bytes'] / 1e6:,.0f} MB unpacked). This is the file to train on.
-- **[`{tf}`]({tf})**: **English-to-Odia translations**, if you want them separately.
-  {len(real):,} English paragraphs and headings from these articles ({kinds['paragraph']:,} paragraphs,
-  {kinds['heading']:,} headings), each with its Odia translation: `source` is the English, `odia` the
-  translation, plus `kind`, the article's `title`, the automatic `checks` it passed and who made it
-  (`by`). The corpus already has them in place of the English. The file's other
-  {len(pairs) - len(real):,} lines are names and titles kept in English (`keep_as_is`) or junk to drop
-  (`drop`).
+- **[`{pf}`]({pf})**: **English-to-Odia translation pairs**, if you want them separately, ready
+  for training: {tp['pairs']:,} pairs, one per line, `{{"english": …, "odia": …}}`. They are English
+  paragraphs and headings found in these articles, with their Odia translations, which the corpus has
+  in place of the English.
 
 ```python
 import gzip, json
 articles = [json.loads(line) for line in gzip.open("{gz.name}", "rt", encoding="utf-8")]
-pairs = [p for p in map(json.loads, open("{tf}", encoding="utf-8"))
-         if not p.get("drop") and not p["keep_as_is"]]
+pairs = [json.loads(line) for line in open("{pf}", encoding="utf-8")]
 ```
+
+The pairs come from the translation table, [`{tf}`]({tf}), which also keeps each translation's
+article, kind, checks and notes. Left out of the pairs: {left}.
 
 Everything else in this repository is how they were made, and what it takes to make them again.
 
@@ -1582,7 +1620,8 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | File | What it is |
 |---|---|
 | **`{stem}.jsonl.gz`** | **the training-ready corpus**, one JSON object per line (fields below), gzipped; `build` also writes it unpacked, as `{stem}.jsonl` |
-| **`translations/english-to-odia.jsonl`** | **Odia translations of English paragraphs and headings**, with source and checks |
+| **`translations/english-odia-pairs.jsonl`** | **English-Odia translation pairs for training**, `english` and `odia` only |
+| `translations/english-to-odia.jsonl` | the translation table the pairs come from: each translation with its article, kind, checks and notes |
 | `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `{stem}-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |

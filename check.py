@@ -23,6 +23,8 @@
    digits (the text uses ASCII digits), the unassigned danda U+0B64/65, ଯ + nukta (written ୟ),
    control characters.
 5. The gzipped copy. <corpus>.jsonl.gz, the file git tracks, unpacks to exactly the corpus.
+6. The translation pairs. translations/english-odia-pairs.jsonl has `english` and `odia` on every
+   line, neither empty, no Odia letter in the English, no Odia digit, each pair once.
 """
 
 import argparse
@@ -205,6 +207,15 @@ def main():
     same = gz.exists() and gzip.decompress(gz.read_bytes()) == corpus.read_bytes()
     print(f"gzipped copy: {gz.name} " + ("unpacks to the corpus" if same else "MISSING OR DIFFERENT"))
     failed |= not same
+
+    pairs_file = ROOT / "translations" / "english-odia-pairs.jsonl"
+    pairs = [json.loads(line) for line in open(pairs_file, encoding="utf-8")] if pairs_file.exists() else []
+    pbad = [p for p in pairs if set(p) != {"english", "odia"} or not p["english"].strip() or not p["odia"].strip()
+            or re.search("[\u0B00-\u0B65\u0B70-\u0B7F]", p["english"]) or re.search("[୦-୯]", p["odia"])]
+    dup = len(pairs) - len({(p["english"], p["odia"]) for p in pairs})
+    ok = pairs and not pbad and not dup
+    print(f"translation pairs: {len(pairs):,} " + ("well formed" if ok else f"PROBLEMS: {len(pbad)} bad, {dup} duplicates"))
+    failed |= not ok
     sys.exit(1 if failed else 0)
 
 

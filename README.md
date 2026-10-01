@@ -17,7 +17,11 @@ configs:
   data_files:
   - split: train
     path: orwiki-20260901-trainingready.jsonl.gz
-- config_name: translations
+- config_name: translation_pairs
+  data_files:
+  - split: train
+    path: translations/english-odia-pairs.jsonl
+- config_name: translation_table
   data_files:
   - split: train
     path: translations/english-to-odia.jsonl
@@ -61,20 +65,19 @@ Two files are ready to take and use as they are:
 - **[`orwiki-20260901-trainingready.jsonl.gz`](orwiki-20260901-trainingready.jsonl.gz)**: **the corpus**. 18,683 Odia Wikipedia articles as clean
   Markdown, one JSON object per line, 4,511,338 Odia words (17 MB gzipped,
   87 MB unpacked). This is the file to train on.
-- **[`translations/english-to-odia.jsonl`](translations/english-to-odia.jsonl)**: **English-to-Odia translations**, if you want them separately.
-  791 English paragraphs and headings from these articles (441 paragraphs,
-  350 headings), each with its Odia translation: `source` is the English, `odia` the
-  translation, plus `kind`, the article's `title`, the automatic `checks` it passed and who made it
-  (`by`). The corpus already has them in place of the English. The file's other
-  85 lines are names and titles kept in English (`keep_as_is`) or junk to drop
-  (`drop`).
+- **[`translations/english-odia-pairs.jsonl`](translations/english-odia-pairs.jsonl)**: **English-to-Odia translation pairs**, if you want them separately, ready
+  for training: 726 pairs, one per line, `{"english": …, "odia": …}`. They are English
+  paragraphs and headings found in these articles, with their Odia translations, which the corpus has
+  in place of the English.
 
 ```python
 import gzip, json
 articles = [json.loads(line) for line in gzip.open("orwiki-20260901-trainingready.jsonl.gz", "rt", encoding="utf-8")]
-pairs = [p for p in map(json.loads, open("translations/english-to-odia.jsonl", encoding="utf-8"))
-         if not p.get("drop") and not p["keep_as_is"]]
+pairs = [json.loads(line) for line in open("translations/english-odia-pairs.jsonl", encoding="utf-8")]
 ```
+
+The pairs come from the translation table, [`translations/english-to-odia.jsonl`](translations/english-to-odia.jsonl), which also keeps each translation's
+article, kind, checks and notes. Left out of the pairs: junk, or names and titles kept in English (85); the English side has Odia in it (39); failed an automatic check (25); template residue in the English (1).
 
 Everything else in this repository is how they were made, and what it takes to make them again.
 
@@ -83,7 +86,8 @@ Everything else in this repository is how they were made, and what it takes to m
 | File | What it is |
 |---|---|
 | **`orwiki-20260901-trainingready.jsonl.gz`** | **the training-ready corpus**, one JSON object per line (fields below), gzipped; `build` also writes it unpacked, as `orwiki-20260901-trainingready.jsonl` |
-| **`translations/english-to-odia.jsonl`** | **Odia translations of English paragraphs and headings**, with source and checks |
+| **`translations/english-odia-pairs.jsonl`** | **English-Odia translation pairs for training**, `english` and `odia` only |
+| `translations/english-to-odia.jsonl` | the translation table the pairs come from: each translation with its article, kind, checks and notes |
 | `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `orwiki-20260901-trainingready-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |

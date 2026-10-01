@@ -63,6 +63,16 @@
   "fix_pending": 26,
   "paragraph_refs_not_found": 0
  },
+ "translation_pairs": {
+  "file": "translations/english-odia-pairs.jsonl",
+  "pairs": 726,
+  "left_out": {
+   "junk, or names and titles kept in English": 85,
+   "the English side has Odia in it": 39,
+   "failed an automatic check": 25,
+   "template residue in the English": 1
+  }
+ },
  "curated": {
   "file": "curation/junk-paragraphs.jsonl",
   "entries": 183,

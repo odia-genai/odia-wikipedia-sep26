@@ -66,6 +66,14 @@ browsing and reviewing datasets. Entry format: **what happened** — **lesson** 
 
 ## Data (Odia)
 
+- **The translation table's "English" is not always English** (2026-10-01, the owner asked for the
+  translations as clean pairs for training). 48 of the 791 translations had Odia in their source,
+  because blocks that mixed the languages were sent for translation by their share of Latin
+  letters (`ଅଚଳନ(Immobilisation)` became `ଅଚଳନ`). And 25 failed a check, mostly loose headings and
+  species names copied over. — A table built to fix articles isn't a training set as it stands:
+  filter it for the task. — done: `build` writes `translations/english-odia-pairs.jsonl`, 726
+  pairs, with every reason for leaving a row out counted in the build statistics.
+
 - **The first review of the queue: 142 of 217 articles were fine, and the English lists are where
   the work is** (2026-10-01, the owner's review of the whole review-first queue).
   - **What happened.** 179 kept, 12 dropped, 26 *fix*; 74 paragraphs dropped from 6 articles.

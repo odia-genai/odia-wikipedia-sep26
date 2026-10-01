@@ -33,6 +33,7 @@ The outputs are all JSON lines, JSON or Markdown, readable with any editor or `j
 
 - `orwiki-20260901-trainingready.jsonl`: the training-ready corpus, one record per article. Each line starts with the metadata and counts, `words` (Odia words) and `chars` (characters), so articles can be picked by length, e.g. `jq -c 'select(.chars >= 500 and .chars < 600)'` (879 articles); `text` is last. Build statistics: `orwiki-20260901-trainingready-build.json`.
 - `orwiki-20260901-trainingready.jsonl.gz`: the same corpus gzipped (17 MB against 96 MB), byte for byte the same every build. It is what git tracks and what to download.
+- `translations/english-odia-pairs.jsonl`: the English-Odia translation pairs, for training (see [Training pairs](#training-pairs)).
 - `excluded.jsonl`: every page left out, with `id`, `revid`, `title`, `reason` and `detail`
 - `removed-blocks.jsonl`: blocks cut out of kept articles (citations, junk, English prose awaiting translation)
 - `annotations/*.jsonl`, with a `.json` description each
@@ -624,6 +625,21 @@ For list items, "(1997). Title" also counts, as do publisher words (Press, Publi
 - **Scores.** Corpus bpb 0.5500 → 0.5544, as Latin-script lists and tables returned. Prose 0.5221; translated paragraphs 0.519; restored lists and tables 0.96.
 - **Afterwards.** Removing the 9 missed reference lines needed no GPU: removals leave no new text to score, and `score_bpb.py build` carries every other score over.
 
+### Training pairs
+
+**Rule.** `build` turns the translation table into `translations/english-odia-pairs.jsonl`, one `{"english": …, "odia": …}` per line, for training a model on English-to-Odia translation (`training_pairs()`). A row becomes a pair when:
+- it is a translation, not junk (`drop`) and not names or titles kept in English (`keep_as_is`);
+- it passed every automatic check (digits, script, Odia share, length, spelling);
+- its English side has no Odia letter;
+- its English has no template residue (`|`, `{{`);
+- the two sides differ.
+
+The English loses its Markdown escapes outside math (`538\.` becomes `538.`, `\$80` becomes `$80`), and the Odia gets ASCII digits, as in the corpus. Each pair appears once, in the table's order.
+
+**Why.** The table's "English" is the block as the build found it, and some blocks mixed the two languages: `ଅଚଳନ(Immobilisation)` was translated by dropping the gloss, not by translating English. Pairs like that teach a model to delete text. The rows that failed a check are mostly loose headings ("Awards" as ପୁରସ୍କାର ଓ ସମ୍ମାନ, "awards and honours") and species names copied over unchanged.
+
+**Effect.** 726 pairs from the 876 rows. Left out: 85 junk or kept in English, 39 with Odia in the English, 25 that failed a check, 1 with template residue, each counted under the first rule it breaks (48 translations have Odia in the English; 9 of them also failed a check).
+
 ## Known limitations and open issues
 
 - **Boilerplate.** Year pages, empty date pages and empty film-year lists are out (2,143 pages). What stays is fact-bearing stubs with repeated frames: 1,007 articles have `templated_share` ≥ 0.5, and about 1.8% of the corpus's Odia words are in template sentences. The training mix does not yet use `templated_share` (a down-weight or a repeat cap is still to do). Frames are matched on whole paragraphs, so a template sentence inside a longer paragraph is not counted.
@@ -644,6 +660,8 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-10-01: English-Odia pairs for training.** `build` writes `translations/english-odia-pairs.jsonl`: 726 pairs from the 876 rows of the translation table, `english` and `odia` only. See [Training pairs](#training-pairs). `check.py` checks the file.
 
 - **2026-10-01: a repository of its own.**
   - Moved out of odia-llm-trainer with its inputs, scores, translations, curation and review decisions. `odia_text.py` is a copy of that project's `odia_llm.text`, and review decisions are read from `reviews/reviews.jsonl`.
