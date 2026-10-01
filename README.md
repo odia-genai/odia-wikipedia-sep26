@@ -95,6 +95,7 @@ Everything else in this repository is how they were made, and what it takes to m
 | `curation/junk-paragraphs.jsonl` | paragraphs judged by hand not to be content, with the reason; `build` drops them |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
+| `LICENSE` | CC BY-SA 4.0, for the data and the code |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
 All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file here is
@@ -316,10 +317,11 @@ paragraphs and the review decisions. `METHODOLOGY.md` and `LEARNINGS.md` keep th
 
 ## License
 
-The text is by Odia Wikipedia contributors, licensed
-[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Anything derived from it must
-keep that license and credit Wikipedia. Each record's `revid` names its exact source revision,
-whose history lists the authors.
+Everything in this repository, the data and the code, is licensed
+[CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) (the full text is in `LICENSE`).
+The text is by Odia Wikipedia contributors: anything derived from it must keep that license and
+credit Wikipedia. Each record's `revid` names its exact source revision, whose history lists the
+authors.
 
 ## Rebuild
 

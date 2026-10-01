@@ -650,6 +650,7 @@ Newest first.
   - `build` also writes the corpus gzipped, `orwiki-20260901-trainingready.jsonl.gz` (17 MB against 96 MB). Git tracks that copy, and `check.py` checks that it unpacks to the corpus. Every tracked file is under 50 MB, and none goes through Git LFS.
   - A rebuild from the same inputs on the same day leaves every tracked file as it was: `annotate.py` keeps a description's `created` time when nothing changed, as `score_bpb.py` already did.
   - `README.md` opens with the two files to download, the corpus and the English-to-Odia translations, under a Hugging Face dataset card header (licence, language, one viewer config per table).
+  - Everything in the repository, the data and the code, is licensed CC BY-SA 4.0, the licence of Wikipedia's text (the owner's decision); the full text is in `LICENSE`.
 
 - **2026-10-01: the first human review.**
   - The owner decided all 217 articles of the review-first queue (the 200, plus 17 the re-ranking brought in): 179 kept, 12 dropped, 26 marked *fix*; 74 paragraphs dropped from 6 kept articles. See [First review](#first-review-2026-10-01).
