@@ -1212,6 +1212,40 @@ def load_curated(path=CURATED):
     return out
 
 
+# Paragraph fixes (curation/paragraph-fixes.jsonl): paragraphs a reviewer marked *fix*, replaced by
+# their fixed text, mostly English lists, tables and passages translated into Odia with the names
+# transliterated. One line per paragraph: page id, the sha1 of the paragraph as the build produces
+# it, the new text and the kind (translation or correction). Matched by content, like the curated
+# junk; an entry whose paragraph is no longer in its article is reported, not applied.
+# `translate.py fixes` and `merge-fixes` make them.
+FIXES = ROOT / "curation" / "paragraph-fixes.jsonl"
+
+
+def load_fixes(path=FIXES):
+    out = collections.defaultdict(dict)
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                e = json.loads(line)
+                out[e["id"]][e["sha1"]] = e
+    return out
+
+
+def apply_fixes(text, fixes, counts):
+    """(text with each paragraph that has a fix replaced by its fixed text, translations applied)."""
+    if not fixes:
+        return text, 0
+    paras, done, translated = text.split("\n\n"), set(), 0
+    for i, q in enumerate(paras):
+        if (f := fixes.get(para_sha1(q))) is not None:
+            paras[i] = f["text"]
+            done.add(f["sha1"])
+            translated += f["kind"] == "translation"
+    counts["paragraphs_fixed"] += len(done)
+    counts["entries_not_found"] += len(set(fixes) - done)
+    return "\n\n".join(paras), translated
+
+
 def block_kind(q):
     if HEADING_LINE.match(q):
         return "heading"
@@ -1318,6 +1352,7 @@ def build(args):
     english_totals = collections.Counter()
     reviews = {} if args.no_reviews else load_reviews(args.reviews, DATASET)
     curated, curated_counts, curated_stale = load_curated(), collections.Counter(), []
+    fixes, fix_counts = load_fixes(), collections.Counter(paragraphs_fixed=0, entries_not_found=0)
     review_counts = collections.Counter(articles_dropped=0, paragraphs_dropped=0, fix_pending=0,
                                         paragraph_refs_not_found=0)
 
@@ -1375,6 +1410,7 @@ def build(args):
                 continue
             review_counts["fix_pending"] += review.get("verdict") == "fix"
             text = apply_review(text, review, review_counts)
+        text, fixed_translations = apply_fixes(text, fixes.get(a["id"]), fix_counts)
         if args.min_chars and len(text) < args.min_chars:
             exclude(a, f"under {args.min_chars} characters")
             continue
@@ -1392,7 +1428,7 @@ def build(args):
             "chars": len(text),
             "odia_ratio": round(odia_ratio(text), 4),
             "tables": len(re.findall(r"(?m)^\|(?:---\|)+$", text)),
-            "translated_paragraphs": info["translated"],  # paragraphs/headings machine-translated from English
+            "translated_paragraphs": info["translated"] + fixed_translations,  # paragraphs/headings machine-translated from English
             "bot_created": a["bot_created"],
             "stub": a["stub"],
         })
@@ -1455,6 +1491,8 @@ def build(args):
                     **review_counts},
         "translation_pairs": {"file": str(PAIRS_FILE.relative_to(ROOT)), "pairs": len(pairs),
                               "left_out": dict(pairs_left.most_common())},
+        "paragraph_fixes": {"file": str(FIXES.relative_to(ROOT)), "entries": sum(map(len, fixes.values())),
+                            **fix_counts},
         "curated": {"file": str(CURATED.relative_to(ROOT)), "entries": sum(map(len, curated.values())),
                     "paragraphs_dropped": curated_counts["paragraphs_dropped"],
                     "entries_not_found": len(curated_stale)},
@@ -1467,6 +1505,9 @@ def build(args):
     if curated_stale:
         print(f"{len(curated_stale)} curated entries match no paragraph any more (text changed?): "
               f"{curated_stale[:8]}", file=sys.stderr)
+    if fix_counts["entries_not_found"]:
+        print(f"{fix_counts['entries_not_found']} paragraph fixes match no paragraph any more (text changed?)",
+              file=sys.stderr)
     print(f"{len(records):,} articles, {stats['words']:,} Odia words -> {jl.name}; "
           f"{len(excluded):,} excluded ({dict(dropped)}) -> excluded.jsonl", file=sys.stderr)
 
@@ -1535,9 +1576,11 @@ decision: articles marked *drop* are left out, and dropped paragraphs are remove
 sha1 of their text (not by position), so they survive rebuilds. Paragraph 0 (the title) is never
 dropped. This
 build applied {rv['articles_reviewed']:,} reviews: {rv['articles_dropped']:,} articles dropped,
-{rv['paragraphs_dropped']:,} paragraphs dropped, {rv['fix_pending']:,} marked *fix*, and
+{rv['paragraphs_dropped']:,} paragraphs dropped, {rv['fix_pending']:,} still marked *fix*, and
 {rv['paragraph_refs_not_found']:,} paragraph decisions whose text is no longer in the article.
-Use `--no-reviews` to build without them.
+{stats['paragraph_fixes']['paragraphs_fixed']:,} paragraphs of articles marked *fix* have been fixed
+(`curation/paragraph-fixes.jsonl`, made by `translate.py fixes` and `merge-fixes`).
+Use `--no-reviews` to build without the decisions.
 """
 
 
@@ -1729,6 +1772,9 @@ A short example record:
    - paragraphs judged by hand not to be content: test edits, colour legends of tables whose colours
      are gone, a leaked timeline template, pasted search-result snippets
      ({stats['curated']['paragraphs_dropped']:,}; each with its reason in `curation/junk-paragraphs.jsonl`)
+   - paragraphs a reviewer marked *fix*, replaced by their fixed text: English lists, tables and
+     passages translated into Odia with the names transliterated, and a wrong name corrected
+     ({stats['paragraph_fixes']['paragraphs_fixed']:,}; each with its source in `curation/paragraph-fixes.jsonl`)
    - **English inside articles** (blocks with more than twice as many Latin as Odia letters):
      citations are removed ({stats['english']['removed_blocks'].get('citation', 0):,}), paragraphs and
      headings are replaced by their Odia translation ({stats['english'].get('translated', 0):,},

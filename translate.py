@@ -15,6 +15,16 @@ kept aside in removed-blocks.jsonl with reason "awaiting translation". A round:
   uv run translate.py mark --drop <sha1-prefix>… --reason "…"   # junk, not content
   uv run prepare.py build        # the translations go into the articles
 
+Paragraphs a reviewer marked *fix* (English lists, tables or passages to translate) go the same way,
+into curation/paragraph-fixes.jsonl, keyed by the sha1 of the paragraph as the corpus has it:
+
+  uv run translate.py fixes     # paragraphs named by *fix* reviews -> translations/work/fix-in-*.jsonl
+  (translators write translations/work/fix-out-*.jsonl: {"sha1", "text", "notes"})
+  uv run translate.py merge-fixes --by "<who, when>"   # check, then add to the fixes
+
+`merge-fixes` also checks the shape: the same lines, list markers and indentation, table cells and
+table rules as the source, and no blank line inside.
+
 `merge` refuses a batch with a missing or extra sha1. It records per-item checks and prints every
 item that fails one:
   - digits: every digit sequence of the source appears in the translation (ASCII digits)
@@ -37,6 +47,9 @@ ROOT = Path(__file__).resolve().parent
 TABLE = ROOT / "translations" / "english-to-odia.jsonl"
 WORK = ROOT / "translations" / "work"
 REMOVED = ROOT / "removed-blocks.jsonl"
+FIXES = ROOT / "curation" / "paragraph-fixes.jsonl"
+REVIEWS = ROOT / "reviews" / "reviews.jsonl"
+DATASET = "odia-wikipedia"
 
 ODIA = re.compile(r"[\u0B00-\u0B65\u0B70-\u0B7F]")
 LATIN = re.compile(r"[A-Za-z]")
@@ -72,6 +85,88 @@ def checks(source, odia):
         "length": 0.5 <= ratio <= 2.5,
         "spelling": "\u0b2f\u0b3c" not in odia,
     }
+
+
+CELL = re.compile(r"(?<!\\)\|")
+TABLE_RULE = re.compile(r"\|(?:\s*:?-+:?\s*\|)+")
+LINE_PREFIX = re.compile(r"\s*(?:- |\d+\. )?")
+
+
+def shape(source, text):
+    """True when text has the Markdown shape of source: the same lines, each with the same
+    indentation and list marker, the same number of table cells, the same table rules, and no
+    blank line inside (a paragraph stays one paragraph)."""
+    s, t = source.split("\n"), text.split("\n")
+    if "\n\n" in text.strip() or len(s) != len(t):
+        return False
+    for a, b in zip(s, t):
+        if a.startswith("|") or b.startswith("|"):
+            if len(CELL.findall(a)) != len(CELL.findall(b)) or (TABLE_RULE.fullmatch(a.strip()) and a != b):
+                return False
+        elif LINE_PREFIX.match(a).group() != LINE_PREFIX.match(b).group():
+            return False
+    return True
+
+
+def fixes(args):
+    """Work items for the paragraphs that reviewers marked *fix*: the paragraph named in the review's
+    note ("para N"), as the corpus has it now. Paragraphs already fixed are skipped."""
+    latest = {}
+    for e in read_jsonl(REVIEWS):
+        if e.get("dataset") == DATASET:
+            latest[int(e["id"])] = e
+    todo = {i: e for i, e in latest.items() if e.get("verdict") == "fix"}
+    done = {f["sha1"] for f in read_jsonl(FIXES)} if FIXES.exists() else set()
+    corpus = max(ROOT.glob("*-trainingready.jsonl"), key=lambda p: p.stat().st_mtime)
+    items, skipped = [], []
+    for line in open(corpus, encoding="utf-8"):
+        r = json.loads(line)
+        if (e := todo.get(r["id"])) is None:
+            continue
+        m = re.search(r"para (\d+)", e.get("note") or "")
+        paras = r["text"].split("\n\n")
+        if not m or int(m.group(1)) >= len(paras):
+            skipped.append((r["id"], r["title"], "no paragraph named in the note"))
+            continue
+        q = paras[int(m.group(1))]
+        h = hashlib.sha1(q.encode()).hexdigest()
+        if h in done:
+            continue
+        kind = "table" if q.startswith("|") else "list" if LINE_PREFIX.match(q).group().strip() else "paragraph"
+        items.append({"sha1": h, "id": r["id"], "title": r["title"], "para": int(m.group(1)), "kind": kind,
+                      "note": e["note"], "source": q})
+    WORK.mkdir(parents=True, exist_ok=True)
+    size = args.size
+    for i in range(0, len(items), size):
+        write_jsonl(WORK / f"fix-in-{i // size + 1:02d}.jsonl", items[i:i + size])
+    print(f"{len(items)} paragraphs to fix -> {-(-len(items) // size)} batches in {WORK}")
+    for s in skipped:
+        print("   skipped (fix it by hand):", s)
+
+
+def merge_fixes(args):
+    table = {f["sha1"]: f for f in read_jsonl(FIXES)} if FIXES.exists() else {}
+    added, failed = 0, []
+    for out in sorted(WORK.glob("fix-out-*.jsonl")):
+        src = WORK / out.name.replace("fix-out-", "fix-in-")
+        inputs, outputs = read_jsonl(src), read_jsonl(out)
+        if [r["sha1"] for r in inputs] != [r["sha1"] for r in outputs]:
+            sys.exit(f"{out.name}: sha1s don't match {src.name} (missing, extra or reordered items)")
+        for i, o in zip(inputs, outputs, strict=True):
+            text = (o.get("text") or "").strip("\n")
+            row = {"sha1": i["sha1"], "id": i["id"], "title": i["title"], "para": i["para"], "kind": "translation",
+                   "source": i["source"], "text": text, "checks": {**checks(i["source"], text), "shape": shape(i["source"], text)},
+                   "notes": o.get("notes") or "", "review_note": i["note"], "by": args.by}
+            bad = [k for k, v in row["checks"].items() if not v]
+            if bad:
+                failed.append((out.name, i["sha1"][:10], i["title"], bad))
+            added += i["sha1"] not in table
+            table[i["sha1"]] = row
+    FIXES.parent.mkdir(parents=True, exist_ok=True)
+    write_jsonl(FIXES, sorted(table.values(), key=lambda r: (r["id"], r["para"])))
+    print(f"{FIXES.relative_to(ROOT)}: {len(table)} fixes ({added} new); items failing a check: {len(failed)}")
+    for f in failed:
+        print("  ", f)
 
 
 def batches(args):
@@ -142,8 +237,12 @@ def main():
     b.add_argument("--size", type=int, default=70)
     m = sub.add_parser("merge")
     m.add_argument("--by", default=f"LLM translation, {datetime.date.today().isoformat()}")
+    f = sub.add_parser("fixes", help="work items for the paragraphs reviewers marked fix")
+    f.add_argument("--size", type=int, default=6)
+    mf = sub.add_parser("merge-fixes", help="check fixed paragraphs, then add them to curation/paragraph-fixes.jsonl")
+    mf.add_argument("--by", default=f"LLM translation, {datetime.date.today().isoformat()}")
     args = ap.parse_args()
-    {"batches": batches, "merge": merge, "mark": mark}[args.cmd](args)
+    {"batches": batches, "merge": merge, "mark": mark, "fixes": fixes, "merge-fixes": merge_fixes}[args.cmd](args)
 
 
 if __name__ == "__main__":
