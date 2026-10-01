@@ -1,0 +1,7 @@
+# local environment and caches (state/ is human work and is NOT ignored)
+.venv/
+.cache/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.pytest-tmp/

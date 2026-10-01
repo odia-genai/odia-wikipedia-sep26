@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>edaapp</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect x='1' y='9' width='3' height='6' rx='1' fill='%232a78d6'/%3E%3Crect x='6' y='5' width='3' height='10' rx='1' fill='%232a78d6'/%3E%3Crect x='11' y='1' width='3' height='14' rx='1' fill='%232a78d6'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="stylesheet" href="/static/vendor/katex/katex.min.css">
+  <script src="/static/vendor/katex/katex.min.js" defer></script>
+  <script type="module" src="/static/js/main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/">edaapp</a>
+    <span id="ds-picker"></span>
+    <nav id="nav" class="nav"></nav>
+    <span class="spacer"></span>
+    <span id="status" class="status" aria-live="polite"></span>
+    <button id="help-btn" class="ghost" title="Keyboard shortcuts (?)">?</button>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main id="main"><p class="muted pad">Loading…</p></main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+  <dialog id="dialog"></dialog>
+</body>
+</html>
