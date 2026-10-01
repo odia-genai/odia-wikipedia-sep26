@@ -1274,9 +1274,20 @@ def write_annotation(name, rows, sidecar):
     ids = [r["id"] for r in rows]
     if ids != list(load_corpus()) or any(list(r) != cols for r in rows):
         raise SystemExit(f"{name}: rows are not one per corpus article with the columns {cols}")
-    write_jsonl_atomic(ANN / f"{name}.jsonl", (output_row(r) for r in rows))
-    write_atomic(ANN / f"{name}.json", json.dumps(sidecar | {"created": now()}, indent=1, ensure_ascii=False)
-                 + "\n")
+    data, side = ANN / f"{name}.jsonl", ANN / f"{name}.json"
+    before = data.read_bytes() if data.exists() else None
+    write_jsonl_atomic(data, (output_row(r) for r in rows))
+    # "created" is when the content last changed, as in score_bpb.py: rebuilt from the same inputs,
+    # both files are byte-identical, so git sees no change.
+    created = now()
+    try:
+        old = json.loads(side.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        old = None
+    if isinstance(old, dict) and before == data.read_bytes() and \
+            {**old, "created": None} == json.loads(json.dumps({**sidecar, "created": None})):
+        created = old.get("created") or created
+    write_atomic(side, json.dumps(sidecar | {"created": created}, indent=1, ensure_ascii=False) + "\n")
     print(f"annotations/{name}.jsonl: {len(rows):,} articles; annotations/{name}.json", file=sys.stderr)
 
 

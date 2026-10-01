@@ -1,4 +1,6 @@
-# the corpus: `prepare.py build` makes it from what is tracked
+# Every file here is tracked in git, and every one is under 50 MB: the corpus as its gzipped copy.
+# Larger files are left out; `uv run pipeline.py` rebuilds them from what is tracked, and its summary
+# lists any file over 50 MB.
 /orwiki-*.jsonl
 # optional per-article Markdown export (`build --markdown`): a second copy of the corpus
 /markdown/
@@ -11,5 +13,7 @@
 *.bad
 __pycache__/
 .cache/
+.venv/
+.DS_Store
 # translation work batches: scratch between `translate.py batches` and `merge`
 translations/work/

@@ -69,11 +69,12 @@ def summary():
     corpus = build.with_name(build.name.replace("-build.json", ".jsonl"))
     print(f"\n{corpus.name}: {stats['articles']:,} articles, {stats['words']:,} Odia words, "
           f"{stats['utf8_bytes'] / 1e6:.0f} MB; {stats['excluded']:,} pages in excluded.jsonl")
-    for path in [corpus, ROOT / "excluded.jsonl", ROOT / "removed-blocks.jsonl", build,
+    for path in [corpus, corpus.with_name(corpus.name + ".gz"), ROOT / "excluded.jsonl", ROOT / "removed-blocks.jsonl", build,
                  *sorted((ROOT / "annotations").glob("*.jsonl"))]:
         if path.exists():
             print(f"  {path.relative_to(ROOT)}  {path.stat().st_size / 1e6:.1f} MB")
-    big = [q for q in ROOT.rglob("*") if q.is_file() and q.stat().st_size >= GIT_LIMIT]
+    big = [q for q in ROOT.rglob("*")
+           if q.is_file() and q.stat().st_size >= GIT_LIMIT and ".git" not in q.relative_to(ROOT).parts]
     print(f"files over {GIT_LIMIT / 1e6:.0f} MB (kept out of git; .gitignore must list them): "
           + (", ".join(f"{q.relative_to(ROOT)} ({q.stat().st_size / 1e6:.0f} MB)" for q in big) or "none"))
 

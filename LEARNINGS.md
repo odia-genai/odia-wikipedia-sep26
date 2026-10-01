@@ -1,8 +1,11 @@
 # Learnings: Odia Wikipedia corpus
 
-Learnings from building `data/odia-wikipedia/` (see `README.md` and `prepare.py`). This file is
-separate from the repo's `LEARNINGS.md` so parallel sessions don't race on one file. Merge it
-in when convenient. Same entry format: **what happened** — **lesson** — **action**, tagged
+Learnings from building this dataset (see `README.md` and `prepare.py`). It was built inside
+odia-llm-trainer, a project on Odia language models, as its `data/odia-wikipedia/` folder, with this
+file kept apart from that project's own `LEARNINGS.md` so parallel sessions didn't race on one
+file. Names from that project stay as they were: `src/`, `cpt.py` and `odia-build-cpt` (its
+training-data builder), the eval harness, experiments (E01, E03, …) and edaapp, its web app for
+browsing and reviewing datasets. Entry format: **what happened** — **lesson** — **action**, tagged
 `done:` / `idea:` / `todo:`, newest first within each section.
 
 ---

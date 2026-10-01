@@ -22,10 +22,12 @@
    and image options, URLs, category links, Content Translation markup, HTML entities, Odia
    digits (the text uses ASCII digits), the unassigned danda U+0B64/65, ଯ + nukta (written ୟ),
    control characters.
+5. The gzipped copy. <corpus>.jsonl.gz, the file git tracks, unpacks to exactly the corpus.
 """
 
 import argparse
 import collections
+import gzip
 import json
 import random
 import re
@@ -198,6 +200,11 @@ def main():
             failed = True
             print(f"  {name}: {len(hits[name])} in {len({t for t, _ in hits[name]})} articles, "
                   f"e.g. {hits[name][0][0]}: …{hits[name][0][1]}…")
+
+    gz = corpus.with_name(corpus.name + ".gz")
+    same = gz.exists() and gzip.decompress(gz.read_bytes()) == corpus.read_bytes()
+    print(f"gzipped copy: {gz.name} " + ("unpacks to the corpus" if same else "MISSING OR DIFFERENT"))
+    failed |= not same
     sys.exit(1 if failed else 0)
 
 

@@ -2,6 +2,8 @@
 
 This page records every step and rule that turns Odia Wikipedia into the training corpus in this folder. Each rule says what it does, why it exists (the evidence that led to it) and what it changed (counts), and names the code and the report behind it. When a step is added or changed, this page is updated in the same change (see [How to keep this page current](#how-to-keep-this-page-current)).
 
+**Where it was built.** This dataset was built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as its `data/odia-wikipedia/` folder, and then moved to a repository of its own with everything needed to rebuild it. Names from that project stay as they were on this page: `src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness, its experiments (E01, E03, …), and edaapp, its web app for browsing and reviewing datasets, which recorded the review decisions.
+
 ## Summary
 
 The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered by Wikipedia itself, converted to GitHub-flavoured Markdown, cleaned, checked and annotated.
@@ -30,6 +32,7 @@ The corpus is every article of the **2026-09-01 Odia Wikipedia dump**, rendered 
 The outputs are all JSON lines, JSON or Markdown, readable with any editor or `jq` (the owner's rule since 2026-09-25: no Parquet):
 
 - `orwiki-20260901-trainingready.jsonl`: the training-ready corpus, one record per article. Each line starts with the metadata and counts, `words` (Odia words) and `chars` (characters), so articles can be picked by length, e.g. `jq -c 'select(.chars >= 500 and .chars < 600)'` (879 articles); `text` is last. Build statistics: `orwiki-20260901-trainingready-build.json`.
+- `orwiki-20260901-trainingready.jsonl.gz`: the same corpus gzipped (17 MB against 96 MB), byte for byte the same every build. It is what git tracks and what to download.
 - `excluded.jsonl`: every page left out, with `id`, `revid`, `title`, `reason` and `detail`
 - `removed-blocks.jsonl`: blocks cut out of kept articles (citations, junk, English prose awaiting translation)
 - `annotations/*.jsonl`, with a `.json` description each
@@ -641,6 +644,12 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-10-01: a repository of its own.**
+  - Moved out of odia-llm-trainer with its inputs, scores, translations, curation and review decisions. `odia_text.py` is a copy of that project's `odia_llm.text`, and review decisions are read from `reviews/reviews.jsonl`.
+  - `build` also writes the corpus gzipped, `orwiki-20260901-trainingready.jsonl.gz` (17 MB against 96 MB). Git tracks that copy, and `check.py` checks that it unpacks to the corpus. Every tracked file is under 50 MB, and none goes through Git LFS.
+  - A rebuild from the same inputs on the same day leaves every tracked file as it was: `annotate.py` keeps a description's `created` time when nothing changed, as `score_bpb.py` already did.
+  - `README.md` opens with the two files to download, the corpus and the English-to-Odia translations, under a Hugging Face dataset card header (licence, language, one viewer config per table).
 
 - **2026-10-01: the first human review.**
   - The owner decided all 217 articles of the review-first queue (the 200, plus 17 the re-ranking brought in): 179 kept, 12 dropped, 26 marked *fix*; 74 paragraphs dropped from 6 kept articles. See [First review](#first-review-2026-10-01).

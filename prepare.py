@@ -1387,6 +1387,8 @@ def build(args):
     # Readers (edaapp, agents) never see a half-written file, and a failed write (a full disk)
     # leaves no partial file behind.
     atomic_write(jl, lambda tmp: write_jsonl(tmp, records))
+    # The gzipped copy is what git tracks and what to download (the corpus itself is over 50 MB).
+    atomic_write(gz_path(jl), lambda tmp: gzip_copy(jl, tmp))
     atomic_write(ROOT / "excluded.jsonl", lambda tmp: write_jsonl(tmp, excluded))
     atomic_write(ROOT / "removed-blocks.jsonl", lambda tmp: write_jsonl(tmp, removed_blocks))
     if args.markdown:
@@ -1434,6 +1436,19 @@ def write_jsonl(path, rows):
     with open(path, "w", encoding="utf-8") as f:
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def gz_path(path):
+    return path.with_name(path.name + ".gz")
+
+
+def gzip_copy(src, dst):
+    """src gzipped into dst with no name or time in the header, so the same corpus always gives the
+    same bytes (and git sees no change when nothing changed)."""
+    with open(src, "rb") as f, open(dst, "wb") as raw, \
+            gzip.GzipFile(filename="", mode="wb", fileobj=raw, compresslevel=9, mtime=0) as gz:
+        while chunk := f.read(1 << 20):
+            gz.write(chunk)
 
 
 def annotations_section(stats):
@@ -1487,6 +1502,59 @@ Use `--no-reviews` to build without them.
 """
 
 
+def dataset_card(stats, stem, pretty):
+    """The YAML header Hugging Face reads from README.md: licence, language, size and one viewer
+    config per table (the corpus first)."""
+    n = stats["articles"]
+    size = next((f"{a}<n<{b}" for a, b, lo, hi in [("1K", "10K", 1e3, 1e4), ("10K", "100K", 1e4, 1e5),
+                                                   ("100K", "1M", 1e5, 1e6)] if lo <= n < hi),
+                "n<1K" if n < 1e3 else "1M<n<10M")
+    tables = [("corpus", f"{stem}.jsonl.gz"), ("translations", "translations/english-to-odia.jsonl"),
+              ("excluded", "excluded.jsonl"), ("removed_blocks", "removed-blocks.jsonl"),
+              ("topics", "annotations/topics.jsonl"), ("translation_flags", "annotations/translation.jsonl"),
+              ("bpb", "annotations/bpb.jsonl"), ("bpb_paragraphs", "annotations/bpb.paragraphs.jsonl")]
+    configs = "".join(f"- config_name: {name}\n" + ("  default: true\n" if i == 0 else "")
+                      + f"  data_files:\n  - split: train\n    path: {path}\n" for i, (name, path) in enumerate(tables))
+    return (f"---\npretty_name: Odia Wikipedia, cleaned for LLM training ({pretty} dump)\nlanguage:\n- or\n"
+            f"license: cc-by-sa-4.0\ntask_categories:\n- text-generation\n- translation\ntags:\n- wikipedia\n- odia\n"
+            f"size_categories:\n- {size}\nconfigs:\n{configs}---\n\n")
+
+
+def download_section(stats, stem):
+    """The two files to take and use, at the top of README.md."""
+    gz = gz_path(ROOT / f"{stem}.jsonl")
+    gz_mb = gz.stat().st_size / 1e6 if gz.exists() else 0
+    pairs = [json.loads(line) for line in TRANSLATIONS_FILE.open(encoding="utf-8")] if TRANSLATIONS_FILE.exists() else []
+    real = [p for p in pairs if not p.get("drop") and not p.get("keep_as_is")]
+    kinds = collections.Counter(p["kind"] for p in real)
+    tf = TRANSLATIONS_FILE.relative_to(ROOT)
+    return f"""## Download
+
+Two files are ready to take and use as they are:
+
+- **[`{gz.name}`]({gz.name})**: **the corpus**. {stats['articles']:,} Odia Wikipedia articles as clean
+  Markdown, one JSON object per line, {stats['words']:,} Odia words ({gz_mb:,.0f} MB gzipped,
+  {stats['utf8_bytes'] / 1e6:,.0f} MB unpacked). This is the file to train on.
+- **[`{tf}`]({tf})**: **English-to-Odia translations**, if you want them separately.
+  {len(real):,} English paragraphs and headings from these articles ({kinds['paragraph']:,} paragraphs,
+  {kinds['heading']:,} headings), each with its Odia translation: `source` is the English, `odia` the
+  translation, plus `kind`, the article's `title`, the automatic `checks` it passed and who made it
+  (`by`). The corpus already has them in place of the English. The file's other
+  {len(pairs) - len(real):,} lines are names and titles kept in English (`keep_as_is`) or junk to drop
+  (`drop`).
+
+```python
+import gzip, json
+articles = [json.loads(line) for line in gzip.open("{gz.name}", "rt", encoding="utf-8")]
+pairs = [p for p in map(json.loads, open("{tf}", encoding="utf-8"))
+         if not p.get("drop") and not p["keep_as_is"]]
+```
+
+Everything else in this repository is how they were made, and what it takes to make them again.
+
+"""
+
+
 def write_readme(stats, records, stem):
     date = stats["dump"].split("-")[1]
     pretty = f"{date[:4]}-{date[4:6]}-{date[6:]}"
@@ -1509,9 +1577,12 @@ Every article on [Odia Wikipedia](https://or.wikipedia.org) in the **{pretty} du
 GitHub-flavoured Markdown, one article per record: **{stats['articles']:,} articles, {stats['words']:,}
 Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 
+{download_section(stats, stem)}## What is here
+
 | File | What it is |
 |---|---|
-| **`{stem}.jsonl`** | **the training-ready corpus**, one JSON object per line (fields below) |
+| **`{stem}.jsonl.gz`** | **the training-ready corpus**, one JSON object per line (fields below), gzipped; `build` also writes it unpacked, as `{stem}.jsonl` |
+| **`translations/english-to-odia.jsonl`** | **Odia translations of English paragraphs and headings**, with source and checks |
 | `excluded.jsonl` | every page of the dump that is not in the corpus: `id`, `revid`, `title`, `reason`, `detail` |
 | `removed-blocks.jsonl` | blocks taken out of articles: citations, junk, prose awaiting translation |
 | `{stem}-build.json` | build statistics (counts per exclusion reason; the pages are in `excluded.jsonl`) |
@@ -1520,14 +1591,15 @@ Odia words, {stats['utf8_bytes'] / 1e6:,.0f} MB of UTF-8 text**.
 | `prepare.py`, `check.py`, `translate.py`, `annotate.py`, `score_bpb.py` | the steps |
 | `METHODOLOGY.md` | every step and rule applied to the data, with the evidence and counts |
 | `LEARNINGS.md` | what building this corpus taught us, and ideas for next steps |
-| `translations/english-to-odia.jsonl` | Odia translations of English paragraphs and headings, with source and checks |
 | `curation/junk-paragraphs.jsonl` | paragraphs judged by hand not to be content, with the reason; `build` drops them |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
-All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file under
-50 MB here is tracked in git; the corpus JSONL (larger) is rebuilt from them by `pipeline.py`.
+All outputs are JSON, JSON lines or Markdown, to read with any editor or `jq`. Every file here is
+tracked in git, all under 50 MB and none through Git LFS: the corpus as `{stem}.jsonl.gz`, while the
+unpacked `{stem}.jsonl` is left out and rebuilt by `pipeline.py` from the inputs in `raw/`,
+`translations/`, `curation/` and `reviews/`.
 
 ## Record format
 
@@ -1572,7 +1644,7 @@ A short example record:
 1. **Download.** `{stats['dump']}` from dumps.wikimedia.org, with its SHA-1
    (`{stats['dump_sha1']}`) checked against the dump's `dumpstatus.json`. The build needs only
    each article's id, title, revision id, timestamp and bot/stub flags, so the dump is reduced to
-   that index (`raw/{stem}-articles.jsonl`, with its provenance in `raw/{stem}-dump.json`) and
+   that index (`{index_path(date).relative_to(ROOT)}`, with its provenance in `{provenance_path(date).relative_to(ROOT)}`) and
    deleted; `download` fetches it again.
 2. **Render.** Every main-namespace page that is not a redirect ({stats['pages_in_dump']:,} pages)
    was fetched as Wikipedia's own rendering (Parsoid HTML) **of the exact revision in the
@@ -1659,14 +1731,14 @@ bibliographies and numeric tables; a threshold of 0.6 (the default of odia-llm-t
 ## Using it
 
 ```python
-import json
-docs = [r["text"] for r in map(json.loads, open("{stem}.jsonl", encoding="utf-8"))
+import gzip, json
+docs = [r["text"] for r in map(json.loads, gzip.open("{stem}.jsonl.gz", "rt", encoding="utf-8"))
         if r["templated_share"] < 0.8]  # e.g. down-weight or skip formulaic stubs
 ```
 
 ```bash
 jq -r 'select(.reason == "year page") | .title' excluded.jsonl | head   # why a page is missing
-jq -c 'select(.chars >= 500 and .chars < 600) | {{id, title, words, chars}}' {stem}.jsonl | head
+gzip -dc {stem}.jsonl.gz | jq -c 'select(.chars >= 500 and .chars < 600) | {{id, title, words, chars}}' | head
 ```
 
 - In odia-llm-trainer, `odia-build-cpt --local {stem}.jsonl --local-upsample 1` adds all of it
@@ -1675,6 +1747,15 @@ jq -c 'select(.chars >= 500 and .chars < 600) | {{id, title, words, chars}}' {st
   (`wikimedia/wikipedia`, `20231101.or`).
 - The text is already normalised with `normalize_odia`, so a pipeline that applies it again
   (and line dedup) barely touches it.
+
+## Origin
+
+Built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as
+its `data/odia-wikipedia/` folder, then moved here with everything needed to rebuild it: the
+rendered HTML, the annotation inputs, every Sarvam-1 score, the translations, the curated junk
+paragraphs and the review decisions. `METHODOLOGY.md` and `LEARNINGS.md` keep that project's names:
+`src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness, experiments
+(E01, E03, …) and edaapp, its web app for browsing and reviewing datasets.
 
 ## License
 
@@ -1705,7 +1786,7 @@ parallel requests it ran at about 3 pages/s (21,095 pages in about 2 hours), bac
 occasional 429 as `Retry-After` asks. Rendered chunks are cached in `raw/html/<date>/`, so a rerun fetches only what is
 missing. The script writes only inside this directory. uv keeps its environment in its own cache.
 """
-    (ROOT / "README.md").write_text(readme, encoding="utf-8")
+    (ROOT / "README.md").write_text(dataset_card(stats, stem, pretty) + readme, encoding="utf-8")
 
 
 def main():
