@@ -2,7 +2,7 @@
 
 This page records every step and rule that turns Odia Wikipedia into the training corpus in this folder. Each rule says what it does, why it exists (the evidence that led to it) and what it changed (counts), and names the code and the report behind it. When a step is added or changed, this page is updated in the same change (see [How to keep this page current](#how-to-keep-this-page-current)).
 
-**Where it was built.** This dataset was built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as its `data/odia-wikipedia/` folder, and then moved to a repository of its own with everything needed to rebuild it. Names from that project stay as they were on this page: `src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness, its experiments (E01, E03, …), and edaapp, its web app for browsing and reviewing datasets, which recorded the review decisions.
+**Where it was built.** This dataset was built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as its `data/odia-wikipedia/` folder, and then moved to a repository of its own with everything needed to rebuild it. Names from that project stay as they were on this page: `src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness and its experiments (E01, E03, …). edaapp, its web app for browsing and reviewing datasets, which recorded the review decisions, moved here too (`edaapp/`).
 
 ## Summary
 
@@ -458,7 +458,7 @@ Its first items:
 
 ## Human review loop
 
-edaapp, the web app of odia-llm-trainer for browsing and reviewing datasets, shows this corpus with its annotations and records decisions as append-only JSON events, one per line, with the page id, a verdict (`keep`, `drop`, `fix` or none), a note, dropped paragraphs (index and sha1 of their text) and the sha1 of the text reviewed. They are kept here in `reviews/reviews.jsonl`; events appended by hand in the same format work too.
+edaapp, the web app in `edaapp/` (`cd edaapp && uv run edaapp`), shows this corpus with its annotations and records decisions as append-only JSON events, one per line, with the page id, a verdict (`keep`, `drop`, `fix` or none), a note, dropped paragraphs (index and sha1 of their text) and the sha1 of the text reviewed. It writes them to `reviews/reviews.jsonl`, the file `build` reads; events appended by hand in the same format work too. It was built in odia-llm-trainer and moved here on 2026-10-02.
 
 `prepare.py build` reads that file (`load_reviews()`, `apply_review()`):
 
@@ -676,6 +676,8 @@ Details and the history of each issue are in `LEARNINGS.md`.
 ## Changelog
 
 Newest first.
+
+- **2026-10-02: edaapp moved here.** The review web app now lives in `edaapp/`. It serves this repository as the dataset `odia-wikipedia` by default (the published Hugging Face copy with `--hub`), and writes decisions straight to `reviews/reviews.jsonl`. So there is one review log, and reviewing is: decide, `uv run pipeline.py`, commit and push, then upload the dataset to Hugging Face without `edaapp/`.
 
 - **2026-10-02: the fix round.** The 26 articles the owner marked *fix* are fixed: 25 English lists, tables and passages translated into Odia with the names transliterated, and one wrong name corrected, all in `curation/paragraph-fixes.jsonl`, which `build` applies by paragraph sha1. `translate.py fixes` and `merge-fixes` make and check them. 4,514,702 Odia words (+3,364); *fix* pending 0. See [Fix round](#fix-round-2026-10-02).
 

@@ -4,8 +4,8 @@ Learnings from building this dataset (see `README.md` and `prepare.py`). It was 
 odia-llm-trainer, a project on Odia language models, as its `data/odia-wikipedia/` folder, with this
 file kept apart from that project's own `LEARNINGS.md` so parallel sessions didn't race on one
 file. Names from that project stay as they were: `src/`, `cpt.py` and `odia-build-cpt` (its
-training-data builder), the eval harness, experiments (E01, E03, …) and edaapp, its web app for
-browsing and reviewing datasets. Entry format: **what happened** — **lesson** — **action**, tagged
+training-data builder), the eval harness and experiments (E01, E03, …). edaapp, its web app for
+browsing and reviewing datasets, moved here on 2026-10-02 (`edaapp/`). Entry format: **what happened** — **lesson** — **action**, tagged
 `done:` / `idea:` / `todo:`, newest first within each section.
 
 ---

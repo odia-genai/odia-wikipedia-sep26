@@ -99,6 +99,8 @@ Everything else in this repository is how they were made, and what it takes to m
 | `curation/junk-paragraphs.jsonl` | paragraphs judged by hand not to be content, with the reason; `build` drops them |
 | `reviews/reviews.jsonl` | review decisions (keep, drop, fix, paragraphs to drop); `build` applies them |
 | `odia_text.py` | the Odia text rules the steps share: normalisation, Odia words, digits |
+| `edaapp/` | the review web app: browse the dataset, read the methodology, record review decisions |
+| `publish_hub.py` | uploads the dataset to Hugging Face: the files git tracks, without `edaapp/` |
 | `LICENSE` | CC BY-SA 4.0, for the data and the code |
 | `raw/` | rebuild inputs: article index, dump provenance, rendered HTML, annotation inputs, model scores |
 
@@ -282,8 +284,8 @@ Reports: [`quality/bpb.md`](quality/bpb.md), [`quality/review-first.md`](quality
 Review decisions are kept in `reviews/reviews.jsonl`, one append-only JSON event per line: `ts`,
 `dataset` (`odia-wikipedia`), `id`, `title`, `verdict` (`keep`, `drop`, `fix` or null), `note`,
 `drop_paragraphs` (a list of `{"para": i, "sha1": …}`) and `text_sha1` (the text reviewed). They were
-recorded with edaapp, the review web app of the project this dataset was built in; appending
-events by hand works as well.
+recorded with edaapp, the review web app in `edaapp/` (`cd edaapp && uv run edaapp`), which writes
+them to this file; appending events by hand works as well.
 `build` applies the **latest event per article**, so every event carries the article's complete
 decision: articles marked *drop* are left out, and dropped paragraphs are removed, matched by the
 sha1 of their text (not by position), so they survive rebuilds. Paragraph 0 (the title) is never
@@ -320,9 +322,9 @@ gzip -dc orwiki-20260901-trainingready.jsonl.gz | jq -c 'select(.chars >= 500 an
 Built from 2026-09-24 to 2026-10-01 inside odia-llm-trainer, a project on Odia language models, as
 its `data/odia-wikipedia/` folder, then moved here with everything needed to rebuild it: the
 rendered HTML, the annotation inputs, every Sarvam-1 score, the translations, the curated junk
-paragraphs and the review decisions. `METHODOLOGY.md` and `LEARNINGS.md` keep that project's names:
-`src/`, `cpt.py` and `odia-build-cpt` (its training-data builder), the eval harness, experiments
-(E01, E03, …) and edaapp, its web app for browsing and reviewing datasets.
+paragraphs and the review decisions. edaapp, the web app that recorded those decisions, followed on
+2026-10-02. `METHODOLOGY.md` and `LEARNINGS.md` keep that project's other names: `src/`, `cpt.py`
+and `odia-build-cpt` (its training-data builder), the eval harness and experiments (E01, E03, …).
 
 ## License
 
@@ -353,3 +355,10 @@ anonymous bulk clients to about one request a minute per connection. With contac
 parallel requests it ran at about 3 pages/s (21,095 pages in about 2 hours), backing off on the
 occasional 429 as `Retry-After` asks. Rendered chunks are cached in `raw/html/<date>/`, so a rerun fetches only what is
 missing. The script writes only inside this directory. uv keeps its environment in its own cache.
+
+## Publishing
+
+GitHub (https://github.com/odia-genai/odia-wikipedia-sep26) holds this repository with its history. The Hugging Face dataset is the same files
+without `edaapp/`, one commit per publish: commit and push first, then `uv run publish_hub.py`
+(`--dry-run` lists what would change). It deletes on the Hub what git no longer tracks and checks every
+file afterwards.
